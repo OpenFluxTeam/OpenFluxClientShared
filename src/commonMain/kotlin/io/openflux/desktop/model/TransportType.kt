@@ -39,6 +39,10 @@ enum class TransportType(
     CUPSONLINE("cupsonline", "Cups.online", "Cups", ValueKind.DocumentUrl,
         "Код комнат от ноды", "ic_code"),
 
+    @SerialName("telemost")
+    TELEMOST("telemost", "Яндекс Телемост", "Телемост", ValueKind.DocumentUrl,
+        "https://telemost.yandex.ru/j/…", "ic_yandex"),
+
     @SerialName("oneme")
     ONEME("oneme", "MAX (OneMe)", "MAX", ValueKind.Token,
         "Токен MAX Web", "ic_max"),

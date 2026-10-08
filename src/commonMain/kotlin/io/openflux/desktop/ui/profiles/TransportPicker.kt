@@ -51,6 +51,7 @@ private fun TransportType.blurb(): String = when (this) {
     TransportType.BOARDS -> "Доска Яндекса"
     TransportType.MAILRU -> "Публичный файл Облака Mail.ru"
     TransportType.CUPSONLINE -> "Комнаты cups.online, код выдаёт нода"
+    TransportType.TELEMOST -> "Конференция Яндекс Телемоста, несколько потоков (экспериментально)"
     TransportType.ONEME -> "Звонок в MAX, нужен токен MAX Web"
     TransportType.DIRECT -> "Прямое TCP-соединение с нодой"
     TransportType.SCRIPT -> "JS-транспорт"
