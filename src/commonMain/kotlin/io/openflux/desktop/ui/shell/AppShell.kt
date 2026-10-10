@@ -30,6 +30,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -102,14 +103,27 @@ class ShellController {
 
 val LocalShell = staticCompositionLocalOf { ShellController() }
 
-val AppTabs: List<Tab> = listOf(HomeTab, ProfilesTab, AccountsTab, LogsTab, SettingsTab)
+/**
+ * The sections of the app: Accounts only in developer mode; «Транспорты» (JS
+ * transports) only while the experimental features are on.
+ */
+fun appTabs(experimental: Boolean, developerMode: Boolean = false): List<Tab> = buildList {
+    add(HomeTab)
+    add(ProfilesTab)
+    if (developerMode) add(io.openflux.desktop.ui.accounts.AccountsTab)
+    if (experimental) add(io.openflux.desktop.ui.scripts.ScriptsTab)
+    add(LogsTab)
+    add(SettingsTab)
+}
 
-/** The tabs on show: Accounts only in developer mode. */
-fun visibleTabs(developerMode: Boolean): List<Tab> = if (developerMode) AppTabs else AppTabs - AccountsTab
+/** The tabs on show for these settings. */
+fun visibleTabs(developerMode: Boolean, experimental: Boolean = false): List<Tab> = appTabs(experimental, developerMode)
 
 @Composable
 fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shortcuts, browsers: BrowserViews = NoBrowserViews) {
     val settings by container.settings.settings.collectAsState()
+    // Once a day: look for updates of the installed script transports (only with the experimental features on).
+    LaunchedEffect(settings.experimental) { if (settings.experimental) runCatching { container.scriptUpdater.autoCheck() } }
     val dark = when (settings.theme) {
         ThemeMode.System -> isSystemInDarkTheme()
         ThemeMode.Light -> false
@@ -140,8 +154,14 @@ private fun AppShell(shell: ShellController, toaster: Toaster) {
     val touch = LocalTouchUi.current
     val settings by container.settings.settings.collectAsState()
     val incomingLink by container.incomingLink.collectAsState()
+    val tabs = appTabs(settings.experimental, settings.developerMode)
+    val currentTabs by rememberUpdatedState(tabs)
     TabNavigator(HomeTab) { navigator ->
         shell.tabNavigator = navigator
+        // Turned off while that section is open: it is gone, go home.
+        LaunchedEffect(settings.experimental) {
+            if (!settings.experimental && navigator.current.key == io.openflux.desktop.ui.scripts.ScriptsTab.key) navigator.current = HomeTab
+        }
         // The Profiles screen imports the link.
         LaunchedEffect(incomingLink) { if (incomingLink != null) navigator.current = ProfilesTab }
         // Back from another section returns home; screens handle their own
@@ -159,10 +179,7 @@ private fun AppShell(shell: ShellController, toaster: Toaster) {
                     else -> -1
                 }
                 when {
-                    index >= 0 -> {
-                        visibleTabs(settings.developerMode).getOrNull(index)?.let { navigator.current = it }
-                        true
-                    }
+                    index >= 0 -> { currentTabs.getOrNull(index)?.let { navigator.current = it }; true }
                     event.key == Key.Enter -> {
                         val state = container.connection.state.value
                         if (state.isActive) container.connection.disconnect() else HomeTab.connectSelected(container)
@@ -190,7 +207,7 @@ private fun AppShell(shell: ShellController, toaster: Toaster) {
                     Box(Modifier.fillMaxSize()) { navigator.saveableState("tab", tab) { tab.Content() } }
                 }
             }
-            val tabs = visibleTabs(settings.developerMode)
+            val tabs = visibleTabs(settings.developerMode, settings.experimental)
             // Developer mode turned off while on Accounts: back to Settings.
             LaunchedEffect(tabs) { if (navigator.current !in tabs) navigator.current = SettingsTab }
             if (shell.widthClass == WidthClass.Phone) {
@@ -215,6 +232,7 @@ private fun AppShell(shell: ShellController, toaster: Toaster) {
             ToastHost(toaster, Modifier.align(Alignment.BottomCenter).padding(bottom = toastGap, start = AppTheme.spacing.l, end = AppTheme.spacing.l))
             CaptchaDialog()
             SignInDialog()
+            ScriptSettingsDialog()
         }
     }
 }

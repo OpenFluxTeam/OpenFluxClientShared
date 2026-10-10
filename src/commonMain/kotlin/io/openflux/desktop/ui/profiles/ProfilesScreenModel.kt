@@ -5,6 +5,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 import io.openflux.desktop.model.NodeDocuments
 import io.openflux.desktop.model.AccountKind
+import io.openflux.desktop.model.PhpMessages
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -19,6 +20,7 @@ import io.openflux.desktop.model.profile
 import io.openflux.desktop.service.AccountException
 import io.openflux.desktop.service.AppContainer
 import io.openflux.desktop.ui.node.NodeWizardModel
+import io.openflux.desktop.ui.node.PhpWizardModel
 import kotlinx.coroutines.launch
 
 /** A profile being edited; [isNew] until it is saved once. */
@@ -49,6 +51,14 @@ class ProfilesScreenModel(private val container: AppContainer) : ScreenModel {
     /** The "Своя нода" wizard while it is open. */
     var wizard by mutableStateOf<NodeWizardModel?>(null)
         private set
+    /** The "без сервера" (PHP hosting) wizard while it is open. */
+    var phpWizard by mutableStateOf<PhpWizardModel?>(null)
+        private set
+    /** What the node controls of the selected hosting profile last said, and whether one is running. */
+    var nodeMessage by mutableStateOf<String?>(null)
+        private set
+    var nodeBusy by mutableStateOf(false)
+        private set
 
     fun filter(list: List<Profile>): List<Profile> {
         val q = query.trim().lowercase()
@@ -61,6 +71,7 @@ class ProfilesScreenModel(private val container: AppContainer) : ScreenModel {
 
     fun select(profile: Profile) {
         if (editor != null && editor?.draft?.id != profile.id) editor = null
+        if (selectedId != profile.id) nodeMessage = null
         selectedId = profile.id
     }
 
@@ -199,8 +210,67 @@ class ProfilesScreenModel(private val container: AppContainer) : ScreenModel {
         if (focusId != null) selectedId = focusId
     }
 
+    fun openPhpWizard() {
+        if (phpWizard == null) phpWizard = PhpWizardModel(container, screenModelScope)
+        editor = null
+    }
+
+    fun closePhpWizard(focusId: String? = null) {
+        phpWizard?.close()
+        phpWizard = null
+        if (focusId != null) selectedId = focusId
+    }
+
+    /** Runs the node of a hosting profile (idempotent: one already running is left alone). */
+    fun startNode(profile: Profile) = nodeControl(profile, "Запускаю ноду…") { node ->
+        val state = container.phpHosting.start(node.siteUrl, node.token, profile.transport.cliName, profile.value.trim(), chain = true)
+        if (state.running) "Нода: ${PhpMessages.nodeStatus(state)}" else "Нода не ответила"
+    }
+
+    /** Asks the node how it is: running, which generation serves now, when it hands over. */
+    fun refreshNode(profile: Profile) = nodeControl(profile, "Спрашиваю ноду…", unreachable = "Состояние ноды неизвестно: хостинг не ответил") { node ->
+        "Нода: " + PhpMessages.nodeStatus(container.phpHosting.node(node.siteUrl, node.token, profile.transport.cliName, profile.value.trim()))
+    }
+
+    /** Opens the node's control panel (its page in the browser: state, generation, log, Start/Stop). */
+    fun openNodePanel(profile: Profile) = nodeControl(profile, "Открываю панель ноды…") { node ->
+        container.platform.openUrl(container.phpHosting.page(node.siteUrl, node.token, profile.transport.cliName, profile.value.trim()))
+        "" // keep what was shown before
+    }
+
+    /** Stops the node on the hosting (the whole chain); a connection through it stops working. */
+    fun stopNode(profile: Profile) = nodeControl(profile, "Останавливаю ноду…") { node ->
+        container.phpHosting.stop(node.siteUrl, node.token, profile.transport.cliName, profile.value.trim())
+        "Нода остановлена"
+    }
+
+    private fun nodeControl(
+        profile: Profile,
+        busyText: String,
+        unreachable: String? = null,
+        action: suspend (io.openflux.desktop.model.PhpNodeRef) -> String,
+    ) {
+        val node = profile.phpNode ?: return
+        if (nodeBusy) return
+        nodeBusy = true
+        val before = nodeMessage
+        nodeMessage = busyText
+        screenModelScope.launch {
+            nodeMessage = try {
+                action(node).ifEmpty { before }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                unreachable ?: e.message ?: "Не удалось связаться с хостингом"
+            } finally {
+                nodeBusy = false
+            }
+        }
+    }
+
     override fun onDispose() {
         wizard?.close()
+        phpWizard?.close()
     }
 
     // ---- import ----

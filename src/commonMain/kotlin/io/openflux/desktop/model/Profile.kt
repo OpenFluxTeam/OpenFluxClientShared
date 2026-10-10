@@ -27,6 +27,15 @@ data class ExtraTransport(
     val uid: String = "",
     val priority: Int = 50,
     val network: NetworkKind = NetworkKind.Default,
+    /** Which installed script this carrier uses, when [type] is SCRIPT. */
+    val scriptId: String = "",
+    /**
+     * What this carrier saved in the script's settings wizard, besides [value]
+     * (its own [InstalledScript.primaryParam], when the script has one). The
+     * wizard shows and saves both together - editing either the field above or
+     * the wizard changes the one value a param stands for.
+     */
+    val settings: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -45,6 +54,10 @@ data class Profile(
     val transport: TransportType = TransportType.VYANDEX,
     /** Document URL, host:port for direct, MAX Web token for oneme. */
     val value: String = "",
+    /** Which installed script the main transport uses, when [transport] is SCRIPT. */
+    val scriptId: String = "",
+    /** The main carrier's saved script settings; see [ExtraTransport.settings]. */
+    val settings: Map<String, String> = emptyMap(),
     /** MAX user id (oneme only). */
     val uid: String = "",
     val secret: String = "",
@@ -63,13 +76,26 @@ data class Profile(
      * exit that bonds (node-v1.3.0+); others route by flow as before.
      */
     val bonding: Boolean = false,
+    /**
+     * The mode without a server: the exit is a PHP node on an ordinary web host, reached over
+     * cups.online ([transport] CUPSONLINE, [value] the room's address) or a Mail.ru document
+     * (MAILRU, [value] its link). No key, no Session, TCP only. Profiles saved before this
+     * existed read as false.
+     */
+    val stream: Boolean = false,
+    /** Where this profile's node lives, to start it again; null when it was made without the wizard. */
+    val phpNode: PhpNodeRef? = null,
 ) {
     /** Every carrier of the profile, main first. */
     val carriers: List<ExtraTransport>
-        get() = listOf(ExtraTransport(transport, value, uid, priority, network)) + if (session) extras else emptyList()
+        get() = listOf(ExtraTransport(transport, value, uid, priority, scriptId = scriptId, settings = settings, network = network)) + if (session) extras else emptyList()
 
     val summary: String
-        get() = if (session) carriers.joinToString(" + ") { it.type.shortLabel } else transport.label
+        get() = when {
+            stream -> "Без сервера · ${transport.shortLabel}"
+            session -> carriers.joinToString(" + ") { it.type.shortLabel }
+            else -> transport.label
+        }
 
     /** "Mail.ru · Мобильная + Яндекс · Wi-Fi" for a bonded profile, "" otherwise. */
     val bondingSummary: String
@@ -80,6 +106,10 @@ data class Profile(
     /** Problems that keep the profile from connecting, empty when it can. */
     fun problems(): List<String> = buildList {
         if (name.isBlank()) add("Укажите название")
+        if (stream) {
+            streamProblem()?.let { add(it) }
+            return@buildList
+        }
         carriers.forEachIndexed { index, carrier ->
             val where = if (index == 0) "Основной транспорт" else "Транспорт ${index + 1}"
             carrierProblem(carrier)?.let { add("$where: $it") }
@@ -88,6 +118,19 @@ data class Profile(
         if (!session && secret.isNotEmpty() && secret.length < MIN_SECRET) add("Ключ должен быть не короче $MIN_SECRET символов")
         if (!session && transport.sessionOnly) add("${transport.label} работает только в режиме Session")
         if (bonding && (!session || carriers.size < 2)) add("Для бондинга нужен режим Session и хотя бы два транспорта")
+    }
+
+    /** What keeps a stream-mode profile from connecting, null when nothing does. */
+    private fun streamProblem(): String? {
+        val v = value.trim()
+        return when {
+            session || secret.isNotEmpty() -> "В режиме без сервера нет ключа и режима Session"
+            transport == TransportType.CUPSONLINE ->
+                if (PhpHosts.cupsRoom(v) == null) "Нужен адрес комнаты cups.online (https://interview.cups.online/live-coding/?room=…)" else null
+            transport == TransportType.MAILRU ->
+                if (NodeTransports.cleanMailru(v) == null) "Нужна публичная ссылка на документ Mail.ru (https://cloud.mail.ru/public/…)" else null
+            else -> "Режим без сервера работает через cups.online или Mail.ru"
+        }
     }
 
     /**
@@ -118,12 +161,41 @@ data class Profile(
                 uid = carrier.uid.trim(),
                 priority = carrier.priority,
                 network = carrier.network,
+                scriptId = carrier.scriptId,
+                settings = carrier.settings,
             )
         }
     }
 
+    /**
+     * What to call a carrier the core reports by its session name ("boards-2",
+     * "script", "script-2") on screen and in the notification: "Board 2" for a
+     * native one, the script's own name for a script transport (the core only
+     * knows it as "script"). [scripts] are the installed ones.
+     */
+    fun carrierLabel(coreName: String, scripts: List<InstalledScript>): String {
+        val spec = sessionSpecs().firstOrNull { it.name == coreName }
+        if (spec != null && spec.type == TransportType.SCRIPT) {
+            return scripts.firstOrNull { it.id == spec.scriptId }?.name?.ifBlank { null } ?: spec.scriptId.ifBlank { "JS" }
+        }
+        return TransportType.carrierLabel(coreName)
+    }
+
+    /** The carriers that carry data now, named for the screen: "Volga + Мой транспорт". */
+    fun carrierLabels(coreNames: List<String>, scripts: List<InstalledScript>): String =
+        coreNames.joinToString(" + ") { carrierLabel(it, scripts) }
+
     /** The link another device scans; null with why when it cannot be shared. */
     fun toShare(): Result<ShareConfig> = runCatching {
+        if (stream) {
+            streamProblem()?.let { throw IllegalArgumentException(it) }
+            // The node's token stays out: a link is for a device that only needs to connect.
+            return@runCatching ShareConfig(
+                name = name,
+                mode = ShareConfig.MODE_STREAM,
+                transports = listOf(ShareTransport(type = transport.cliName, url = value.trim())),
+            )
+        }
         require(transport.shareable) { "${transport.label} нельзя передать ссылкой: токен привязан к аккаунту" }
         val transports = carriers.filter { it.type.shareable }.map {
             ShareTransport(
@@ -154,6 +226,11 @@ data class Profile(
 
         fun carrierProblem(carrier: ExtraTransport): String? {
             val value = carrier.value.trim()
+            // A script transport validates its own params in the engine; here
+            // just make sure one was actually chosen.
+            if (carrier.type == TransportType.SCRIPT) {
+                return if (carrier.scriptId.isBlank()) "выберите скрипт-транспорт" else null
+            }
             return when (carrier.type.kind) {
                 ValueKind.DocumentUrl -> when {
                     // Cups.online with no rooms is valid: the node generates its own
@@ -177,6 +254,20 @@ data class Profile(
          * non-direct transport becomes the main one, the rest Session extras.
          */
         fun fromShare(config: ShareConfig, id: String, now: Long, source: ProfileSource): Profile {
+            if (config.isStream) {
+                val only = config.transports.singleOrNull()
+                    ?: throw IllegalArgumentException("В режиме без сервера нужен ровно один транспорт")
+                return Profile(
+                    id = id,
+                    name = config.name.ifBlank { "Без сервера" },
+                    transport = TransportType.fromCli(only.type)
+                        ?: throw IllegalArgumentException("Неизвестный транспорт ${only.type}"),
+                    value = only.url,
+                    stream = true,
+                    source = source,
+                    createdAt = now,
+                )
+            }
             val sorted = config.transports.sortedByDescending { it.priority }
             val main = sorted.firstOrNull { it.type != TransportType.DIRECT.cliName } ?: sorted.first()
             fun value(t: ShareTransport) = if (t.type == TransportType.DIRECT.cliName) t.dial else t.url
@@ -209,4 +300,7 @@ data class SessionSpec(
     val uid: String,
     val priority: Int,
     val network: NetworkKind = NetworkKind.Default,
+    val scriptId: String = "",
+    /** The carrier's own saved script settings; see [ExtraTransport.settings]. */
+    val settings: Map<String, String> = emptyMap(),
 )

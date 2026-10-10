@@ -1,5 +1,7 @@
 package io.openflux.desktop.core
 
+import io.openflux.desktop.model.SetupPages
+
 import io.openflux.desktop.data.AppDirs
 import io.openflux.desktop.data.restrictToOwner
 import io.openflux.desktop.model.AppSettings
@@ -10,6 +12,7 @@ import io.openflux.desktop.platform.WindowsCoreElevation
 import io.openflux.desktop.platform.WindowsElevation
 import io.openflux.desktop.web.BrowserLog
 import io.openflux.desktop.model.ConnectionMode
+import io.openflux.desktop.model.ExitBackend
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.CoreConfig
 import io.openflux.desktop.model.CorePaths
@@ -27,6 +30,7 @@ import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.service.Accounts
 import io.openflux.desktop.service.ConnectionService
 import io.openflux.desktop.service.SettingsRepository
+import io.openflux.desktop.web.BuiltInBrowser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -62,6 +66,7 @@ class CoreConnectionService(
     private val settings: SettingsRepository,
     private val binary: CoreBinary,
     private val accounts: Accounts,
+    private val scripts: DesktopScriptRepository,
 ) : ConnectionService {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val isWindows = System.getProperty("os.name").lowercase().contains("win")
@@ -148,6 +153,9 @@ class CoreConnectionService(
                 }
             }
         }
+        scope.launch {
+            BuiltInBrowser.submissions.collect { json -> onSetupSubmission(json) }
+        }
     }
 
     /** Your own node (from the wizard): it may get your sign-in without asking. */
@@ -203,7 +211,11 @@ class CoreConnectionService(
                     "(./gradlew соберёт ядро сам) или укажите файл ядра в настройках",
             )
             if (current.fullTunnel && current.mode == ConnectionMode.Client) checkFullTunnel(core)
+            val exitL3 = current.mode == ConnectionMode.Exit && current.exitBackend == ExitBackend.L3
+            if (exitL3) ExitL3.problem()?.let { throw IllegalStateException(it) }
             val runtime = AppDirs.runtime
+            // The core finds WinDivert in the folder it is run in: fetched when it is not beside the core.
+            val workDir = if (exitL3 && isWindows) WinDivertFiles().folderFor(core) { log(LogLevel.Info, it) } else runtime
             val tag = profile.id.take(8)
             val keyFile = if (profile.secret.isNotEmpty()) File(runtime, "key-$tag").also {
                 it.writeText(profile.secret)
@@ -225,7 +237,7 @@ class CoreConnectionService(
                 cookieStore = File(AppDirs.config, "cookies/$tag.json").also { it.parentFile.mkdirs() }.absolutePath,
                 ipcSocket = ipcSocket?.absolutePath,
             )
-            val launch = CoreConfig.build(profile, current, paths)
+            val launch = CoreConfig.build(profile, current, paths, scripts::carrier)
             if (current.useAccountSessions) {
                 CookieStoreSeeder.seed(File(paths.cookieStore), profile, accounts.sessions.value)
             }
@@ -234,10 +246,11 @@ class CoreConnectionService(
                 restrictToOwner(confFile)
                 files += confFile
             }
-            log(LogLevel.Info, "Запуск ядра: ${profile.name} (${current.mode.label})")
+            log(LogLevel.Info, "Запуск ядра: ${profile.name} (${current.mode.label}${if (current.mode == ConnectionMode.Exit) ", ${current.exitBackend.label}" else ""})")
             var command = listOf(core.absolutePath) + launch.arguments
-            val elevate = current.fullTunnel && current.mode == ConnectionMode.Client &&
-                ((MacElevation.mac && !MacElevation.root) || (isWindows && !WindowsElevation.elevated))
+            val elevate = (current.fullTunnel && current.mode == ConnectionMode.Client &&
+                ((MacElevation.mac && !MacElevation.root) || (isWindows && !WindowsElevation.elevated))) ||
+                (exitL3 && ExitL3.needsUac(System.getProperty("os.name"), WindowsElevation.elevated))
             val elevated = if (elevate) {
                 val stamp = System.currentTimeMillis()
                 fun output(suffix: String) = File(runtime, "core-$tag-$stamp$suffix").apply { writeText("") }.also {
@@ -251,9 +264,14 @@ class CoreConnectionService(
                 if (isWindows) {
                     val out = output(".out.log")
                     val err = output(".err.log")
-                    command = WindowsCoreElevation.command(command, runtime, out, err, stop, app)
-                    log(LogLevel.Info, "Windows попросит разрешение администратора: ядру нужны права для адаптера Wintun и маршрутов")
-                    Elevated(listOf(out, err), stop, WindowsCoreElevation::cancelled, "Нет разрешения администратора: без него режим «Весь трафик» не запускается")
+                    command = WindowsCoreElevation.command(command, workDir, out, err, stop, app)
+                    if (exitL3) {
+                        log(LogLevel.Info, "Windows попросит разрешение администратора: ноде L3 нужны права, чтобы перехватывать пакеты через WinDivert")
+                        Elevated(listOf(out, err), stop, WindowsCoreElevation::cancelled, "Нет разрешения администратора: без него нода L3 не запускается, выберите L4")
+                    } else {
+                        log(LogLevel.Info, "Windows попросит разрешение администратора: ядру нужны права для адаптера Wintun и маршрутов")
+                        Elevated(listOf(out, err), stop, WindowsCoreElevation::cancelled, "Нет разрешения администратора: без него режим «Весь трафик» не запускается")
+                    }
                 } else {
                     val out = output(".log")
                     command = MacElevation.command(command, out, stop, app)
@@ -262,7 +280,7 @@ class CoreConnectionService(
                 }
             } else null
             val process = ProcessBuilder(command)
-                .directory(AppDirs.runtime)
+                .directory(if (exitL3 && isWindows) workDir else AppDirs.runtime)
                 .redirectErrorStream(true)
                 .start()
             val newRun = Run(profile, current, process, files, launch.httpProxyAddress, launch.usesIpc, elevated)
@@ -562,8 +580,18 @@ class CoreConnectionService(
     private fun onCaptchaRequest(request: IpcCookiesRequest) {
         if (pendingCaptcha == request) return
         pendingCaptcha = request
-        log(LogLevel.Warning, if (request.remote) "Нода просит пройти проверку Яндекса" else "Яндекс просит пройти проверку")
-        _captcha.value = CaptchaPrompt(request.url, request.reason, request.remote)
+        log(
+            LogLevel.Warning,
+            when {
+                request.isOwn -> "Транспорт «${request.transport}» просит настройку"
+                request.remote -> "Нода просит пройти проверку Яндекса"
+                else -> "Яндекс просит пройти проверку"
+            },
+        )
+        _captcha.value = CaptchaPrompt(
+            request.url, request.reason, request.remote,
+            html = request.html.ifEmpty { null }, own = request.isOwn, transport = request.transport,
+        )
         openCaptcha()
     }
 
@@ -575,9 +603,36 @@ class CoreConnectionService(
                 captchaBrowser.open(request) { step -> _captcha.update { it?.copy(progress = step) } }
             }.exceptionOrNull()
             _captcha.update { it?.copy(error = error?.message.orEmpty(), progress = "") }
-            if (error == null && captchaBrowser.awaitPassed() && pendingCaptcha == request) {
+            // A script's own setup page submits itself (onSetupSubmission); only
+            // a real check can pass silently and needs this nudge.
+            if (error == null && !request.isOwn && captchaBrowser.awaitPassed() && pendingCaptcha == request) {
                 log(LogLevel.Info, "Страница Яндекса открылась без проверки, передаю cookies")
                 submitCaptcha()
+            }
+        }
+    }
+
+    /**
+     * window.openfluxSubmit(payload) from a script's own setup page
+     * (BuiltInBrowser.submissions); [SetupSubmission.flatten] says how the
+     * payload is read. Only the client half of {client, node} is applied -
+     * node delivery during a node deploy is a separate, not yet wired, path.
+     */
+    private fun onSetupSubmission(json: String) {
+        val request = pendingCaptcha ?: return
+        if (!request.isOwn || _captcha.value?.busy == true) return
+        _captcha.update { it?.copy(busy = true, error = "") }
+        scope.launch {
+            try {
+                val jar = SetupPages.flatten(json)
+                val ipc = synchronized(lock) { run }?.ipc ?: throw IllegalStateException("Ядро не на связи")
+                ipc.offerCookies(IpcCookiesOffer(request.transport, jar, remote = request.remote))
+                log(LogLevel.Success, "Настройка передана транспорту «${request.transport}»")
+                pendingCaptcha = null
+                _captcha.value = null
+                captchaBrowser.close()
+            } catch (e: Exception) {
+                _captcha.update { it?.copy(busy = false, error = e.message ?: "Не удалось передать настройку") }
             }
         }
     }

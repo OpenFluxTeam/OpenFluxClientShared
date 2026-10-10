@@ -8,6 +8,7 @@ import io.openflux.desktop.model.AuthStatus
 import io.openflux.desktop.model.AccountKind
 import cafe.adriel.voyager.core.model.ScreenModel
 import io.openflux.desktop.model.ConnectionMode
+import io.openflux.desktop.model.ExitBackend
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.isActive
 import io.openflux.desktop.model.profile
@@ -38,6 +39,8 @@ class HomeScreenModel(private val container: AppContainer) : ScreenModel {
     }
 
     fun setMode(mode: ConnectionMode) = settings.update { it.copy(mode = mode) }
+
+    fun setExitBackend(backend: ExitBackend) = settings.update { it.copy(exitBackend = backend) }
 
     fun setSystemProxy(enabled: Boolean) = settings.update { it.copy(systemProxy = enabled) }
 
