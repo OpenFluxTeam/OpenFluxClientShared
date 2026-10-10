@@ -108,6 +108,12 @@ data class AppSettings(
     val closeToTray: Boolean = true,
     /** Release channel the update check follows (also the channel of script transports' own updates). */
     val updateChannel: UpdateChannel = UpdateChannel.Stable,
+    /** Look for a newer release of the app on GitHub now and then, and offer it. */
+    val autoUpdate: Boolean = true,
+    /** The release tag the person said "пропустить" to: it is not offered again. */
+    val skippedUpdate: String = "",
+    /** When the app last asked GitHub for a newer release (ms since epoch); 0 = never. */
+    val updateCheckedAt: Long = 0,
     /** Install an update of a first-party script transport without asking (same wire, same key). Others always ask. */
     val autoUpdateScripts: Boolean = true,
     /** When the script transports were last checked for updates (ms since epoch); 0 = never. */

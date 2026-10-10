@@ -51,7 +51,7 @@ import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.CoreRepos
 import io.openflux.desktop.model.CoreSource
 import io.openflux.desktop.model.ThemeMode
-import io.openflux.desktop.model.UpdateChannel
+import io.openflux.desktop.model.UpdateState
 import io.openflux.desktop.model.isActive
 import io.openflux.desktop.service.AppContainer
 import io.openflux.desktop.service.LocalAppContainer
@@ -72,7 +72,10 @@ import io.openflux.desktop.ui.components.PageHeader
 import io.openflux.desktop.ui.components.SectionLabel
 import io.openflux.desktop.ui.components.Segmented
 import io.openflux.desktop.ui.components.SwitchRow
+import io.openflux.desktop.ui.Format
 import io.openflux.desktop.ui.components.Tone
+import io.openflux.desktop.ui.logs.LogsTab
+import io.openflux.desktop.ui.shell.LocalShell
 import io.openflux.desktop.ui.components.appClickable
 import io.openflux.desktop.ui.theme.AppTheme
 import kotlinx.coroutines.launch
@@ -101,8 +104,6 @@ class SettingsScreenModel(val container: AppContainer) : ScreenModel {
     val android = container.platform.kind == PlatformKind.Android
     var category by mutableStateOf(SettingsCategory.Connection)
     var mobileDetailOpen by mutableStateOf(false)
-    var latestRelease by mutableStateOf<String?>(null)
-    var checkingRelease by mutableStateOf(false)
     /** The core download running, and the last one's result or error. */
     var coreDownloading by mutableStateOf(false)
     var coreDownloadResult by mutableStateOf<String?>(null)
@@ -554,6 +555,17 @@ private fun debugLevelLabel(level: Int): String = when (level) {
 @Composable
 private fun InterfaceSettings(model: SettingsScreenModel) {
     val settings by model.container.settings.settings.collectAsState()
+    val shell = LocalShell.current
+    AppCard {
+        Text("Журнал работы", style = AppTheme.typography.bodyStrong, color = AppTheme.colors.text)
+        Spacer(Modifier.height(AppTheme.spacing.xs))
+        Text(
+            "Что делало приложение и ядро: полезно, если что-то не подключается или нужно показать ошибку.",
+            style = AppTheme.typography.bodySmall, color = AppTheme.colors.textSecondary,
+        )
+        Spacer(Modifier.height(AppTheme.spacing.m))
+        AppButton("Открыть журнал", { shell.open(LogsTab) }, style = ButtonStyle.Secondary)
+    }
     AppCard {
         SectionLabel("Тема")
         Spacer(Modifier.height(AppTheme.spacing.s))
@@ -625,7 +637,7 @@ private fun AboutSettings(model: SettingsScreenModel) {
     val scope = rememberCoroutineScope()
     val toaster = LocalToaster.current
     val settings by model.container.settings.settings.collectAsState()
-    val nightly = settings.updateChannel == UpdateChannel.Nightly
+    val update by model.container.updates.state.collectAsState()
     AppCard(padding = 0.dp) {
         KeyValueRow(
             "Версия приложения",
@@ -639,11 +651,15 @@ private fun AboutSettings(model: SettingsScreenModel) {
         KeyValueRow("Ядро OpenFlux", platform.coreVersion)
         HorizontalRule()
         KeyValueRow(
-            if (nightly) "Последняя ночная или основная" else "Последний выпуск",
-            when {
-                model.checkingRelease -> "проверяю…"
-                model.latestRelease != null -> model.latestRelease!!
-                else -> "не проверялось"
+            "Последний выпуск",
+            when (val u = update) {
+                UpdateState.Checking -> "проверяю…"
+                UpdateState.UpToDate -> "у вас последняя версия"
+                is UpdateState.Available -> u.release.version
+                is UpdateState.Downloading -> "скачиваю ${u.release.version}…"
+                is UpdateState.Installing -> "${u.release.version}: установка"
+                is UpdateState.Failed -> u.message
+                UpdateState.Idle -> if (settings.updateCheckedAt == 0L) "не проверялось" else "проверено ${Format.ago(platform.now() - settings.updateCheckedAt)}"
             },
         )
     }
@@ -658,22 +674,21 @@ private fun AboutSettings(model: SettingsScreenModel) {
         }
     }
     SwitchRow(
-        "Ночные сборки",
-        "Тестовые версии, выходят чаще основных: свежее, но возможны сбои. Выключено — только основные выпуски",
-        nightly,
-        { v ->
-            model.update { it.copy(updateChannel = if (v) UpdateChannel.Nightly else UpdateChannel.Stable) }
-            model.latestRelease = null
-        },
+        "Проверять обновления сами",
+        "Приложение раз в несколько часов смотрит новые выпуски на GitHub и предлагает обновиться. Скачивается и ставится только после вашего согласия",
+        settings.autoUpdate,
+        { v -> model.update { it.copy(autoUpdate = v) } },
     )
+    val offered = update as? UpdateState.Available
+    if (offered != null) {
+        AppButton("Обновить до ${offered.release.version}", model.container.updates::install)
+    }
     AppButton("Проверить обновления", {
-        model.checkingRelease = true
         scope.launch {
-            val found = if (nightly) platform.latestNightly() ?: platform.latestRelease() else platform.latestRelease()
-            model.latestRelease = found ?: "не найден"
-            model.checkingRelease = false
+            model.container.updates.check(manual = true)
+            if (model.container.updates.state.value == UpdateState.UpToDate) toaster.show("У вас последняя версия", Tone.Success)
         }
-    }, style = ButtonStyle.Secondary)
+    }, style = if (offered != null) ButtonStyle.Secondary else ButtonStyle.Primary, enabled = update !is UpdateState.Checking && update !is UpdateState.Downloading)
     SectionLabel("Репозитории")
     AppCard(padding = AppTheme.spacing.s) {
         LinkRow("OpenFlux (ядро, форк)", "github.com/${CoreRepos.FORK}", "https://github.com/${CoreRepos.FORK}", platform::openUrl)

@@ -26,6 +26,9 @@ import io.openflux.desktop.model.ShareLinkCodec
 import io.openflux.desktop.model.TrafficStats
 import io.openflux.desktop.model.YandexDocument
 import io.openflux.desktop.ui.BrowserPage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -209,6 +212,27 @@ interface PlatformServices {
     /** Newest app release tag on GitHub, null when unknown. */
     suspend fun latestRelease(): String?
 
+    // --- The app's own updates (see AppUpdates; defaults keep platforms without them building) ---
+
+    /** Whether the app can download and start the installer of a new release; otherwise the release's page is opened. */
+    val updateInstallSupported: Boolean get() = false
+    /** The text at an https [url] (GitHub's release list, a release's SHA256SUMS.txt); throws when it cannot be read. */
+    suspend fun httpText(url: String): String = throw UnsupportedOperationException("Загрузка не поддерживается")
+    /** The file of a release this system installs (the installer for its OS and CPU), null when there is none. */
+    fun updateAsset(assets: List<io.openflux.desktop.model.AppAsset>): io.openflux.desktop.model.AppAsset? = null
+    /**
+     * Downloads [asset] and returns the path of the file. Checks its SHA-256 against [sha256] (hex) and throws,
+     * leaving nothing behind, when it differs. [onProgress] gets bytes done and the total (0 when unknown).
+     */
+    suspend fun downloadUpdate(asset: io.openflux.desktop.model.AppAsset, sha256: String, onProgress: (Long, Long) -> Unit): String =
+        throw UnsupportedOperationException("Обновление здесь не поддерживается")
+    /**
+     * Starts the installer at [path]. The desktop quits for the Windows installer, which must replace the app;
+     * Android may first ask the person to allow installing from OpenFlux ([InstallResult.started] false).
+     */
+    suspend fun installUpdate(path: String): io.openflux.desktop.model.InstallResult =
+        io.openflux.desktop.model.InstallResult(false, "Обновление здесь не поддерживается")
+
     /** Whether [downloadCore] works here (the desktop; Android has its core built in). */
     val coreDownloadSupported: Boolean get() = false
     /** The release tag of the core downloaded for [source] (Fork, Official), null when there is none. */
@@ -378,6 +402,9 @@ class AppContainer(
 
     /** Checks installed script transports for updates and applies them. */
     val scriptUpdater: ScriptUpdater by lazy { ScriptUpdater(scripts, platform, settings) }
+
+    /** The app's own updates from its GitHub releases. */
+    val updates: AppUpdates by lazy { AppUpdates(platform, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default)) }
 
     /** An `openflux://` link opened from outside (a scanned code, a chat); the Profiles screen imports it. */
     val incomingLink = MutableStateFlow<String?>(null)

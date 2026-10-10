@@ -121,7 +121,6 @@ fun appTabs(experimental: Boolean, developerMode: Boolean = false): List<Tab> = 
     add(io.openflux.desktop.ui.subscription.SubscriptionTab)
     if (developerMode) add(io.openflux.desktop.ui.accounts.AccountsTab)
     if (experimental) add(io.openflux.desktop.ui.scripts.ScriptsTab)
-    add(LogsTab)
     add(SettingsTab)
 }
 
@@ -133,6 +132,8 @@ fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shor
     val settings by container.settings.settings.collectAsState()
     // Once a day: look for updates of the installed script transports (only with the experimental features on).
     LaunchedEffect(settings.experimental) { if (settings.experimental) runCatching { container.scriptUpdater.autoCheck() } }
+    // The app's own updates: a look at GitHub's releases a few seconds after the start and every few hours.
+    LaunchedEffect(Unit) { container.updates.start() }
     val dark = when (settings.theme) {
         ThemeMode.System -> isSystemInDarkTheme()
         ThemeMode.Light -> false
@@ -184,7 +185,9 @@ private fun AppShell(shell: ShellController, toaster: Toaster) {
         }
         // Back from another section returns home; screens handle their own
         // inner steps first. Only on touch: Esc stays with dialogs on the desktop.
-        PlatformBackHandler(enabled = touch && navigator.current.key != HomeTab.key) { navigator.current = HomeTab }
+        PlatformBackHandler(enabled = touch && navigator.current.key != HomeTab.key) {
+            navigator.current = if (navigator.current == LogsTab) SettingsTab else HomeTab
+        }
         DisposableEffect(navigator) {
             val unregister = shortcuts.register { event ->
                 if (event.type != KeyEventType.KeyDown || !event.isCtrlPressed) return@register false
@@ -213,32 +216,38 @@ private fun AppShell(shell: ShellController, toaster: Toaster) {
             shell.widthClass = widthClassOf(maxWidth)
             val collapsed = settings.sidebarCollapsed || shell.widthClass == WidthClass.Compact
             val content = @Composable { modifier: Modifier ->
-                AnimatedContent(
-                    targetState = navigator.current,
-                    transitionSpec = {
-                        (fadeIn(tween(220, delayMillis = 40)) + slideInVertically(tween(260)) { it / 40 })
-                            .togetherWith(fadeOut(tween(120)))
-                    },
-                    modifier = modifier,
-                    contentKey = { it.key },
-                ) { tab ->
-                    Box(Modifier.fillMaxSize()) { navigator.saveableState("tab", tab) { tab.Content() } }
+                Column(modifier) {
+                    // A new release of the app, when there is one.
+                    UpdateBanner()
+                    AnimatedContent(
+                        targetState = navigator.current,
+                        transitionSpec = {
+                            (fadeIn(tween(220, delayMillis = 40)) + slideInVertically(tween(260)) { it / 40 })
+                                .togetherWith(fadeOut(tween(120)))
+                        },
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        contentKey = { it.key },
+                    ) { tab ->
+                        Box(Modifier.fillMaxSize()) { navigator.saveableState("tab", tab) { tab.Content() } }
+                    }
                 }
             }
             val tabs = visibleTabs(settings.developerMode, settings.experimental)
             // Developer mode turned off while on Accounts: back to Settings.
-            LaunchedEffect(tabs) { if (navigator.current !in tabs) navigator.current = SettingsTab }
+            // The journal is a page of Settings, not a tab of its own.
+            LaunchedEffect(tabs) { if (navigator.current !in tabs && navigator.current != LogsTab) navigator.current = SettingsTab }
+            val highlighted = if (navigator.current == LogsTab) SettingsTab else navigator.current
             if (shell.widthClass == WidthClass.Phone) {
                 Column(Modifier.fillMaxSize()) {
                     content(Modifier.weight(1f).fillMaxWidth())
                     // The keyboard takes the room: the tab bar would only float above it.
                     if (WindowInsets.ime.getBottom(LocalDensity.current) == 0) {
-                        BottomBar(current = navigator.current, tabs = tabs, onSelect = { navigator.current = it })
+                        BottomBar(current = highlighted, tabs = tabs, onSelect = { navigator.current = it })
                     }
                 }
             } else Row(Modifier.fillMaxSize()) {
                 Sidebar(
-                    current = navigator.current,
+                    current = highlighted,
                     tabs = tabs,
                     collapsed = collapsed,
                     canExpand = shell.widthClass != WidthClass.Compact,

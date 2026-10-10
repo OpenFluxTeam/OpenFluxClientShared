@@ -140,6 +140,39 @@ class JvmPlatformServices(
         releaseTags().firstOrNull { it.startsWith(DESKTOP_TAG_PREFIX) }?.removePrefix(DESKTOP_TAG_PREFIX)
     }
 
+    // --- The app's own updates ---
+
+    override val updateInstallSupported: Boolean get() = true
+
+    override suspend fun httpText(url: String): String = io.openflux.desktop.data.UpdateDownloads.text(url)
+
+    override fun updateAsset(assets: List<io.openflux.desktop.model.AppAsset>) =
+        DesktopUpdate.pick(assets, os, System.getProperty("os.arch").lowercase(), File("/usr/bin/dpkg").exists())
+
+    override suspend fun downloadUpdate(asset: io.openflux.desktop.model.AppAsset, sha256: String, onProgress: (Long, Long) -> Unit): String {
+        val dir = File(io.openflux.desktop.data.AppDirs.config, "updates")
+        // Installers of earlier updates are of no use any more.
+        dir.listFiles()?.forEach { it.delete() }
+        return io.openflux.desktop.data.UpdateDownloads.file(asset.url, dir, asset.name, sha256, onProgress).absolutePath
+    }
+
+    override suspend fun installUpdate(path: String): io.openflux.desktop.model.InstallResult = withContext(Dispatchers.IO) {
+        val file = File(path)
+        require(file.isFile) { "Файл обновления пропал: $path" }
+        val opened = runCatching {
+            if (os.contains("linux")) ProcessBuilder("xdg-open", path).start() else Desktop.getDesktop().open(file)
+        }.isSuccess
+        if (!opened) return@withContext io.openflux.desktop.model.InstallResult(false, "Не удалось открыть установщик: запустите его вручную из $path")
+        if (os.contains("win")) {
+            // The setup program replaces the files OpenFlux runs from; the shutdown hook stops the core and the proxy.
+            Thread {
+                Thread.sleep(2500)
+                kotlin.system.exitProcess(0)
+            }.apply { isDaemon = true; start() }
+        }
+        io.openflux.desktop.model.InstallResult(true, DesktopUpdate.afterOpen(os))
+    }
+
     override val coreDownloadSupported: Boolean get() = true
 
     override fun downloadedCore(source: CoreSource): String? = binary.downloadedTag(source)
