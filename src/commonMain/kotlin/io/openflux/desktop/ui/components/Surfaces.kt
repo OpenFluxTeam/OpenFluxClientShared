@@ -87,9 +87,23 @@ fun KeyValueRow(
     modifier: Modifier = Modifier,
     valueColor: Color = AppTheme.colors.text,
     trailing: @Composable (() -> Unit)? = null,
-) {
+) = BoxWithConstraints(modifier.fillMaxWidth()) {
+    // On a phone a long value does not fit beside its key: the key goes above it and the value gets the line.
+    if (maxWidth < 480.dp && key.length + value.length > 30) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = AppTheme.spacing.l, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(key, style = AppTheme.typography.bodySmall, color = AppTheme.colors.textSecondary)
+                Text(value, style = AppTheme.typography.bodyStrong, color = valueColor, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            }
+            if (trailing != null) {
+                Spacer(Modifier.size(AppTheme.spacing.s))
+                trailing()
+            }
+        }
+        return@BoxWithConstraints
+    }
     Row(
-        modifier.fillMaxWidth().padding(horizontal = AppTheme.spacing.l, vertical = 10.dp),
+        Modifier.fillMaxWidth().padding(horizontal = AppTheme.spacing.l, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // The key keeps its words; a long value gives way and ends in "…".

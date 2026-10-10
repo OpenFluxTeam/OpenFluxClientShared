@@ -61,13 +61,14 @@ fun AccountsSettings() {
     val cards by model.cards.collectAsState()
     val now = container.platform.now()
     Text(
-        "Войдите один раз: Яндекс перестанет часто просить проверку, а на вашей ноде сессия обновится сама, когда закончится. " +
-            "Пароль OpenFlux не видит и не хранит: остаётся только сессия, на этом устройстве и на ваших нодах.",
+        "Войдите один раз: Яндекс реже просит проверку, а сессия на вашей ноде обновляется сама. " +
+            "Пароль OpenFlux не видит: остаётся только сессия.",
         style = AppTheme.typography.body,
         color = AppTheme.colors.textSecondary,
     )
     model.error?.let { Banner(it, Tone.Danger, icon = Icons.Rounded.ErrorOutline) }
-    cards.forEach { card -> AccountCardView(card, model, now) }
+    // MAX has no sign-in yet: nothing to show for it.
+    cards.filter { it.kind.signsIn }.forEach { card -> AccountCardView(card, model, now) }
     if (cards.any { it.status !is AuthStatus.SignedOut }) {
         AppButton("Проверить все", model::checkAll, style = ButtonStyle.Secondary)
     }

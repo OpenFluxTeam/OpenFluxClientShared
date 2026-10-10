@@ -1,6 +1,7 @@
 package io.openflux.desktop.ui.node
 
 import io.openflux.desktop.ui.PlatformBackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -96,7 +97,7 @@ fun NodeWizardPane(
             if (model.busy != null) LinearProgressIndicator(Modifier.fillMaxWidth().height(3.dp), color = AppTheme.colors.accent)
             else Spacer(Modifier.height(3.dp))
             Column(
-                Modifier.fillMaxSize().verticalScroll(scroll)
+                Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll)
                     .padding(horizontal = AppTheme.spacing.page, vertical = AppTheme.spacing.xl),
             ) {
                 Column(Modifier.widthIn(max = 640.dp)) {
@@ -116,6 +117,7 @@ fun NodeWizardPane(
                     Status(model)
                 }
             }
+            if (model.profileTarget != null) NodeEditorBar(model, requestClose)
         }
         scrollbars.Vertical(scroll, Modifier.align(Alignment.CenterEnd))
     }
@@ -370,11 +372,13 @@ private fun ColumnScope.DocumentStep(model: NodeWizardModel) {
 
 /** The carriers of a channel and the documents they need: shared by the wizard's step and the node screen. */
 @Composable
-private fun ColumnScope.TransportsEditor(model: NodeWizardModel) {
+private fun ColumnScope.TransportsEditor(model: NodeWizardModel, heading: Boolean = true) {
     val idle = model.busy == null
     val editing = model.editing
-    Spacer(Modifier.height(AppTheme.spacing.xl))
-    SectionLabel("Транспорты")
+    if (heading) {
+        Spacer(Modifier.height(AppTheme.spacing.xl))
+        SectionLabel("Транспорты")
+    }
     Note(
         "Можно выбрать несколько: если один перестанет работать, устройство перейдёт на следующий. " +
             "Прямое подключение к серверу (Direct) есть всегда: это резерв и через него идёт проверка.",
@@ -747,7 +751,7 @@ private fun ColumnScope.NodeEditor(
     AppTextField(model.name, { model.name = it }, label = "Название", enabled = idle && !verifying)
     model.profileTarget?.let { p ->
         Spacer(Modifier.height(AppTheme.spacing.xs))
-        TextAction("Ключ, приоритеты, режим и другие параметры профиля…", { onAdvanced(p) })
+        TextAction("Другие параметры профиля…", { onAdvanced(p) })
     }
 
     Spacer(Modifier.height(AppTheme.spacing.xl))
@@ -819,14 +823,22 @@ private fun ColumnScope.NodeEditor(
     if (!model.editingHasProfile) {
         Note("Профиля этого канала на устройстве нет: изменения применятся на сервере.")
     }
-    TransportsEditor(model)
+    TransportsEditor(model, heading = false)
     if (verifying) {
         Spacer(Modifier.height(AppTheme.spacing.l))
         VerifyStep(model)
         return
     }
-    if (!model.needsYandexDocument || model.documentUrl.isNotEmpty()) {
-        Actions {
+}
+
+/** "Применить на сервере", always in reach under the page once the channel is loaded. */
+@Composable
+private fun NodeEditorBar(model: NodeWizardModel, onClose: () -> Unit) {
+    val ready = model.editing != null && model.step == WizardStep.Document && (!model.needsYandexDocument || model.documentUrl.isNotEmpty())
+    if (!ready) return
+    val idle = model.busy == null
+    Box(Modifier.fillMaxWidth().background(AppTheme.colors.surface).padding(horizontal = AppTheme.spacing.page, vertical = AppTheme.spacing.m)) {
+        Row(Modifier.widthIn(max = 640.dp), horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalAlignment = Alignment.CenterVertically) {
             AppButton(if (idle) "Применить на сервере" else "Применяю…", model::next, enabled = idle)
             AppButton("Отмена", onClose, style = ButtonStyle.Ghost, enabled = idle)
         }

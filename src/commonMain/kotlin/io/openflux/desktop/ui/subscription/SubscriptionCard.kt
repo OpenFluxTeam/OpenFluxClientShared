@@ -52,16 +52,19 @@ fun SubscriptionStrip(state: SubscriptionState, platform: PlatformServices, onOp
             IconBubble(AppIcons.Person)
             Spacer(Modifier.width(AppTheme.spacing.m))
             Column(Modifier.weight(1f)) {
-                Text(
-                    state.title.ifBlank { "Подписка" }, style = AppTheme.typography.bodyStrong, color = AppTheme.colors.text,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        state.title.ifBlank { "Подписка" }, style = AppTheme.typography.bodyStrong, color = AppTheme.colors.text,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (look.attention) {
+                        Spacer(Modifier.width(AppTheme.spacing.s))
+                        StatusBadge(look.badge, look.tone)
+                    }
+                }
                 Text(look.line, style = AppTheme.typography.caption, color = AppTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
-            if (look.attention) {
-                StatusBadge(look.badge, look.tone)
-                Spacer(Modifier.width(AppTheme.spacing.s))
-            }
+            Spacer(Modifier.width(AppTheme.spacing.s))
             AppButton(
                 if (look.attention) "Продлить" else "Открыть", onOpen,
                 style = if (look.attention) ButtonStyle.Primary else ButtonStyle.Ghost,
