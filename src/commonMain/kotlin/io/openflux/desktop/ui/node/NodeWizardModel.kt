@@ -575,15 +575,15 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
     }
 
     /**
-     * The saved profile of an installed channel: a node profile with the key
-     * whose direct carrier dials this server at the channel's port.
+     * The saved profile of an installed channel: one with the key whose direct
+     * carrier dials this server at the channel's port, made by this wizard or
+     * imported from the owner's link alike.
      */
     private fun channelProfile(info: InstalledChannel): Profile? {
         val host = host.trim()
         val dials = setOf("$host:${info.port}", "[$host]:${info.port}")
         return container.profiles.profiles.value.firstOrNull { p ->
-            p.source == ProfileSource.Node && p.secret.isNotBlank() &&
-                p.carriers.any { it.type == TransportType.DIRECT && it.value.trim() in dials }
+            p.secret.isNotBlank() && p.carriers.any { it.type == TransportType.DIRECT && it.value.trim() in dials }
         }
     }
 
@@ -631,7 +631,7 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
         }
         val link = service.channelShareLink(saved.name, saved.secret, host.trim(), now.port, now.transports, now.context)
         shareLink = link
-        val candidate = Profile.fromShare(container.shareCodec.decode(link), saved.id, saved.createdAt, ProfileSource.Node)
+        val candidate = Profile.fromShare(container.shareCodec.decode(link), saved.id, saved.createdAt, saved.source)
             .copy(icon = saved.icon, name = saved.name)
         profile = candidate
         installed = true

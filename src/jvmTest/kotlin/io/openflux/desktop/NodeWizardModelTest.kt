@@ -544,13 +544,13 @@ class NodeWizardModelTest {
     private val boardLink = "https://boards.yandex.ru/whiteboard/?hash=820d6571111dffeb9e85de65ccfc880a"
 
     /** A channel of-old on the server (Volga and Mail.ru, port 31337) and, with [profile], its saved profile here. */
-    private suspend fun installedChannel(env: Env, profile: Boolean): Profile? {
+    private suspend fun installedChannel(env: Env, profile: Boolean, source: ProfileSource = ProfileSource.Node): Profile? {
         val transports = listOf(NodeTransport("vyandex", docUrl), NodeTransport("mailru", mailruLink))
         env.node.installed["of-old"] = InstalledChannel("of-old", "active", 31337, docUrl, transports)
         env.settings.update { it.copy(knownHostKeys = mapOf("$serverIp:22" to "SHA256:new")) }
         if (!profile) return null
         val link = env.node.shareLink("Моя нода", "cd".repeat(32), serverIp, 31337, transports)
-        val saved = Profile.fromShare(env.container.shareCodec.decode(link), "p-old", 7L, ProfileSource.Node)
+        val saved = Profile.fromShare(env.container.shareCodec.decode(link), "p-old", 7L, source)
             .copy(name = "Моя нода", icon = "ic_terminal")
         env.profiles.upsert(saved)
         return saved
@@ -602,6 +602,31 @@ class NodeWizardModelTest {
         assertEquals(listOf(TransportType.MAILRU, TransportType.BOARDS, TransportType.DIRECT), saved.carriers.map { it.type })
         assertEquals("$serverIp:31337", saved.carriers.last().value)
         assertEquals(listOf(saved), env.profiles.profiles.value, "the profile is replaced, not added")
+    }
+
+    /** A profile imported from the owner's link has the key too: it is found and keeps being a link profile. */
+    @Test
+    fun anImportedProfileOfTheChannelIsUpdatedToo() = runTest {
+        val env = Env()
+        val before = installedChannel(env, profile = true, source = ProfileSource.Link)!!
+        env.connection.active = "mailru"
+        val wizard = NodeWizardModel(env.container, this)
+        wizard.host = serverIp
+        wizard.password = "ssh-pass"
+        wizard.connect()
+        advanceUntilIdle()
+        wizard.editChannel("of-old")
+        advanceUntilIdle()
+        assertTrue(wizard.editingHasProfile)
+        wizard.useVolga = false
+        wizard.next()
+        advanceUntilIdle()
+        assertEquals(WizardStep.Done, wizard.step, wizard.verifyFailed ?: wizard.error ?: "")
+        val saved = wizard.save()!!
+        assertEquals(before.id, saved.id)
+        assertEquals(ProfileSource.Link, saved.source)
+        assertEquals(docUrl, saved.context)
+        assertEquals(listOf(TransportType.MAILRU, TransportType.DIRECT), saved.carriers.map { it.type })
     }
 
     @Test
