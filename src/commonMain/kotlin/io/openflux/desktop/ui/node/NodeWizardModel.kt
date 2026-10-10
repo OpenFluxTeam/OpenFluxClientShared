@@ -192,6 +192,9 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
     val editingHasProfile: Boolean get() = editingProfile != null
     /** A failed check may remove only a channel this wizard made, never one it was asked to change. */
     val canRemoveChannel: Boolean get() = editing == null
+    /** The channel the result is about, for the done step: the one changed, or the one installed. */
+    val resultChannel: String
+        get() = editing?.let { "${it.id}, порт ${it.port}" } ?: "${channel?.id.orEmpty()}, порт ${plan?.port ?: 0}"
 
     private var job: Job? = null
 

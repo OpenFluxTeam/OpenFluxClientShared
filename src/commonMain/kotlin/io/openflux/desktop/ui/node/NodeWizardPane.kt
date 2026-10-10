@@ -656,7 +656,7 @@ private fun ColumnScope.DoneStep(model: NodeWizardModel, onShowQr: () -> Unit, o
     AppCard(padding = 0.dp) {
         KeyValueRow("Профиль", model.name.trim().ifEmpty { model.profile?.name.orEmpty() })
         HorizontalRule()
-        KeyValueRow("Канал", "${model.channel?.id.orEmpty()}, порт ${model.plan?.port ?: 0}")
+        KeyValueRow("Канал", model.resultChannel)
         if (model.verifiedIp.isNotEmpty()) {
             HorizontalRule()
             KeyValueRow("Внешний адрес", model.verifiedIp, valueColor = AppTheme.colors.success)
