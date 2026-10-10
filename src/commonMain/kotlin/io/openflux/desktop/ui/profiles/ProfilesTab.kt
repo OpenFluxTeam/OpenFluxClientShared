@@ -164,7 +164,10 @@ private fun ProfilesScreen(model: ProfilesScreenModel) {
     val showDetail = model.editor != null || selected != null
 
     model.wizard?.let { wizard ->
-        NodeWizardPane(wizard, onClose = { model.closeWizard() }, onSaved = { model.closeWizard(it) })
+        NodeWizardPane(
+            wizard, onClose = { model.closeWizard() }, onSaved = { model.closeWizard(it) },
+            onAdvanced = { profile -> model.closeWizard(); model.startProfileEdit(profile) },
+        )
         return
     }
     model.phpWizard?.let { wizard ->
@@ -469,10 +472,6 @@ private fun ProfileDetails(model: ProfilesScreenModel, profile: Profile, state: 
                 }
                 HorizontalRule()
                 KeyValueRow("Источник", profile.source.label)
-            }
-            if (profile.editableNode) {
-                Spacer(Modifier.height(AppTheme.spacing.xl))
-                NodeOnServerCard(onOpen = { model.openWizardForProfile(profile) })
             }
             profile.phpNode?.let { node ->
                 Spacer(Modifier.height(AppTheme.spacing.xl))

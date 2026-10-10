@@ -85,7 +85,13 @@ class ProfilesScreenModel(private val container: AppContainer) : ScreenModel {
         selectedId = null
     }
 
+    /** A node of the person's own opens its screen (profile, server, transports); any other profile, the editor. */
     fun startEdit(profile: Profile) {
+        if (profile.editableNode) openWizardForProfile(profile) else startProfileEdit(profile)
+    }
+
+    /** The editor of the profile's own fields, for any profile. */
+    fun startProfileEdit(profile: Profile) {
         if (profile.managed) return // the subscription's locations are the service's to change
         selectedId = profile.id
         editor = EditorState(profile, isNew = false)

@@ -147,10 +147,6 @@ fun ProfileEditor(model: ProfilesScreenModel, state: EditorState, onBack: (() ->
 
                 AppTextField(draft.name, { v -> model.updateDraft { it.copy(name = v) } }, label = "Название", placeholder = "Например, Нода в Нидерландах")
 
-                if (!state.isNew && draft.editableNode) {
-                    NodeOnServerCard(onOpen = { model.openWizardForProfile(draft) })
-                }
-
                 Column {
                     SectionLabel("Значок")
                     Spacer(Modifier.height(AppTheme.spacing.s))
@@ -573,21 +569,3 @@ private fun CupsRoomsRow(model: ProfilesScreenModel, index: Int) {
     }
 }
 
-/**
- * "Нода на сервере": the node this profile reaches can be changed from here, not only made anew
- * in the wizard. It opens the wizard on this profile's channel; the server's password is asked there.
- */
-@Composable
-internal fun NodeOnServerCard(onOpen: () -> Unit) {
-    AppCard {
-        Text("Нода на сервере", style = AppTheme.typography.bodyStrong, color = AppTheme.colors.text)
-        Spacer(Modifier.height(AppTheme.spacing.xs))
-        Text(
-            "Добавьте или уберите документы ноды (Яндекс, Mail.ru, доску, cups.online) прямо на сервере. " +
-                "Ключ, порт и ссылки останутся прежними, профиль обновится сам. Понадобится пароль от сервера.",
-            style = AppTheme.typography.bodySmall, color = AppTheme.colors.textSecondary,
-        )
-        Spacer(Modifier.height(AppTheme.spacing.m))
-        AppButton("Изменить транспорты на сервере…", onOpen, style = ButtonStyle.Secondary, leading = Icons.Rounded.Dns)
-    }
-}

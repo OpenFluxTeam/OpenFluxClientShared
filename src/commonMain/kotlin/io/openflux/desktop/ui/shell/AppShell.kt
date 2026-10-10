@@ -62,7 +62,6 @@ import io.openflux.desktop.ui.Shortcuts
 import io.openflux.desktop.ui.components.LocalToaster
 import io.openflux.desktop.ui.components.ToastHost
 import io.openflux.desktop.ui.components.Toaster
-import io.openflux.desktop.ui.accounts.AccountsTab
 import io.openflux.desktop.ui.accounts.SignInDialog
 import io.openflux.desktop.ui.home.HomeTab
 import io.openflux.desktop.ui.logs.LogsTab
@@ -104,8 +103,17 @@ class ShellController {
     /** Set by the Subscription screen's "Без сервера": the Profiles screen opens the PHP-hosting wizard. */
     var phpWizardRequested by mutableStateOf(false)
 
+    /** Set where a screen sends the person to a page of Settings ("Войти в Яндекс"); Settings takes it and clears it. */
+    var settingsCategory by mutableStateOf<io.openflux.desktop.ui.settings.SettingsCategory?>(null)
+
     fun open(tab: Tab) {
         tabNavigator?.current = tab
+    }
+
+    /** Opens Settings on [category]. */
+    fun openSettings(category: io.openflux.desktop.ui.settings.SettingsCategory) {
+        settingsCategory = category
+        open(io.openflux.desktop.ui.settings.SettingsTab)
     }
 }
 
@@ -119,7 +127,6 @@ fun appTabs(experimental: Boolean, developerMode: Boolean = false): List<Tab> = 
     add(HomeTab)
     add(ProfilesTab)
     add(io.openflux.desktop.ui.subscription.SubscriptionTab)
-    if (developerMode) add(io.openflux.desktop.ui.accounts.AccountsTab)
     if (experimental) add(io.openflux.desktop.ui.scripts.ScriptsTab)
     add(SettingsTab)
 }

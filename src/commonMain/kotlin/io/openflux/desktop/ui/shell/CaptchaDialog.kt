@@ -16,7 +16,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.ui.LocalBrowserViews
+import io.openflux.desktop.ui.settings.SettingsCategory
 import io.openflux.desktop.service.LocalAppContainer
 import io.openflux.desktop.ui.components.AppDialog
 import io.openflux.desktop.ui.components.Banner
@@ -38,7 +40,11 @@ import io.openflux.desktop.ui.theme.AppTheme
 @Composable
 fun CaptchaDialog() {
     val connection = LocalAppContainer.current.connection
+    val accounts = LocalAppContainer.current.accounts
+    val shell = LocalShell.current
     val prompt by connection.captcha.collectAsState()
+    // Re-read when a sign-in appears or goes.
+    val sessions by accounts.sessions.collectAsState()
     val page by connection.captchaPage.collectAsState()
     val browsers = LocalBrowserViews.current
     val current = prompt ?: return
@@ -93,5 +99,13 @@ fun CaptchaDialog() {
             connection::openCaptcha,
             enabled = !current.busy,
         )
+        // A signed-in Yandex account is the lasting answer: its session goes to the transports (and to your node) by itself.
+        if (!isSetupPage && sessions[AccountKind.Yandex]?.let { !it.expired && it.cookies.isNotEmpty() } != true) {
+            Spacer(Modifier.height(AppTheme.spacing.xs))
+            TextAction("Не хочу проходить каждый раз: войти в аккаунт Яндекса", {
+                connection.dismissCaptcha()
+                shell.openSettings(SettingsCategory.Accounts)
+            })
+        }
     }
 }

@@ -20,16 +20,15 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.model.rememberScreenModel
-import cafe.adriel.voyager.navigator.tab.Tab
-import cafe.adriel.voyager.navigator.tab.TabOptions
 import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.AuthStatus
 import io.openflux.desktop.service.LocalAppContainer
@@ -48,58 +47,37 @@ import io.openflux.desktop.ui.components.Tone
 import io.openflux.desktop.ui.profiles.ProfilesTab
 import io.openflux.desktop.ui.shell.LocalShell
 import io.openflux.desktop.ui.theme.AppTheme
-import org.jetbrains.compose.resources.painterResource
 
-object AccountsTab : Tab {
-    override val options: TabOptions
-        @Composable get() = TabOptions(index = 2u, title = "Аккаунты", icon = painterResource(AppIcons.Person))
-
-    @Composable
-    override fun Content() {
-        val container = LocalAppContainer.current
-        val model = rememberScreenModel { AccountsScreenModel(container) }
-        LaunchedEffect(Unit) { container.accounts.checkAllInBackground() }
-        AccountsScreen(model)
-    }
-}
-
+/**
+ * Sign-ins to Yandex and Mail.ru, a page of Settings: sign in once and OpenFlux feeds the session to the
+ * transports (fewer Yandex checks) and, for your own node, to the node when its session ends.
+ */
 @Composable
-private fun AccountsScreen(model: AccountsScreenModel) {
-    val cards by model.cards.collectAsState()
-    val scroll = rememberScrollState()
-    val scrollbars = LocalScrollbars.current
+fun AccountsSettings() {
     val container = LocalAppContainer.current
+    val model = remember { AccountsScreenModel(container) }
+    DisposableEffect(model) { onDispose { model.onDispose() } }
+    LaunchedEffect(Unit) { container.accounts.checkAllInBackground() }
+    val cards by model.cards.collectAsState()
     val now = container.platform.now()
-    Box(Modifier.fillMaxSize()) {
-        Column(
-            Modifier.fillMaxSize().verticalScroll(scroll)
-                .padding(horizontal = AppTheme.spacing.page, vertical = AppTheme.spacing.xl),
-        ) {
-            PageHeader("Аккаунты", "Войдите один раз — документы и вход на своих нодах OpenFlux сделает сам") {
-                if (cards.any { it.status !is AuthStatus.SignedOut }) {
-                    AppButton("Проверить все", model::checkAll, style = ButtonStyle.Secondary)
-                }
-            }
-            Spacer(Modifier.height(AppTheme.spacing.xl))
-            Column(Modifier.widthIn(max = 760.dp), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.l)) {
-                Text(
-                    "Использование аккаунтов в OpenFlux может привести к их блокировке или удалению сервисом. " +
-                        "Автор и другие участники проекта не несут ответственности за ваши аккаунты и последствия их использования.",
-                    style = AppTheme.typography.body,
-                    color = AppTheme.colors.danger,
-                )
-                model.error?.let { Banner(it, Tone.Danger, icon = Icons.Rounded.ErrorOutline) }
-                cards.forEach { card -> AccountCardView(card, model, now) }
-                Text(
-                    "Cups.online и Direct входа не требуют. Пароль OpenFlux не видит и не хранит: " +
-                        "остаётся только сессия, на этом устройстве и на ваших нодах.",
-                    style = AppTheme.typography.bodySmall,
-                    color = AppTheme.colors.textSecondary,
-                )
-            }
-        }
-        scrollbars.Vertical(scroll, Modifier.align(Alignment.CenterEnd))
+    Text(
+        "Войдите один раз: Яндекс перестанет часто просить проверку, а на вашей ноде сессия обновится сама, когда закончится. " +
+            "Пароль OpenFlux не видит и не хранит: остаётся только сессия, на этом устройстве и на ваших нодах.",
+        style = AppTheme.typography.body,
+        color = AppTheme.colors.textSecondary,
+    )
+    model.error?.let { Banner(it, Tone.Danger, icon = Icons.Rounded.ErrorOutline) }
+    cards.forEach { card -> AccountCardView(card, model, now) }
+    if (cards.any { it.status !is AuthStatus.SignedOut }) {
+        AppButton("Проверить все", model::checkAll, style = ButtonStyle.Secondary)
     }
+    Text(
+        "Использование аккаунтов в OpenFlux может привести к их блокировке или удалению сервисом. " +
+            "Автор и другие участники проекта не несут ответственности за ваши аккаунты и последствия их использования. " +
+            "Cups.online и Direct входа не требуют.",
+        style = AppTheme.typography.bodySmall,
+        color = AppTheme.colors.textSecondary,
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -109,6 +87,8 @@ private fun AccountCardView(card: AccountCard, model: AccountsScreenModel, now: 
     val busy = card.status is AuthStatus.Busy || card.status is AuthStatus.Checking
     val shell = LocalShell.current
     val toaster = LocalToaster.current
+    val appSettings by LocalAppContainer.current.settings.settings.collectAsState()
+    val developer = appSettings.developerMode
     AppCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconBubble(AppIcons.byName(card.kind.icon))
@@ -140,7 +120,7 @@ private fun AccountCardView(card: AccountCard, model: AccountsScreenModel, now: 
                 is AuthStatus.Checking -> Unit
                 is AuthStatus.Busy -> AppButton("Отмена", model::cancel, style = ButtonStyle.Secondary)
                 is AuthStatus.SignedIn -> {
-                    if (kind.createsDocuments) AppButton("Создать документ", { model.createDocument(kind) }, leadingResource = AppIcons.Add)
+                    if (kind.createsDocuments && developer) AppButton("Создать документ", { model.createDocument(kind) }, leadingResource = AppIcons.Add)
                     AppButton("Проверить", { model.check(kind) }, style = if (kind.createsDocuments) ButtonStyle.Secondary else ButtonStyle.Primary)
                     AppButton("Выйти", { model.signOut(kind) }, style = ButtonStyle.Ghost)
                 }

@@ -84,6 +84,7 @@ import org.jetbrains.compose.resources.painterResource
 
 enum class SettingsCategory(val title: String, val subtitle: String, val icon: DrawableResource) {
     Connection("Подключение", "Режим, порты, автозапуск", AppIcons.Swap),
+    Accounts("Аккаунты", "Яндекс и Mail.ru: войти один раз", AppIcons.Person),
     SystemProxy("Системный прокси", "Весь трафик компьютера через OpenFlux", AppIcons.Routing),
     Core("Ядро OpenFlux", "Файл ядра и подробный журнал", AppIcons.Code),
     Interface("Интерфейс", "Тема, трей, журнал", AppIcons.DarkMode),
@@ -112,8 +113,8 @@ class SettingsScreenModel(val container: AppContainer) : ScreenModel {
     private var versionTaps = 0
 
     /**
-     * A tap on the app version: the tenth turns developer mode on (it shows
-     * the Accounts tab), like an Android phone's build number. Returns what
+     * A tap on the app version: the tenth turns developer mode on (creating documents
+     * from the account cards), like an Android phone's build number. Returns what
      * to tell the user, null for nothing.
      */
     fun tapVersion(): String? {
@@ -124,7 +125,7 @@ class SettingsScreenModel(val container: AppContainer) : ScreenModel {
             left <= 0 -> {
                 versionTaps = 0
                 update { it.copy(developerMode = true) }
-                "Режим разработчика включён: появилась вкладка «Аккаунты»"
+                "Режим разработчика включён"
             }
             left <= 5 -> "Ещё $left ${taps(left)} до режима разработчика"
             else -> null
@@ -161,6 +162,11 @@ object SettingsTab : Tab {
 
 @Composable
 private fun SettingsScreen(model: SettingsScreenModel) {
+    // Another screen sent the person to one of the pages ("Войти в Яндекс" in a check).
+    val shell = LocalShell.current
+    LaunchedEffect(shell.settingsCategory) {
+        shell.settingsCategory?.let { model.category = it; model.mobileDetailOpen = true; shell.settingsCategory = null }
+    }
     // Categories beside the page when both fit, else one at a time.
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val compact = maxWidth < 680.dp
@@ -199,6 +205,7 @@ private fun SettingsScreen(model: SettingsScreenModel) {
                     Column(Modifier.widthIn(max = 720.dp), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.l)) {
                         when (model.category) {
                             SettingsCategory.Connection -> ConnectionSettings(model)
+                            SettingsCategory.Accounts -> io.openflux.desktop.ui.accounts.AccountsSettings()
                             SettingsCategory.SystemProxy -> SystemProxySettings(model)
                             SettingsCategory.Core -> CoreSettings(model)
                             SettingsCategory.Interface -> InterfaceSettings(model)
@@ -667,7 +674,7 @@ private fun AboutSettings(model: SettingsScreenModel) {
         AppCard(padding = AppTheme.spacing.s) {
             SwitchRow(
                 "Режим разработчика",
-                "Вкладка «Аккаунты»: вход в сервисы и автоматическое создание документов.",
+                "Создание документов из карточек аккаунтов в «Аккаунты».",
                 checked = true,
                 onCheckedChange = { on -> model.update { it.copy(developerMode = on) } },
             )

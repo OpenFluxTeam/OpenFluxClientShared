@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,7 +72,12 @@ import io.openflux.desktop.ui.theme.AppTheme
  * [onSaved] opens the saved profile.
  */
 @Composable
-fun NodeWizardPane(model: NodeWizardModel, onClose: () -> Unit, onSaved: (String) -> Unit) {
+fun NodeWizardPane(
+    model: NodeWizardModel,
+    onClose: () -> Unit,
+    onSaved: (String) -> Unit,
+    onAdvanced: (io.openflux.desktop.model.Profile) -> Unit = {},
+) {
     var confirmClose by remember { mutableStateOf(false) }
     var qrOpen by remember { mutableStateOf(false) }
     val requestClose = {
@@ -81,7 +87,7 @@ fun NodeWizardPane(model: NodeWizardModel, onClose: () -> Unit, onSaved: (String
     }
     // Back steps back through the wizard, then leaves it.
     PlatformBackHandler(enabled = LocalTouchUi.current && model.busy == null) {
-        if (model.step == WizardStep.Document || model.step == WizardStep.Plan) model.back() else requestClose()
+        if (model.profileTarget == null && (model.step == WizardStep.Document || model.step == WizardStep.Plan)) model.back() else requestClose()
     }
     val scroll = rememberScrollState()
     val scrollbars = LocalScrollbars.current
@@ -94,14 +100,18 @@ fun NodeWizardPane(model: NodeWizardModel, onClose: () -> Unit, onSaved: (String
                     .padding(horizontal = AppTheme.spacing.page, vertical = AppTheme.spacing.xl),
             ) {
                 Column(Modifier.widthIn(max = 640.dp)) {
-                    Header(model, requestClose)
-                    Spacer(Modifier.height(AppTheme.spacing.xl))
-                    when (model.step) {
-                        WizardStep.Server -> ServerStep(model)
-                        WizardStep.Document -> DocumentStep(model)
-                        WizardStep.Plan -> PlanStep(model)
-                        WizardStep.Verify -> VerifyStep(model)
-                        WizardStep.Done -> DoneStep(model, onShowQr = { qrOpen = true }, onSaved = onSaved, onClose = requestClose)
+                    if (model.profileTarget != null) {
+                        NodeEditor(model, onShowQr = { qrOpen = true }, onSaved = onSaved, onClose = requestClose, onAdvanced = onAdvanced)
+                    } else {
+                        Header(model, requestClose)
+                        Spacer(Modifier.height(AppTheme.spacing.xl))
+                        when (model.step) {
+                            WizardStep.Server -> ServerStep(model)
+                            WizardStep.Document -> DocumentStep(model)
+                            WizardStep.Plan -> PlanStep(model)
+                            WizardStep.Verify -> VerifyStep(model)
+                            WizardStep.Done -> DoneStep(model, onShowQr = { qrOpen = true }, onSaved = onSaved, onClose = requestClose)
+                        }
                     }
                     Status(model)
                 }
@@ -341,6 +351,28 @@ private fun ColumnScope.DocumentStep(model: NodeWizardModel) {
         model.channel?.let { Note("Канал: ${it.id}. Для него создан отдельный ключ шифрования, его знают только это устройство и нода.") }
     }
 
+    TransportsEditor(model)
+    if (!model.needsYandexDocument || model.documentUrl.isNotEmpty()) {
+        Actions {
+            if (editing != null) {
+                AppButton(if (idle) "Применить" else "Подождите…", model::next, enabled = idle)
+                AppButton("Отменить изменение", model::cancelEditing, style = ButtonStyle.Secondary, enabled = idle)
+            } else {
+                AppButton(if (idle) "Далее" else "Подождите…", model::next, enabled = idle)
+            }
+        }
+    } else if (editing != null) {
+        Actions {
+            AppButton("Отменить изменение", model::cancelEditing, style = ButtonStyle.Secondary, enabled = idle)
+        }
+    }
+}
+
+/** The carriers of a channel and the documents they need: shared by the wizard's step and the node screen. */
+@Composable
+private fun ColumnScope.TransportsEditor(model: NodeWizardModel) {
+    val idle = model.busy == null
+    val editing = model.editing
     Spacer(Modifier.height(AppTheme.spacing.xl))
     SectionLabel("Транспорты")
     Note(
@@ -401,7 +433,7 @@ private fun ColumnScope.DocumentStep(model: NodeWizardModel) {
             )
         }
         Note(
-            "Вход откроется в окне встроенного браузера, как на вкладке «Аккаунты»: если вход уже сохранён, вводить " +
+            "Вход откроется в окне встроенного браузера, как в Настройках → Аккаунты: если вход уже сохранён, вводить " +
                 "ничего не придётся. Документ появится в папке openflux в Облаке с редактированием по ссылке.",
         )
         Spacer(Modifier.height(AppTheme.spacing.l))
@@ -445,20 +477,6 @@ private fun ColumnScope.DocumentStep(model: NodeWizardModel) {
         Spacer(Modifier.height(AppTheme.spacing.l))
         AppTextField(model.sudoPassword, { model.sudoPassword = it }, label = "Пароль sudo пользователя ${model.user.trim()}",
             secret = true, enabled = idle, helper = "Для изменения канала нужны права root")
-    }
-    if (!model.needsYandexDocument || model.documentUrl.isNotEmpty()) {
-        Actions {
-            if (editing != null) {
-                AppButton(if (idle) "Применить" else "Подождите…", model::next, enabled = idle)
-                AppButton("Отменить изменение", model::cancelEditing, style = ButtonStyle.Secondary, enabled = idle)
-            } else {
-                AppButton(if (idle) "Далее" else "Подождите…", model::next, enabled = idle)
-            }
-        }
-    } else if (editing != null) {
-        Actions {
-            AppButton("Отменить изменение", model::cancelEditing, style = ButtonStyle.Secondary, enabled = idle)
-        }
     }
 }
 
@@ -521,7 +539,7 @@ private fun ColumnScope.VolgaDocument(model: NodeWizardModel) {
         }
         // The page itself opens in the sign-in window, like on the Accounts tab.
         Note(
-            "Вход и Диск откроются в окне встроенного браузера, как на вкладке «Аккаунты»: если вход уже сохранён, " +
+            "Вход и Диск откроются в окне встроенного браузера, как в Настройках → Аккаунты: если вход уже сохранён, " +
                 "вводить ничего не придётся. Документ появится в папке openflux на вашем Яндекс Диске с доступом " +
                 "«Редактирование» по ссылке.",
         )
@@ -682,4 +700,180 @@ private fun ColumnScope.DoneStep(model: NodeWizardModel, onShowQr: () -> Unit, o
     Actions {
         AppButton("Готово", onClose, style = ButtonStyle.Ghost)
     }
+}
+
+// ---- the node screen: a profile's node, changed on one screen ----
+
+/**
+ * The screen of a node the person runs: its profile, the way into its server and the transports of its channel
+ * in one place, not step by step. "Загрузить с сервера" reads the channel, the switches below are what the
+ * server will have, "Применить" changes the server and the profile together.
+ */
+@Composable
+private fun ColumnScope.NodeEditor(
+    model: NodeWizardModel,
+    onShowQr: () -> Unit,
+    onSaved: (String) -> Unit,
+    onClose: () -> Unit,
+    onAdvanced: (io.openflux.desktop.model.Profile) -> Unit,
+) {
+    val idle = model.busy == null
+    val editing = model.editing
+    val loaded = editing != null
+    val done = model.step == WizardStep.Done
+    val verifying = model.step == WizardStep.Verify
+    // The profile follows the server: saved as soon as the channel is changed and checked.
+    LaunchedEffect(done) { if (done && !model.saved) model.save() }
+
+    Row(verticalAlignment = Alignment.Top) {
+        Column(Modifier.weight(1f)) {
+            Text(model.profileTarget?.name.orEmpty().ifBlank { "Нода" }, style = AppTheme.typography.pageTitle, color = AppTheme.colors.text)
+            Text(
+                "Профиль, доступ к серверу и транспорты канала на одном экране.",
+                style = AppTheme.typography.body, color = AppTheme.colors.textSecondary,
+            )
+        }
+        AppButton("Закрыть", onClose, style = ButtonStyle.Ghost, enabled = idle)
+    }
+    Spacer(Modifier.height(AppTheme.spacing.xl))
+
+    if (done) {
+        NodeEditorResult(model, onShowQr, onSaved)
+        return
+    }
+
+    SectionLabel("Профиль")
+    Spacer(Modifier.height(AppTheme.spacing.s))
+    AppTextField(model.name, { model.name = it }, label = "Название", enabled = idle && !verifying)
+    model.profileTarget?.let { p ->
+        Spacer(Modifier.height(AppTheme.spacing.xs))
+        TextAction("Ключ, приоритеты, режим и другие параметры профиля…", { onAdvanced(p) })
+    }
+
+    Spacer(Modifier.height(AppTheme.spacing.xl))
+    SectionLabel("Сервер")
+    Spacer(Modifier.height(AppTheme.spacing.s))
+    if (!loaded) {
+        Row(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
+            AppTextField(model.host, { model.host = it.trim() }, Modifier.weight(1f), label = "Адрес (IP или домен)", enabled = idle)
+            AppTextField(
+                model.port, { model.port = it.filter(Char::isDigit).take(5) }, Modifier.width(110.dp), label = "SSH-порт",
+                keyboardType = KeyboardType.Number, enabled = idle,
+            )
+        }
+        Spacer(Modifier.height(AppTheme.spacing.m))
+        AppTextField(model.user, { model.user = it.trim() }, label = "Логин", enabled = idle)
+        Spacer(Modifier.height(AppTheme.spacing.m))
+        Segmented(listOf(false, true), model.useKey, { if (it) "Вход по ключу" else "Вход по паролю" }, { model.useKey = it }, enabled = idle)
+        Spacer(Modifier.height(AppTheme.spacing.m))
+        if (model.useKey) {
+            AppTextField(
+                model.privateKey, { model.privateKey = it }, label = "Приватный ключ (OpenSSH или PEM)",
+                placeholder = "-----BEGIN OPENSSH PRIVATE KEY-----", singleLine = false, minLines = 4, monospace = true, enabled = idle,
+            )
+            Spacer(Modifier.height(AppTheme.spacing.s))
+            AppButton("Выбрать файл ключа…", model::readKeyFile, style = ButtonStyle.Secondary, leading = Icons.Rounded.FolderOpen, enabled = idle)
+            Spacer(Modifier.height(AppTheme.spacing.m))
+            AppTextField(model.passphrase, { model.passphrase = it }, label = "Пароль ключа (если есть)", secret = true, enabled = idle)
+            Spacer(Modifier.height(AppTheme.spacing.m))
+            AppTextField(model.sudoPassword, { model.sudoPassword = it }, label = "Пароль sudo (если сервер его просит)", secret = true, enabled = idle)
+        } else {
+            AppTextField(model.password, { model.password = it }, label = "Пароль от сервера", secret = true, enabled = idle)
+        }
+        Note("Пароль нужен только чтобы прочитать и изменить канал: OpenFlux его не сохраняет.")
+        Actions {
+            AppButton(if (idle) "Загрузить с сервера" else "Загружаю…", { model.connect() }, enabled = idle, leading = Icons.Rounded.Refresh)
+        }
+    } else {
+        AppCard(padding = 0.dp) {
+            KeyValueRow("Сервер", "${model.user.trim()}@${model.host.trim()}")
+            model.probe?.let { probe ->
+                HorizontalRule()
+                KeyValueRow("Система", listOf(probe.os, probe.arch).filter(String::isNotBlank).joinToString(", "))
+            }
+            HorizontalRule()
+            KeyValueRow("Канал", "${editing?.id}, порт ${editing?.port}")
+            HorizontalRule()
+            KeyValueRow(
+                "Состояние", if (editing?.running == true) "работает" else editing?.state?.ifBlank { "неизвестно" }.orEmpty(),
+                valueColor = if (editing?.running == true) AppTheme.colors.success else AppTheme.colors.text,
+            )
+        }
+        Spacer(Modifier.height(AppTheme.spacing.s))
+        AppButton("Прочитать заново", { model.connect() }, style = ButtonStyle.Ghost, leading = Icons.Rounded.Refresh, enabled = idle)
+    }
+
+    Spacer(Modifier.height(AppTheme.spacing.xl))
+    SectionLabel("Транспорты канала")
+    Spacer(Modifier.height(AppTheme.spacing.s))
+    if (!loaded) {
+        AppCard {
+            Text(
+                "Загрузите настройки с сервера: здесь появятся документы канала. Их можно добавить, убрать или заменить; " +
+                    "ключ, порт и выданные ссылки останутся прежними.",
+                style = AppTheme.typography.body, color = AppTheme.colors.textSecondary,
+            )
+        }
+        return
+    }
+    if (!model.editingHasProfile) {
+        Note("Профиля этого канала на устройстве нет: изменения применятся на сервере.")
+    }
+    TransportsEditor(model)
+    if (verifying) {
+        Spacer(Modifier.height(AppTheme.spacing.l))
+        VerifyStep(model)
+        return
+    }
+    if (!model.needsYandexDocument || model.documentUrl.isNotEmpty()) {
+        Actions {
+            AppButton(if (idle) "Применить на сервере" else "Применяю…", model::next, enabled = idle)
+            AppButton("Отмена", onClose, style = ButtonStyle.Ghost, enabled = idle)
+        }
+    }
+}
+
+/** After the channel was changed and checked: what it is now, and the ways to hand it on. */
+@Composable
+private fun ColumnScope.NodeEditorResult(model: NodeWizardModel, onShowQr: () -> Unit, onSaved: (String) -> Unit) {
+    val toaster = LocalToaster.current
+    Banner(
+        when {
+            model.verifiedIp.isNotEmpty() -> "Транспорты изменены. Трафик выходит с адреса ${model.verifiedIp}."
+            model.sessionProven -> "Транспорты изменены, нода отвечает по защищённому каналу."
+            else -> "Транспорты изменены на сервере."
+        },
+        Tone.Success, icon = Icons.Rounded.CheckCircle,
+    )
+    if ((model.verifiedIp.isNotEmpty() || model.sessionProven) && !model.primaryUp) {
+        Spacer(Modifier.height(AppTheme.spacing.m))
+        Banner(
+            "Сейчас работает резервный канал (прямое подключение). Канал через ${model.primaryType?.shortLabel.orEmpty()} ещё не поднялся: " +
+                "когда нода попросит проверку Яндекса, OpenFlux покажет её.",
+            Tone.Warning, icon = Icons.Rounded.Warning,
+        )
+    }
+    Spacer(Modifier.height(AppTheme.spacing.l))
+    AppCard(padding = 0.dp) {
+        KeyValueRow("Профиль", model.name.trim().ifEmpty { model.profile?.name.orEmpty() })
+        HorizontalRule()
+        KeyValueRow("Канал", model.resultChannel)
+        HorizontalRule()
+        KeyValueRow("Транспорты", NodeTransports.describe(model.transportTypes))
+        HorizontalRule()
+        KeyValueRow(
+            "На этом устройстве", if (model.saved) "профиль обновлён" else "не сохранено",
+            valueColor = if (model.saved) AppTheme.colors.success else AppTheme.colors.danger,
+        )
+    }
+    Actions {
+        AppButton("Открыть профиль", { model.profile?.let { onSaved(it.id) } ?: onSaved("") }, leading = Icons.Rounded.CheckCircle)
+        AppButton("QR для другого устройства", onShowQr, style = ButtonStyle.Secondary, leading = Icons.Rounded.QrCode2, enabled = model.shareLink.isNotEmpty())
+        AppButton("Копировать ссылку", {
+            model.copyLink()
+            toaster.show("Ссылка скопирована", Tone.Success)
+        }, style = ButtonStyle.Secondary, leading = Icons.Rounded.ContentCopy, enabled = model.shareLink.isNotEmpty())
+    }
+    Spacer(Modifier.height(AppTheme.spacing.m))
+    Banner("В QR и ссылке лежит ключ канала: передавайте их только тому, кто будет им пользоваться.", Tone.Neutral, icon = Icons.Rounded.Lock)
 }
