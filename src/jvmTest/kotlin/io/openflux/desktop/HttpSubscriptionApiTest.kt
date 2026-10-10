@@ -38,8 +38,8 @@ class HttpSubscriptionApiTest {
 
     private val handler = HttpHandler { ex: HttpExchange ->
         val body = ex.requestBody.readBytes().toString(Charsets.UTF_8)
-        seen += Seen(ex.requestMethod, ex.requestURI.path, ex.requestHeaders.getFirst("Authorization"), body)
-        val (code, json) = when (ex.requestURI.path) {
+        seen += Seen(ex.requestMethod, ex.requestURI.rawPath, ex.requestHeaders.getFirst("Authorization"), body)
+        val (code, json) = when (ex.requestURI.rawPath) {
             "/api/v1/plans" -> 200 to """{"plans":[{"id":"month","name":"Месяц","days":30,"devices":3,"price":"299 ₽"}],"payment":{"provider":"manual","instructions":"Напишите в поддержку"},"future":"field"}"""
             "/api/v1/register" -> 201 to """{"deviceToken":"tok","deviceId":"d1","recoveryKey":"AAAA-BBBB","account":{"id":"u","login":"ivan","status":"active","expires":2000000000,"plan":{"id":"trial","name":"Пробный","devices":1},"trialAvailable":false,"devices":[{"id":"d1","name":"Тест","current":true}],"deviceLimit":1}}"""
             "/api/v1/login" -> 409 to """{"error":"device_limit","message":"Достигнут предел устройств.","devices":[{"id":"d9","name":"Телефон","createdAt":1,"lastSeen":2}]}"""
