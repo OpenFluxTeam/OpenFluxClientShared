@@ -444,7 +444,8 @@ class PhpWizardModelTest {
         val container = AppContainer(
             profiles, settings, connection, platform, FakeShareLinkCodec(),
             object : io.openflux.desktop.service.NodeWizardService by unsupported() {},
-            php,
+            testAccounts(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob())),
+            phpHosting = php,
         )
     }
 
@@ -458,7 +459,7 @@ class PhpWizardModelTest {
         override val socksAddress: StateFlow<String?> = MutableStateFlow(null)
         override val captchaPage: StateFlow<BrowserPage?> = MutableStateFlow(null)
 
-        override fun connect(profile: Profile) {
+        override fun connect(profile: Profile, mode: ConnectionMode?) {
             state.value = ConnectionState.Connected(profile, ConnectionMode.Client, 0)
             exitAddress.value = check()
         }
