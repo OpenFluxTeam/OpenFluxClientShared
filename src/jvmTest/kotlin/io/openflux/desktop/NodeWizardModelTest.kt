@@ -19,6 +19,7 @@ import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.ServerProbe
+import io.openflux.desktop.model.editableNode
 import io.openflux.desktop.model.ShareConfig
 import io.openflux.desktop.model.ShareTransport
 import io.openflux.desktop.model.SshTarget
@@ -724,8 +725,8 @@ class NodeWizardModelTest {
         assertTrue(wizard.useVolga && wizard.useMailru)
 
         wizard.useVolga = false
-        wizard.useCups = true
-        wizard.cupsInput = "WyJyb29tLTEiXQ"
+        wizard.useBoards = true
+        wizard.boardInput = boardLink
         wizard.next()
         advanceUntilIdle()
         assertEquals(WizardStep.Done, wizard.step, wizard.verifyFailed ?: wizard.error ?: "")
@@ -743,7 +744,7 @@ class NodeWizardModelTest {
     fun aProfileWhoseChannelIsNotOnTheServerIsReported() = runTest {
         val env = Env()
         val before = installedChannel(env, profile = true)!!
-        val other = before.copy(carriers = before.carriers.map { if (it.type == TransportType.DIRECT) it.copy(value = "$serverIp:40000") else it })
+        val other = Profile.fromShare(env.container.shareCodec.decode(profileLink(env, 40000)), "p-other", 8L, ProfileSource.Node)
         val wizard = NodeWizardModel(env.container, this)
         wizard.forProfile(other)
         wizard.password = "ssh-pass"
@@ -755,21 +756,30 @@ class NodeWizardModelTest {
     }
 
     @Test
-    fun onlyAProfileWithAKeyAndADirectPortHasANodeToChange() {
-        val link = FakeShareLinkCodec().decode(
-            FakeShareLinkCodec().encode(
-                ShareConfig(
-                    name = "n", negotiate = true, secret = "ab".repeat(32), context = docUrl,
-                    transports = listOf(ShareTransport(type = "direct", dial = "$serverIp:31337", priority = 50)),
-                ),
-            ),
-        )
-        val node = Profile.fromShare(link, "p-1", 1L, ProfileSource.Node)
+    fun onlyAProfileWithAKeyAndADirectPortHasANodeToChange() = runTest {
+        val env = Env()
+        val node = Profile.fromShare(env.container.shareCodec.decode(profileLink(env, 31337)), "p-1", 1L, ProfileSource.Node)
         assertTrue(node.editableNode)
         assertFalse(node.copy(source = ProfileSource.Subscription).editableNode, "a subscription's profile is not the person's node")
         assertFalse(node.copy(secret = "").editableNode)
-        assertFalse(node.copy(carriers = node.carriers.filter { it.type != TransportType.DIRECT }).editableNode)
+        val noDirect = ShareConfig(
+            name = "n", negotiate = true, secret = "ab".repeat(32), context = docUrl,
+            transports = listOf(ShareTransport(type = "vyandex", url = docUrl, priority = 90)),
+        )
+        val viaDocument = Profile.fromShare(env.container.shareCodec.decode(env.container.shareCodec.encode(noDirect)), "p-2", 1L, ProfileSource.Node)
+        assertFalse(viaDocument.editableNode, "no direct address: the server is not known")
     }
+
+    private suspend fun profileLink(env: Env, port: Int): String =
+        env.container.shareCodec.encode(
+            ShareConfig(
+                name = "n", negotiate = true, secret = "ab".repeat(32), context = docUrl,
+                transports = listOf(
+                    ShareTransport(type = "vyandex", url = docUrl, priority = 90),
+                    ShareTransport(type = "direct", dial = "$serverIp:$port", priority = 50),
+                ),
+            ),
+        )
 
     /** The document is named after the node and the time, never "openflux", and never after the server's address. */
     @Test
