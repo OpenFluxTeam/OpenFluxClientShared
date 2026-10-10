@@ -142,8 +142,13 @@ fun AccountScreen(model: SubscriptionScreenModel, state: SubscriptionState, loca
                     Row(Modifier.fillMaxWidth().padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.m), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(d.name + if (d.current || d.id == state.deviceId) " · это устройство" else "", style = AppTheme.typography.bodyStrong, color = AppTheme.colors.text)
-                            if (d.lastSeen > 0) {
-                                Text("был в сети " + Format.ago(nowMillis - d.lastSeen * 1000), style = AppTheme.typography.caption, color = AppTheme.colors.textSecondary)
+                            // The service notes a device when it asks, which is not each minute: this one is here by definition.
+                            val here = d.current || d.id == state.deviceId
+                            if (here || d.lastSeen > 0) {
+                                Text(
+                                    if (here) "сейчас на связи" else "был в сети " + Format.ago(nowMillis - d.lastSeen * 1000),
+                                    style = AppTheme.typography.caption, color = AppTheme.colors.textSecondary,
+                                )
                             }
                         }
                         if (!(d.current || d.id == state.deviceId)) {
