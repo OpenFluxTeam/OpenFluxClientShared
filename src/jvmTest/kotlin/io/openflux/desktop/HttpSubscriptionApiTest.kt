@@ -69,8 +69,8 @@ class HttpSubscriptionApiTest {
         return ServiceEndpoint("http://127.0.0.1:${s.address.port}")
     }
 
-    private val keystore: KeyStore = KeyStore.getInstance("PKCS12").apply {
-        javaClass.classLoader.getResourceAsStream("pinned-test.p12")!!.use { load(it, "changeit".toCharArray()) }
+    private val keystore: KeyStore = KeyStore.getInstance("PKCS12").also { store ->
+        HttpSubscriptionApiTest::class.java.classLoader.getResourceAsStream("pinned-test.p12")!!.use { store.load(it, "changeit".toCharArray()) }
     }
 
     /** The test certificate's pin, as the service prints it. */
