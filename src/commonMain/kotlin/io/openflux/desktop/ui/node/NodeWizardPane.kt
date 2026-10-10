@@ -304,9 +304,27 @@ private fun ColumnScope.DocumentStep(model: NodeWizardModel) {
             }
         }
         Spacer(Modifier.height(AppTheme.spacing.l))
+        if (model.editing == null && probe.channels.isNotEmpty()) {
+            InstalledChannels(model, probe.channels)
+            Spacer(Modifier.height(AppTheme.spacing.l))
+        }
     }
-    AppTextField(model.name, { model.name = it }, label = "Название профиля", enabled = idle)
-    model.channel?.let { Note("Канал: ${it.id}. Для него создан отдельный ключ шифрования, его знают только это устройство и нода.") }
+    val editing = model.editing
+    if (editing != null) {
+        Banner(
+            "Меняются транспорты канала ${editing.id} (порт ${editing.port}, ${if (editing.running) "работает" else editing.state.ifBlank { "состояние неизвестно" }}). " +
+                "Ключ, порт и контекст шифрования останутся прежними: выданные ссылки продолжат работать.",
+            Tone.Accent, icon = Icons.Rounded.Info,
+        )
+        if (!model.editingHasProfile) {
+            Note("Профиля этого канала на устройстве нет: изменения применятся на сервере, а проверить канал и обновить ссылку можно там, где он создан.")
+        }
+        Spacer(Modifier.height(AppTheme.spacing.l))
+    }
+    AppTextField(model.name, { model.name = it }, label = "Название профиля", enabled = idle && editing == null)
+    if (editing == null) {
+        model.channel?.let { Note("Канал: ${it.id}. Для него создан отдельный ключ шифрования, его знают только это устройство и нода.") }
+    }
 
     Spacer(Modifier.height(AppTheme.spacing.xl))
     SectionLabel("Транспорты")
@@ -408,9 +426,49 @@ private fun ColumnScope.DocumentStep(model: NodeWizardModel) {
         VolgaDocument(model)
     }
 
+    if (editing != null && model.needsSudoPassword) {
+        Spacer(Modifier.height(AppTheme.spacing.l))
+        AppTextField(model.sudoPassword, { model.sudoPassword = it }, label = "Пароль sudo пользователя ${model.user.trim()}",
+            secret = true, enabled = idle, helper = "Для изменения канала нужны права root")
+    }
     if (!model.needsYandexDocument || model.documentUrl.isNotEmpty()) {
         Actions {
-            AppButton(if (idle) "Далее" else "Подождите…", model::next, enabled = idle)
+            if (editing != null) {
+                AppButton(if (idle) "Применить" else "Подождите…", model::next, enabled = idle)
+                AppButton("Отменить изменение", model::cancelEditing, style = ButtonStyle.Secondary, enabled = idle)
+            } else {
+                AppButton(if (idle) "Далее" else "Подождите…", model::next, enabled = idle)
+            }
+        }
+    } else if (editing != null) {
+        Actions {
+            AppButton("Отменить изменение", model::cancelEditing, style = ButtonStyle.Secondary, enabled = idle)
+        }
+    }
+}
+
+/** The channels already on the server: each can get other documents, its links stay. */
+@Composable
+private fun InstalledChannels(model: NodeWizardModel, channels: List<String>) {
+    val idle = model.busy == null
+    SectionLabel("Каналы на сервере")
+    Note("Документы канала можно добавить или убрать: ключ, порт и контекст останутся, выданные ссылки продолжат работать.")
+    Spacer(Modifier.height(AppTheme.spacing.s))
+    if (model.needsSudoPassword && model.useKey) {
+        AppTextField(model.sudoPassword, { model.sudoPassword = it }, label = "Пароль sudo пользователя ${model.user.trim()}",
+            secret = true, enabled = idle, helper = "Чтобы прочитать и изменить канал, нужны права root")
+        Spacer(Modifier.height(AppTheme.spacing.s))
+    }
+    AppCard(padding = 0.dp) {
+        channels.forEachIndexed { i, id ->
+            if (i > 0) HorizontalRule()
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.s),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(id, style = AppTheme.typography.bodyStrong, color = AppTheme.colors.text, modifier = Modifier.weight(1f))
+                AppButton("Изменить транспорты", { model.editChannel(id) }, style = ButtonStyle.Secondary, enabled = idle)
+            }
         }
     }
 }
@@ -558,7 +616,9 @@ private fun ColumnScope.VerifyStep(model: NodeWizardModel) {
     Actions {
         AppButton("Повторить проверку", model::verify, leading = Icons.Rounded.Refresh, enabled = idle && model.installed)
         if (model.installed) {
-            AppButton("Удалить канал с сервера", model::removeChannel, style = ButtonStyle.Secondary, leading = Icons.Rounded.Delete, enabled = idle)
+            if (model.canRemoveChannel) {
+                AppButton("Удалить канал с сервера", model::removeChannel, style = ButtonStyle.Secondary, leading = Icons.Rounded.Delete, enabled = idle)
+            }
             AppButton("Сохранить профиль всё равно", model::skipVerification, style = ButtonStyle.Ghost, enabled = idle)
         }
     }

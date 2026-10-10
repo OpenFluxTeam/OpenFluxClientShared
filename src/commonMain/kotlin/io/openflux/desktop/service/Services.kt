@@ -14,7 +14,9 @@ import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.LogLine
 import io.openflux.desktop.model.NewChannel
 import io.openflux.desktop.model.NodePlan
+import io.openflux.desktop.model.InstalledChannel
 import io.openflux.desktop.model.NodeTransport
+import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.ServerProbe
 import io.openflux.desktop.model.SshTarget
 import io.openflux.desktop.model.InstalledScript
@@ -295,6 +297,23 @@ interface NodeWizardService {
         cookieHeader: String,
     )
     suspend fun remove(channel: String, sudoPassword: String)
+
+    /** A channel already on the server: its documents, port, state and encryption context (needs root). */
+    suspend fun showChannel(channel: String, sudoPassword: String): InstalledChannel =
+        throw NodeWizardException("Изменение каналов на сервере здесь не поддерживается")
+
+    /**
+     * Changes the documents of a channel already on the server (some added,
+     * some removed; direct stays). Its key, port and encryption context stay,
+     * so its links keep working. [cookieHeader], when not empty, is a new
+     * Yandex sign-in for its Yandex document. Returns the channel as it is now.
+     */
+    suspend fun setTransports(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String = ""): InstalledChannel =
+        throw NodeWizardException("Изменение каналов на сервере здесь не поддерживается")
+
+    /** [shareLink] for a channel already on the server: the link keeps its [context]. */
+    suspend fun channelShareLink(name: String, key: String, host: String, port: Int, transports: List<NodeTransport>, context: String): String =
+        throw NodeWizardException("Изменение каналов на сервере здесь не поддерживается")
     /** Whether the node can use the Yandex document (edit by link), as an anonymous visitor. */
     suspend fun checkDocument(documentUrl: String)
     /** New cups.online rooms for the channel: the packed list the node and its link take. */

@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.ExitAddress
+import io.openflux.desktop.model.InstalledChannel
 import io.openflux.desktop.model.KnownServer
 import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.NewChannel
@@ -154,6 +155,17 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
     var saved by mutableStateOf(false)
         private set
     private var stopWaitingForPrimary = false
+
+    // Changing the documents of a channel already on the server.
+    /** The installed channel whose documents are being changed; null while a new one is made. */
+    var editing by mutableStateOf<InstalledChannel?>(null)
+        private set
+    /** [editing]'s saved profile on this device (it holds the key), to give it the new documents. */
+    private var editingProfile: Profile? = null
+    /** This device has [editing]'s profile, so the wizard can check the channel and update the profile. */
+    val editingHasProfile: Boolean get() = editingProfile != null
+    /** A failed check may remove only a channel this wizard made, never one it was asked to change. */
+    val canRemoveChannel: Boolean get() = editing == null
 
     private var job: Job? = null
 
@@ -310,7 +322,8 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
             if (!e.captcha) throw e
             "Яндекс попросил проверку у этого устройства, поэтому документ проверит сама нода при запуске."
         }
-        proceed()
+        // A channel being changed is changed only on "Применить".
+        if (editing == null) proceed()
     }
 
     /** Goes on to the plan once the Yandex document is ready or not chosen. */
@@ -349,6 +362,7 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
             chosen += NodeTransport(TransportType.CUPSONLINE.cliName, cupsRooms)
         }
         transports = chosen
+        editing?.let { applyEdit(it); return }
         askPlan()
         if (needsSudoPassword && sudoPassword.isEmpty() && !useKey) sudoPassword = password
         step = WizardStep.Plan
@@ -404,6 +418,7 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
     fun back() {
         if (busy != null) return
         error = null
+        if (step == WizardStep.Document && editing != null) { cancelEditing(); return }
         step = when (step) {
             WizardStep.Document -> WizardStep.Server
             WizardStep.Plan -> WizardStep.Document
@@ -522,7 +537,109 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
         step = WizardStep.Done
     }
 
+    // ---- a channel already on the server ----
+
+    /** Reads [id] on the server and fills the transports step with its documents. */
+    fun editChannel(id: String) {
+        if (needsSudoPassword && sudoPassword.isEmpty() && !useKey) sudoPassword = password
+        if (needsSudoPassword && sudoPassword.isEmpty()) { error = "Введите пароль sudo"; return }
+        launchCall("Читаю канал $id на сервере…", onFailure = { e ->
+            if (e.sudo) { error = "sudo не принял пароль"; true } else false
+        }) {
+            startEditing(onServer { service.showChannel(id, sudoPassword) })
+        }
+    }
+
+    private fun startEditing(info: InstalledChannel) {
+        fun url(type: TransportType) = info.transports.firstOrNull { it.type == type.cliName }?.url.orEmpty()
+        editing = info
+        val yandex = url(TransportType.VYANDEX).ifEmpty { url(TransportType.YANDEX) }
+        useVolga = url(TransportType.VYANDEX).isNotEmpty()
+        useYandexDocs = url(TransportType.YANDEX).isNotEmpty()
+        documentUrl = yandex
+        documentInput = yandex
+        documentWarning = ""
+        useMailru = url(TransportType.MAILRU).isNotEmpty()
+        mailruInput = url(TransportType.MAILRU)
+        useBoards = url(TransportType.BOARDS).isNotEmpty()
+        boardInput = url(TransportType.BOARDS)
+        useCups = url(TransportType.CUPSONLINE).isNotEmpty()
+        cupsRooms = url(TransportType.CUPSONLINE)
+        yandexCookies = ""
+        cookiesDocument = ""
+        editingProfile = channelProfile(info)
+        editingProfile?.let { name = it.name }
+        notice = null
+        val types = info.transports.joinToString(",") { it.type }.ifEmpty { "direct" }
+        service.note("мастер: канал ${info.id}: $types, порт ${info.port}, ${info.state}", LogLevel.Info)
+    }
+
+    /**
+     * The saved profile of an installed channel: a node profile with the key
+     * whose direct carrier dials this server at the channel's port.
+     */
+    private fun channelProfile(info: InstalledChannel): Profile? {
+        val host = host.trim()
+        val dials = setOf("$host:${info.port}", "[$host]:${info.port}")
+        return container.profiles.profiles.value.firstOrNull { p ->
+            p.source == ProfileSource.Node && p.secret.isNotBlank() &&
+                p.carriers.any { it.type == TransportType.DIRECT && it.value.trim() in dials }
+        }
+    }
+
+    /** Back to making a new channel. */
+    fun cancelEditing() {
+        if (busy != null) return
+        editing = null
+        editingProfile = null
+        useVolga = true
+        useYandexDocs = false
+        useMailru = false
+        useBoards = false
+        useCups = false
+        documentUrl = ""
+        documentInput = ""
+        documentWarning = ""
+        mailruInput = ""
+        boardInput = ""
+        cupsRooms = ""
+        name = "Нода ${host.trim()}"
+        error = null
+    }
+
+    /**
+     * Changes [current]'s documents on the server (its key, port and context
+     * stay), then, when this device has its profile, checks the channel
+     * through the new documents like a new one and offers the profile back.
+     */
+    private suspend fun applyEdit(current: InstalledChannel) {
+        if (transports.isEmpty()) throw NodeWizardException("Оставьте хотя бы один документ: без него канал не нужен")
+        if (needsSudoPassword && sudoPassword.isEmpty() && !useKey) sudoPassword = password
+        if (needsSudoPassword && sudoPassword.isEmpty()) throw NodeWizardException("Введите пароль sudo")
+        busy = "Меняю транспорты канала ${current.id} на сервере…"
+        val cookies = if (withCookies) yandexCookies else ""
+        val now = onServer { service.setTransports(current.id, transports, sudoPassword, cookies) }
+        yandexCookies = ""
+        editing = now
+        val described = NodeTransports.describe(now.transportTypes)
+        service.note("мастер: транспорты канала ${now.id} изменены: $described", LogLevel.Info)
+        val saved = editingProfile
+        if (saved == null) {
+            notice = "Транспорты канала ${now.id} изменены: $described. Ключ этого канала хранится на устройстве, " +
+                "где он создан: прежняя ссылка продолжает работать, новые документы появятся в ней после обновления профиля там."
+            return
+        }
+        val link = service.channelShareLink(saved.name, saved.secret, host.trim(), now.port, now.transports, now.context)
+        shareLink = link
+        val candidate = Profile.fromShare(container.shareCodec.decode(link), saved.id, saved.createdAt, ProfileSource.Node)
+            .copy(icon = saved.icon, name = saved.name)
+        profile = candidate
+        installed = true
+        verifyNow(candidate)
+    }
+
     fun removeChannel() {
+        if (!canRemoveChannel) return
         val channel = channel ?: return
         launchCall("Удаляю канал с сервера…", onFailure = { e ->
             if (e.sudo) { error = "sudo не принял пароль"; true } else false

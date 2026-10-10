@@ -30,6 +30,7 @@ import io.openflux.desktop.service.NodeWizardService
 import io.openflux.desktop.service.PlatformServices
 import io.openflux.desktop.service.ProfileRepository
 import io.openflux.desktop.service.SettingsRepository
+import io.openflux.desktop.model.InstalledChannel
 import io.openflux.desktop.model.NodeDocuments
 import io.openflux.desktop.model.YandexDocument
 import io.openflux.desktop.ui.BrowserPage
@@ -539,6 +540,143 @@ class NodeWizardModelTest {
         assertFalse(NodeDocuments.signedIn("yandexuid=1; sessionid2=abc"))
     }
 
+    private val mailruLink = "https://cloud.mail.ru/public/DEmN/ETbZW2MPY"
+    private val boardLink = "https://boards.yandex.ru/whiteboard/?hash=820d6571111dffeb9e85de65ccfc880a"
+
+    /** A channel of-old on the server (Volga and Mail.ru, port 31337) and, with [profile], its saved profile here. */
+    private suspend fun installedChannel(env: Env, profile: Boolean): Profile? {
+        val transports = listOf(NodeTransport("vyandex", docUrl), NodeTransport("mailru", mailruLink))
+        env.node.installed["of-old"] = InstalledChannel("of-old", "active", 31337, docUrl, transports)
+        env.settings.update { it.copy(knownHostKeys = mapOf("$serverIp:22" to "SHA256:new")) }
+        if (!profile) return null
+        val link = env.node.shareLink("Моя нода", "cd".repeat(32), serverIp, 31337, transports)
+        val saved = Profile.fromShare(env.container.shareCodec.decode(link), "p-old", 7L, ProfileSource.Node)
+            .copy(name = "Моя нода", icon = "ic_terminal")
+        env.profiles.upsert(saved)
+        return saved
+    }
+
+    @Test
+    fun changingTheDocumentsOfAnInstalledChannelKeepsItsProfileAndContext() = runTest {
+        val env = Env()
+        val before = installedChannel(env, profile = true)!!
+        env.connection.active = "mailru"
+        val wizard = NodeWizardModel(env.container, this)
+        wizard.host = serverIp
+        wizard.password = "ssh-pass"
+        wizard.connect()
+        advanceUntilIdle()
+        assertEquals(listOf("of-old"), wizard.probe?.channels)
+
+        wizard.editChannel("of-old")
+        advanceUntilIdle()
+        assertNull(wizard.error)
+        assertEquals("of-old", wizard.editing?.id)
+        assertTrue(wizard.editingHasProfile)
+        assertFalse(wizard.canRemoveChannel)
+        // The transports step shows what the channel has now.
+        assertTrue(wizard.useVolga && wizard.useMailru && !wizard.useBoards && !wizard.useCups)
+        assertEquals(docUrl, wizard.documentUrl)
+        assertEquals(mailruLink, wizard.mailruInput)
+        assertEquals("Моя нода", wizard.name)
+
+        // Volga goes, a board comes.
+        wizard.useVolga = false
+        wizard.useBoards = true
+        wizard.boardInput = "$boardLink&from=x"
+        wizard.next()
+        advanceUntilIdle()
+        assertEquals(WizardStep.Done, wizard.step, wizard.verifyFailed ?: wizard.error ?: "")
+        assertEquals(listOf("of-old" to listOf(NodeTransport("mailru", mailruLink), NodeTransport("boards", boardLink))), env.node.setTransportsCalls)
+        assertTrue(env.node.plannedTransports.isEmpty(), "a channel being changed is not planned or installed again")
+        assertTrue(env.node.applied.isEmpty())
+        // The link keeps the channel's context, though its first document is now Mail.ru.
+        assertEquals(listOf(docUrl), env.node.linkContexts)
+
+        val saved = wizard.save()!!
+        assertEquals(before.id, saved.id)
+        assertEquals(before.createdAt, saved.createdAt)
+        assertEquals("Моя нода", saved.name)
+        assertEquals(before.secret, saved.secret)
+        assertEquals(docUrl, saved.context)
+        assertEquals(listOf(TransportType.MAILRU, TransportType.BOARDS, TransportType.DIRECT), saved.carriers.map { it.type })
+        assertEquals("$serverIp:31337", saved.carriers.last().value)
+        assertEquals(listOf(saved), env.profiles.profiles.value, "the profile is replaced, not added")
+    }
+
+    @Test
+    fun changingAChannelWithoutItsProfileChangesTheServerOnly() = runTest {
+        val env = Env()
+        installedChannel(env, profile = false)
+        val wizard = NodeWizardModel(env.container, this)
+        wizard.host = serverIp
+        wizard.password = "ssh-pass"
+        wizard.connect()
+        advanceUntilIdle()
+        wizard.editChannel("of-old")
+        advanceUntilIdle()
+        assertFalse(wizard.editingHasProfile)
+        wizard.useCups = true
+        wizard.next()
+        advanceUntilIdle()
+        assertNull(wizard.error)
+        assertEquals(WizardStep.Document, wizard.step)
+        assertEquals(listOf("vyandex", "mailru", "cupsonline"), env.node.setTransportsCalls.single().second.map { it.type })
+        assertTrue(wizard.notice.orEmpty().contains("изменены"), wizard.notice ?: "")
+        assertTrue(env.node.linkContexts.isEmpty())
+        assertTrue(env.profiles.profiles.value.isEmpty())
+    }
+
+    @Test
+    fun aChannelNeedsADocumentAndEditingCanBeCancelled() = runTest {
+        val env = Env()
+        installedChannel(env, profile = true)
+        val wizard = NodeWizardModel(env.container, this)
+        wizard.host = serverIp
+        wizard.password = "ssh-pass"
+        wizard.connect()
+        advanceUntilIdle()
+        wizard.editChannel("of-old")
+        advanceUntilIdle()
+        wizard.useVolga = false
+        wizard.useMailru = false
+        wizard.next()
+        advanceUntilIdle()
+        assertTrue(wizard.error.orEmpty().contains("хотя бы один документ"), wizard.error ?: "")
+        assertTrue(env.node.setTransportsCalls.isEmpty())
+
+        wizard.cancelEditing()
+        assertNull(wizard.editing)
+        assertTrue(wizard.canRemoveChannel)
+        assertTrue(wizard.useVolga && !wizard.useMailru)
+        assertEquals("", wizard.documentUrl)
+        assertEquals("Нода $serverIp", wizard.name)
+        // A new channel again: planned, not changed.
+        wizard.useVolga = false
+        wizard.useMailru = true
+        wizard.mailruInput = mailruLink
+        wizard.next()
+        advanceUntilIdle()
+        assertEquals(WizardStep.Plan, wizard.step)
+        assertEquals("of-test12", wizard.channel?.id)
+        assertTrue(env.node.setTransportsCalls.isEmpty())
+    }
+
+    @Test
+    fun anUnknownChannelIsReported() = runTest {
+        val env = Env()
+        installedChannel(env, profile = false)
+        val wizard = NodeWizardModel(env.container, this)
+        wizard.host = serverIp
+        wizard.password = "ssh-pass"
+        wizard.connect()
+        advanceUntilIdle()
+        wizard.editChannel("of-gone")
+        advanceUntilIdle()
+        assertNull(wizard.editing)
+        assertTrue(wizard.error.orEmpty().contains("нет на сервере"), wizard.error ?: "")
+    }
+
     /** The document is named after the node and the time, never "openflux", and never after the server's address. */
     @Test
     fun documentNames() {
@@ -580,7 +718,35 @@ class NodeWizardModelTest {
             if (target.hostKey != "SHA256:new") throw NodeWizardException("новый сервер", hostKey = "SHA256:new", trust = true)
             connects++
             dropped = false
-            return ServerProbe(arch = "amd64", os = "Debian 12", systemd = true, sudo = "password")
+            return ServerProbe(arch = "amd64", os = "Debian 12", systemd = true, sudo = "password", channels = installed.keys.toList())
+        }
+
+        /** Channels already on the fake server. */
+        val installed = linkedMapOf<String, InstalledChannel>()
+        val setTransportsCalls = mutableListOf<Pair<String, List<NodeTransport>>>()
+        val linkContexts = mutableListOf<String>()
+
+        override suspend fun showChannel(channel: String, sudoPassword: String): InstalledChannel {
+            if (sudoFails) throw NodeWizardException("sudo не принял пароль", sudo = true)
+            return installed[channel] ?: throw NodeWizardException("канала $channel нет на сервере")
+        }
+
+        override suspend fun setTransports(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String): InstalledChannel {
+            setTransportsCalls += channel to transports
+            val now = installed.getValue(channel).copy(transports = transports)
+            installed[channel] = now
+            return now
+        }
+
+        override suspend fun channelShareLink(name: String, key: String, host: String, port: Int, transports: List<NodeTransport>, context: String): String {
+            linkContexts += context
+            return codec.encode(
+                ShareConfig(
+                    name = name, negotiate = true, secret = key, context = context,
+                    transports = transports.mapIndexed { i, t -> ShareTransport(type = t.type, url = t.url, priority = 100 - 10 * i) } +
+                        ShareTransport(type = "direct", dial = "$host:$port", priority = 50),
+                ),
+            )
         }
 
         override suspend fun newChannel() = NewChannel("of-test12", "ab".repeat(32))

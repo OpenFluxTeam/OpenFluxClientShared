@@ -1,6 +1,7 @@
 package io.openflux.desktop.node
 
 import io.openflux.desktop.core.CoreBinary
+import io.openflux.desktop.model.InstalledChannel
 import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.LogLine
 import io.openflux.desktop.model.NewChannel
@@ -114,6 +115,34 @@ class CoreNodeWizard(
             put("sudoPassword", sudoPassword)
         }
     }
+
+    override suspend fun showChannel(channel: String, sudoPassword: String): InstalledChannel {
+        val reply = call("showChannel", "channel=$channel") {
+            put("channel", channel)
+            put("sudoPassword", sudoPassword)
+        }
+        return json.decodeFromJsonElement(InstalledChannel.serializer(), reply.getValue("channel"))
+    }
+
+    override suspend fun setTransports(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String): InstalledChannel {
+        val reply = call("setTransports", "channel=$channel ${transports.names()}") {
+            put("channel", channel)
+            put("transports", transports.json())
+            put("sudoPassword", sudoPassword)
+            put("cookies", cookieHeader)
+        }
+        return json.decodeFromJsonElement(InstalledChannel.serializer(), reply.getValue("channel"))
+    }
+
+    override suspend fun channelShareLink(name: String, key: String, host: String, port: Int, transports: List<NodeTransport>, context: String): String =
+        call("shareLink", "$host:$port ${transports.names()} context") {
+            put("name", name)
+            put("key", key)
+            put("host", host)
+            put("channelPort", port)
+            put("transports", transports.json())
+            put("context", context)
+        }.string("link")
 
     override suspend fun checkDocument(documentUrl: String) {
         call("checkDocument") { put("documentUrl", documentUrl) }

@@ -57,6 +57,24 @@ data class NodeTransport(val type: String, val url: String) {
     override fun toString() = "NodeTransport($type)"
 }
 
+/**
+ * A channel already on the server, as node-install.sh show reports it: its
+ * carriers besides direct, direct's [port], systemd's [state] and the
+ * encryption [context] its links were made with. Changing its documents keeps
+ * the key, the port and the context, so the links handed out keep working.
+ */
+@Serializable
+data class InstalledChannel(
+    @kotlinx.serialization.SerialName("channel") val id: String,
+    val state: String = "",
+    val port: Int = 0,
+    val context: String = "",
+    val transports: List<NodeTransport> = emptyList(),
+) {
+    val running: Boolean get() = state == "active"
+    val transportTypes: List<TransportType> get() = transports.mapNotNull { TransportType.fromCli(it.type) }
+}
+
 object NodeTransports {
     /** What the wizard offers besides direct, in the node's priority order. */
     val offered = listOf(TransportType.VYANDEX, TransportType.YANDEX, TransportType.MAILRU, TransportType.BOARDS, TransportType.CUPSONLINE)
