@@ -702,6 +702,75 @@ class NodeWizardModelTest {
         assertTrue(wizard.error.orEmpty().contains("нет на сервере"), wizard.error ?: "")
     }
 
+    /** From a profile's settings: the address and channel come from the profile, only the password is asked. */
+    @Test
+    fun aProfilesNodeIsChangedFromItsSettings() = runTest {
+        val env = Env()
+        val before = installedChannel(env, profile = true)!!
+        env.connection.active = "mailru"
+        assertTrue(before.editableNode)
+        val wizard = NodeWizardModel(env.container, this)
+        wizard.forProfile(before)
+        assertEquals(serverIp, wizard.host)
+        assertEquals("Моя нода", wizard.name)
+        assertEquals(NodeCoreSource.Fork, wizard.nodeCore)
+        wizard.password = "ssh-pass"
+        wizard.connect()
+        advanceUntilIdle()
+        // No Plan or Document of a new channel: the profile's channel is opened at once.
+        assertNull(wizard.error, wizard.error ?: "")
+        assertEquals(WizardStep.Document, wizard.step)
+        assertEquals("of-old", wizard.editing?.id)
+        assertTrue(wizard.useVolga && wizard.useMailru)
+
+        wizard.useVolga = false
+        wizard.useCups = true
+        wizard.cupsInput = "WyJyb29tLTEiXQ"
+        wizard.next()
+        advanceUntilIdle()
+        assertEquals(WizardStep.Done, wizard.step, wizard.verifyFailed ?: wizard.error ?: "")
+        assertTrue(env.node.applied.isEmpty())
+        assertEquals(listOf(docUrl), env.node.linkContexts, "the link keeps the key's context")
+        val saved = wizard.save()!!
+        assertEquals(before.id, saved.id)
+        assertEquals(before.secret, saved.secret)
+        assertEquals(listOf(saved), env.profiles.profiles.value, "the profile is replaced, not added")
+        assertTrue(saved.carriers.any { it.type == TransportType.BOARDS })
+    }
+
+    /** A profile of another server (no such port there) is reported, and Back returns to the password. */
+    @Test
+    fun aProfileWhoseChannelIsNotOnTheServerIsReported() = runTest {
+        val env = Env()
+        val before = installedChannel(env, profile = true)!!
+        val other = before.copy(carriers = before.carriers.map { if (it.type == TransportType.DIRECT) it.copy(value = "$serverIp:40000") else it })
+        val wizard = NodeWizardModel(env.container, this)
+        wizard.forProfile(other)
+        wizard.password = "ssh-pass"
+        wizard.connect()
+        advanceUntilIdle()
+        assertTrue(wizard.error.orEmpty().contains("нет канала с портом 40000"), wizard.error ?: "")
+        assertNull(wizard.editing)
+        assertEquals(WizardStep.Server, wizard.step)
+    }
+
+    @Test
+    fun onlyAProfileWithAKeyAndADirectPortHasANodeToChange() {
+        val link = FakeShareLinkCodec().decode(
+            FakeShareLinkCodec().encode(
+                ShareConfig(
+                    name = "n", negotiate = true, secret = "ab".repeat(32), context = docUrl,
+                    transports = listOf(ShareTransport(type = "direct", dial = "$serverIp:31337", priority = 50)),
+                ),
+            ),
+        )
+        val node = Profile.fromShare(link, "p-1", 1L, ProfileSource.Node)
+        assertTrue(node.editableNode)
+        assertFalse(node.copy(source = ProfileSource.Subscription).editableNode, "a subscription's profile is not the person's node")
+        assertFalse(node.copy(secret = "").editableNode)
+        assertFalse(node.copy(carriers = node.carriers.filter { it.type != TransportType.DIRECT }).editableNode)
+    }
+
     /** The document is named after the node and the time, never "openflux", and never after the server's address. */
     @Test
     fun documentNames() {
