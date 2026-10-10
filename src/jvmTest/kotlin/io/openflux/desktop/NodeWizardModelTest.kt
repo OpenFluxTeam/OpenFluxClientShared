@@ -89,6 +89,7 @@ class NodeWizardModelTest {
         assertEquals(serverIp, wizard.verifiedIp)
         assertTrue(wizard.primaryUp)
         assertTrue(wizard.unsaved)
+        assertEquals("of-test12, порт 31337", wizard.resultChannel)
         assertEquals(listOf<ConnectionMode?>(ConnectionMode.Client), env.connection.modes)
 
         val saved = wizard.save()!!
@@ -592,6 +593,7 @@ class NodeWizardModelTest {
         assertTrue(env.node.applied.isEmpty())
         // The link keeps the channel's context, though its first document is now Mail.ru.
         assertEquals(listOf(docUrl), env.node.linkContexts)
+        assertEquals("of-old, порт 31337", wizard.resultChannel, "the done step names the channel that was changed")
 
         val saved = wizard.save()!!
         assertEquals(before.id, saved.id)
