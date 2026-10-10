@@ -59,7 +59,7 @@ fun UpdateBanner(modifier: Modifier = Modifier) {
         }
         is UpdateState.Installing -> Column(modifier.padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.s)) {
             Banner(
-                s.note ?: "Установщик запущен.",
+                s.note ?: "Устанавливаю версию ${s.release.version}…",
                 Tone.Success,
                 icon = Icons.Rounded.Download,
                 action = { TextAction("Закрыть", updates::dismiss) },

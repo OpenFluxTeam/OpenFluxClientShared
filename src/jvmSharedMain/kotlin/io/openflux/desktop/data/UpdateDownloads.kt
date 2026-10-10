@@ -69,6 +69,11 @@ object UpdateDownloads {
         val target = File(dir, name)
         val part = File(dir, "$name.part")
         part.delete()
+        // A file downloaded and checked earlier (the person had to allow installing first): no second download.
+        if (target.isFile && sha256Of(target).equals(sha256, ignoreCase = true)) {
+            onProgress(target.length(), target.length())
+            return@withContext target
+        }
         val c = open(url, 60_000)
         try {
             val total = c.contentLengthLong.coerceAtLeast(0)
@@ -108,6 +113,19 @@ object UpdateDownloads {
         } finally {
             c.disconnect()
         }
+    }
+
+    private fun sha256Of(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                digest.update(buffer, 0, n)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private const val MAX_TEXT = 4 * 1024 * 1024

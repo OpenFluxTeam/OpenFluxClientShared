@@ -152,7 +152,7 @@ class JvmPlatformServices(
     override suspend fun downloadUpdate(asset: io.openflux.desktop.model.AppAsset, sha256: String, onProgress: (Long, Long) -> Unit): String {
         val dir = File(io.openflux.desktop.data.AppDirs.config, "updates")
         // Installers of earlier updates are of no use any more.
-        dir.listFiles()?.forEach { it.delete() }
+        dir.listFiles()?.filter { it.name != asset.name }?.forEach { it.delete() }
         return io.openflux.desktop.data.UpdateDownloads.file(asset.url, dir, asset.name, sha256, onProgress).absolutePath
     }
 

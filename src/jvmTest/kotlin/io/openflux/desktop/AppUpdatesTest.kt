@@ -345,6 +345,13 @@ class AppUpdatesTest {
             assertTrue(progress.isNotEmpty() && progress.last() == body.size.toLong() to body.size.toLong(), progress.toString())
             assertFalse(File(dir, "OpenFlux-1.0-setup.exe.part").exists())
 
+            // Asked again for the same file (and sum): it is not fetched twice.
+            server.removeContext("/ok")
+            server.removeContext("/redirect")
+            val again = kotlinx.coroutines.runBlocking { UpdateDownloads.file("$base/redirect", dir, "OpenFlux-1.0-setup.exe", sha(body)) { _, _ -> } }
+            assertEquals(file, again)
+            server.createContext("/ok") { ex -> ex.sendResponseHeaders(200, body.size.toLong()); ex.responseBody.use { it.write(body) } }
+
             // A wrong sum: nothing is left, not even the earlier file's name taken by a bad one.
             val bad = assertFailsWith<java.io.IOException> {
                 kotlinx.coroutines.runBlocking { UpdateDownloads.file("$base/ok", dir, "bad.exe", "0".repeat(64)) { _, _ -> } }

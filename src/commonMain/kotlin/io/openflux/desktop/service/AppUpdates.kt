@@ -98,6 +98,7 @@ class AppUpdates(
             val path = platform.downloadUpdate(asset, expected) { done, total ->
                 _state.value = UpdateState.Downloading(release, done, if (total > 0) total else asset.size)
             }
+            _state.value = UpdateState.Installing(release, null)
             val result = platform.installUpdate(path)
             _state.value = if (result.started) UpdateState.Installing(release, result.message)
             else UpdateState.Failed(result.message ?: "Не удалось запустить установку", release)
