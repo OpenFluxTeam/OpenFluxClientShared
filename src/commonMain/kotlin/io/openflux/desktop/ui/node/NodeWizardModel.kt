@@ -156,6 +156,32 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
         private set
     private var stopWaitingForPrimary = false
 
+    // The wizard opened from a profile's settings.
+    /**
+     * The profile whose node is being changed: the wizard was opened from its
+     * settings, so the server's address and the channel come from the profile
+     * and only the password is asked. Null for a wizard that makes a channel.
+     */
+    var profileTarget by mutableStateOf<Profile?>(null)
+        private set
+    /** The profile's direct port: the channel on the server that listens on it is the profile's. */
+    private var profileChannelPort = 0
+
+    /** Prepares the wizard for [profile] (see [Profile.editableNode]): its address in the form, the fork's installer. */
+    fun forProfile(profile: Profile) {
+        val direct = profile.carriers.firstOrNull { it.type == TransportType.DIRECT }?.value.orEmpty()
+        val channelPort = direct.substringAfterLast(':', "").toIntOrNull() ?: return
+        val hostPart = direct.substringBeforeLast(':').trim('[', ']')
+        if (hostPart.isEmpty()) return
+        profileTarget = profile
+        profileChannelPort = channelPort
+        host = hostPart
+        settings.settings.value.knownServers.firstOrNull { it.host == hostPart }?.let { port = it.port.toString(); user = it.user }
+        name = profile.name
+        // Only the fork's installer can read and change a running channel.
+        nodeCore = NodeCoreSource.Fork
+    }
+
     // Changing the documents of a channel already on the server.
     /** The installed channel whose documents are being changed; null while a new one is made. */
     var editing by mutableStateOf<InstalledChannel?>(null)
@@ -219,6 +245,10 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
             this.target = target
             lastServerReply = container.platform.now()
             settings.update { s -> s.copy(knownServers = NodeServers.remember(s.knownServers, KnownServer(host, port, user))) }
+            if (profileTarget != null) {
+                openProfileChannel()
+                return@launchCall
+            }
             if (channel == null) channel = service.newChannel()
             if (name.isBlank()) name = "Нода $host"
             step = WizardStep.Document
@@ -418,6 +448,13 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
     fun back() {
         if (busy != null) return
         error = null
+        if (step == WizardStep.Document && editing != null && profileTarget != null) {
+            editing = null
+            editingProfile = null
+            error = null
+            step = WizardStep.Server
+            return
+        }
         if (step == WizardStep.Document && editing != null) { cancelEditing(); return }
         step = when (step) {
             WizardStep.Document -> WizardStep.Server
@@ -550,6 +587,23 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
         }
     }
 
+    /** Finds the channel on the server that listens on the profile's port and opens it for editing. */
+    private suspend fun openProfileChannel() {
+        if (needsSudoPassword && sudoPassword.isEmpty() && !useKey) sudoPassword = password
+        if (needsSudoPassword && sudoPassword.isEmpty()) throw NodeWizardException("Введите пароль sudo")
+        var found: InstalledChannel? = null
+        for (id in probe?.channels.orEmpty()) {
+            busy = "Ищу канал профиля на сервере…"
+            val info = onServer { service.showChannel(id, sudoPassword) }
+            if (info.port == profileChannelPort) { found = info; break }
+        }
+        val channel = found ?: throw NodeWizardException(
+            "На сервере нет канала с портом $profileChannelPort. Возможно, этот профиль относится к другому серверу.",
+        )
+        startEditing(channel)
+        step = WizardStep.Document
+    }
+
     private fun startEditing(info: InstalledChannel) {
         fun url(type: TransportType) = info.transports.firstOrNull { it.type == type.cliName }?.url.orEmpty()
         editing = info
@@ -567,7 +621,7 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
         cupsRooms = url(TransportType.CUPSONLINE)
         yandexCookies = ""
         cookiesDocument = ""
-        editingProfile = channelProfile(info)
+        editingProfile = profileTarget ?: channelProfile(info)
         editingProfile?.let { name = it.name }
         notice = null
         val types = info.transports.joinToString(",") { it.type }.ifEmpty { "direct" }

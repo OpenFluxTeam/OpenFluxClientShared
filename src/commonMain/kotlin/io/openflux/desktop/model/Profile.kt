@@ -14,6 +14,15 @@ enum class ProfileSource(val label: String) {
 val Profile.managed: Boolean get() = source == ProfileSource.Subscription
 
 /**
+ * A profile of a node the person may run: it has a key and a direct address
+ * (host:port), and is not a subscription's. "Изменить транспорты на сервере" is
+ * offered for it, and asks for the password of the server.
+ */
+val Profile.editableNode: Boolean
+    get() = !managed && !stream && secret.isNotEmpty() &&
+        carriers.any { it.type == TransportType.DIRECT && it.value.substringAfterLast(':', "").toIntOrNull() != null }
+
+/**
  * The network a carrier leaves through. With bonding, carriers on different
  * networks (mobile data and Wi-Fi) add their speeds up. Kept on the device:
  * never in `openflux://` links.

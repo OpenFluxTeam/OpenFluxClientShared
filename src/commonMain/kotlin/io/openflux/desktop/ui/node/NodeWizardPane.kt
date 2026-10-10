@@ -179,11 +179,15 @@ fun NodeWizardPane(model: NodeWizardModel, onClose: () -> Unit, onSaved: (String
 @Composable
 private fun Header(model: NodeWizardModel, onClose: () -> Unit) {
     val (title, subtitle) = when (model.step) {
-        WizardStep.Server -> "Своя нода" to "Сервер (VDS) с Linux и systemd: Debian, Ubuntu и похожие."
+        WizardStep.Server -> if (model.profileTarget != null) {
+            "Нода профиля «${model.profileTarget?.name}»" to "Введите пароль от сервера, чтобы изменить транспорты на нём."
+        } else {
+            "Своя нода" to "Сервер (VDS) с Linux и systemd: Debian, Ubuntu и похожие."
+        }
         WizardStep.Document -> "Транспорты канала" to "Через что устройство и нода будут обмениваться зашифрованным трафиком."
         WizardStep.Plan -> "Будут изменения" to "На сервере будет сделано только это."
         WizardStep.Verify -> "Проверка канала" to "Подключаюсь к новой ноде и открываю сайт через неё."
-        WizardStep.Done -> "Нода готова" to when {
+        WizardStep.Done -> (if (model.editing != null) "Транспорты изменены" else "Нода готова") to when {
             model.verifiedIp.isNotEmpty() -> "Трафик выходит в интернет с адреса ${model.verifiedIp}."
             model.sessionProven -> "Нода ответила по защищённому каналу. Адрес выхода в режиме VPN видно в браузере: api.ipify.org."
             else -> "Канал установлен, но проверка не завершена."
@@ -239,7 +243,12 @@ private fun Actions(content: @Composable () -> Unit) {
 private fun ColumnScope.ServerStep(model: NodeWizardModel) {
     val settings by LocalAppContainer.current.settings.settings.collectAsState()
     val idle = model.busy == null
-    if (settings.knownServers.isNotEmpty()) {
+    val forProfile = model.profileTarget != null
+    if (forProfile) {
+        Note("Адрес и порт канала взяты из профиля. Меняется только набор документов; ключ шифрования, порт и ссылки остаются прежними.")
+        Spacer(Modifier.height(AppTheme.spacing.l))
+    }
+    if (settings.knownServers.isNotEmpty() && !forProfile) {
         SectionLabel("Недавние серверы")
         Note("Новый канал встанет рядом с уже установленными: так добавляют ещё одного пользователя.")
         Spacer(Modifier.height(AppTheme.spacing.s))
@@ -274,15 +283,21 @@ private fun ColumnScope.ServerStep(model: NodeWizardModel) {
     } else {
         AppTextField(model.password, { model.password = it }, label = "Пароль", secret = true, enabled = idle)
     }
+    if (forProfile && model.useKey) {
+        Spacer(Modifier.height(AppTheme.spacing.m))
+        AppTextField(model.sudoPassword, { model.sudoPassword = it }, label = "Пароль sudo (если сервер его просит)", secret = true, enabled = idle)
+    }
     Note("Пароль и ключ нужны только на время установки: OpenFlux их не сохраняет.")
-    Spacer(Modifier.height(AppTheme.spacing.l))
-    SectionLabel("Ядро на сервере")
-    Spacer(Modifier.height(AppTheme.spacing.s))
-    Segmented(NodeCoreSource.entries, model.nodeCore, { it.label }, { model.nodeCore = it }, enabled = idle)
-    Note(
-        "Нода ставит ядро из релизов ${model.nodeCore.repo} на GitHub и, если включить автообновление, " +
-            "обновляется по ним же. Ядро одно на все каналы сервера: при другом выборе сервер перейдёт на него.",
-    )
+    if (!forProfile) {
+        Spacer(Modifier.height(AppTheme.spacing.l))
+        SectionLabel("Ядро на сервере")
+        Spacer(Modifier.height(AppTheme.spacing.s))
+        Segmented(NodeCoreSource.entries, model.nodeCore, { it.label }, { model.nodeCore = it }, enabled = idle)
+        Note(
+            "Нода ставит ядро из релизов ${model.nodeCore.repo} на GitHub и, если включить автообновление, " +
+                "обновляется по ним же. Ядро одно на все каналы сервера: при другом выборе сервер перейдёт на него.",
+        )
+    }
     Actions {
         AppButton(if (idle) "Подключиться" else "Подключаюсь…", { model.connect() }, enabled = idle)
     }

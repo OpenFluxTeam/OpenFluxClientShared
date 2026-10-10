@@ -1,5 +1,6 @@
 package io.openflux.desktop.ui.profiles
 
+import io.openflux.desktop.model.editableNode
 import io.openflux.desktop.ui.subscription.SubscriptionTab
 import io.openflux.desktop.model.managed
 import androidx.compose.material.icons.rounded.Info
@@ -468,6 +469,10 @@ private fun ProfileDetails(model: ProfilesScreenModel, profile: Profile, state: 
                 }
                 HorizontalRule()
                 KeyValueRow("Источник", profile.source.label)
+            }
+            if (profile.editableNode) {
+                Spacer(Modifier.height(AppTheme.spacing.xl))
+                NodeOnServerCard(onOpen = { model.openWizardForProfile(profile) })
             }
             profile.phpNode?.let { node ->
                 Spacer(Modifier.height(AppTheme.spacing.xl))

@@ -1,6 +1,7 @@
 package io.openflux.desktop.ui.profiles
 
 import io.openflux.desktop.model.managed
+import io.openflux.desktop.model.editableNode
 import io.openflux.desktop.model.DocumentKind
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
@@ -205,6 +206,13 @@ class ProfilesScreenModel(private val container: AppContainer) : ScreenModel {
     fun openWizard() {
         if (wizard == null) wizard = NodeWizardModel(container, screenModelScope)
         editor = null
+    }
+
+    /** The wizard opened from [profile]'s settings: its node's transports are changed in place. */
+    fun openWizardForProfile(profile: Profile) {
+        if (wizard != null || !profile.editableNode) return
+        wizard = NodeWizardModel(container, screenModelScope).also { it.forProfile(profile) }
+        cancelEdit()
     }
 
     /** Leaves the wizard; [focusId] selects the profile it saved. */
