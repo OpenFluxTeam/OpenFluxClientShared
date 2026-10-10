@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ProfileSource
+import io.openflux.desktop.model.SubscriptionInvite
 import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.service.LocalAppContainer
 import io.openflux.desktop.service.PlatformKind
@@ -43,6 +44,8 @@ import io.openflux.desktop.ui.components.KeyValueRow
 import io.openflux.desktop.ui.components.LocalToaster
 import io.openflux.desktop.ui.components.QrCode
 import io.openflux.desktop.ui.components.Tone
+import io.openflux.desktop.ui.shell.LocalShell
+import io.openflux.desktop.ui.subscription.SubscriptionTab
 import io.openflux.desktop.ui.theme.AppTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -55,7 +58,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun ImportDialog(model: ProfilesScreenModel) {
     val toaster = LocalToaster.current
-    val platform = LocalAppContainer.current.platform
+    val container = LocalAppContainer.current
+    val platform = container.platform
+    val shell = LocalShell.current
     val scope = rememberCoroutineScope()
     var text by remember { mutableStateOf("") }
     var source by remember { mutableStateOf(ProfileSource.Link) }
@@ -64,7 +69,7 @@ fun ImportDialog(model: ProfilesScreenModel) {
         val opened = model.importText
         model.importText = null
         val clip = opened ?: model.clipboardText()
-        if (clip.startsWith("openflux://")) text = clip
+        if (clip.startsWith("openflux://") || SubscriptionInvite.looksLike(clip)) text = clip
     }
     // The core reads the link; typing settles first.
     val preview by produceState<ImportPreview>(ImportPreview.Empty, text, source) {
@@ -73,6 +78,8 @@ fun ImportDialog(model: ProfilesScreenModel) {
         value = model.preview(text, source)
     }
     val ready = preview as? ImportPreview.Ready
+    // A subscription's key is not a profile link: it opens the Subscription screen with the key in place.
+    val isKey = SubscriptionInvite.looksLike(text)
     AppDialog(
         title = "Импорт профиля",
         onDismiss = { model.importOpen = false },
@@ -86,7 +93,7 @@ fun ImportDialog(model: ProfilesScreenModel) {
         },
     ) {
         Text(
-            "Ссылка openflux:// или QR-код приходят от владельца ноды: в OpenFlux это «QR и ссылка» у профиля, в режиме ноды — карточка на главной.",
+            "Ссылка openflux:// или QR-код приходят от владельца ноды: в OpenFlux это «QR и ссылка» у профиля, в режиме ноды — карточка на главной. Ключ подписки тоже можно вставить сюда.",
             style = AppTheme.typography.body,
             color = AppTheme.colors.textSecondary,
         )
@@ -98,8 +105,18 @@ fun ImportDialog(model: ProfilesScreenModel) {
             monospace = true,
             singleLine = false,
             minLines = 3,
-            error = (preview as? ImportPreview.Invalid)?.message,
+            error = if (isKey) null else (preview as? ImportPreview.Invalid)?.message,
         )
+        if (isKey) {
+            Spacer(Modifier.height(AppTheme.spacing.m))
+            Banner("Это ключ подписки, а не ссылка на профиль: он подключает сразу несколько локаций.", Tone.Neutral, icon = Icons.Rounded.Lock)
+            Spacer(Modifier.height(AppTheme.spacing.s))
+            AppButton("Открыть подписку", {
+                container.pendingKey.value = text
+                model.importOpen = false
+                shell.open(SubscriptionTab)
+            })
+        }
         Spacer(Modifier.height(AppTheme.spacing.m))
         ButtonRow {
             if (platform.cameraScanSupported) {
