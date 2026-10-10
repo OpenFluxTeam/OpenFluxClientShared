@@ -91,11 +91,11 @@ private fun Benefit(title: String, text: String) {
 fun AuthRegister(model: SubscriptionScreenModel) {
     val idle = model.busy == null
     AuthFrame("Создать аккаунт", "Логин и пароль. Почта не нужна: пароль можно будет вернуть по ключу восстановления.", onBack = { model.go(AuthStep.Choose) }) {
-        AppTextField(model.login, { model.login = it }, label = "Логин", placeholder = "почта или имя", enabled = idle)
+        AppTextField(model.login, { model.login = it; model.error = null }, label = "Логин", placeholder = "почта или имя", enabled = idle)
         Spacer(Modifier.height(AppTheme.spacing.m))
-        AppTextField(model.password, { model.password = it }, label = "Пароль", secret = true, enabled = idle, helper = "Не короче 10 символов")
+        AppTextField(model.password, { model.password = it; model.error = null }, label = "Пароль", secret = true, enabled = idle, helper = "Не короче 10 символов")
         Spacer(Modifier.height(AppTheme.spacing.m))
-        AppTextField(model.password2, { model.password2 = it }, label = "Пароль ещё раз", secret = true, enabled = idle)
+        AppTextField(model.password2, { model.password2 = it; model.error = null }, label = "Пароль ещё раз", secret = true, enabled = idle)
         FormStatus(model)
         Spacer(Modifier.height(AppTheme.spacing.xl))
         ButtonRow {
@@ -110,9 +110,9 @@ fun AuthRegister(model: SubscriptionScreenModel) {
 fun AuthLogin(model: SubscriptionScreenModel) {
     val idle = model.busy == null
     AuthFrame("Войти", "Логин и пароль вашего аккаунта OpenFlux.", onBack = { model.go(AuthStep.Choose) }) {
-        AppTextField(model.login, { model.login = it }, label = "Логин", enabled = idle)
+        AppTextField(model.login, { model.login = it; model.error = null }, label = "Логин", enabled = idle)
         Spacer(Modifier.height(AppTheme.spacing.m))
-        AppTextField(model.password, { model.password = it }, label = "Пароль", secret = true, enabled = idle)
+        AppTextField(model.password, { model.password = it; model.error = null }, label = "Пароль", secret = true, enabled = idle)
         FormStatus(model)
         Spacer(Modifier.height(AppTheme.spacing.xl))
         ButtonRow {
@@ -133,16 +133,16 @@ fun AuthRecover(model: SubscriptionScreenModel) {
         "Восстановить доступ", "Ключ восстановления вам показали при создании аккаунта. С ним можно задать новый пароль.",
         onBack = { model.go(AuthStep.Choose) },
     ) {
-        AppTextField(model.login, { model.login = it }, label = "Логин", enabled = idle)
+        AppTextField(model.login, { model.login = it; model.error = null }, label = "Логин", enabled = idle)
         Spacer(Modifier.height(AppTheme.spacing.m))
         AppTextField(
-            model.recoveryInput, { model.recoveryInput = it }, label = "Ключ восстановления", placeholder = "XXXX-XXXX-XXXX-…",
+            model.recoveryInput, { model.recoveryInput = it; model.error = null }, label = "Ключ восстановления", placeholder = "XXXX-XXXX-XXXX-…",
             monospace = true, enabled = idle,
         )
         Spacer(Modifier.height(AppTheme.spacing.m))
-        AppTextField(model.password, { model.password = it }, label = "Новый пароль", secret = true, enabled = idle, helper = "Не короче 10 символов")
+        AppTextField(model.password, { model.password = it; model.error = null }, label = "Новый пароль", secret = true, enabled = idle, helper = "Не короче 10 символов")
         Spacer(Modifier.height(AppTheme.spacing.m))
-        AppTextField(model.password2, { model.password2 = it }, label = "Новый пароль ещё раз", secret = true, enabled = idle)
+        AppTextField(model.password2, { model.password2 = it; model.error = null }, label = "Новый пароль ещё раз", secret = true, enabled = idle)
         FormStatus(model)
         Spacer(Modifier.height(AppTheme.spacing.m))
         Text(
@@ -208,7 +208,9 @@ fun RecoveryKeyScreen(model: SubscriptionScreenModel, key: String, trialDays: St
         AppCard {
             SelectionContainer {
                 Text(
-                    key, style = AppTheme.typography.sectionTitle, color = AppTheme.colors.text,
+                    // Four groups to a line: the key never breaks inside a group.
+                    key.split('-').chunked(4).joinToString("\n") { it.joinToString("-") },
+                    style = AppTheme.typography.sectionTitle, color = AppTheme.colors.text,
                     fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
                 )
             }

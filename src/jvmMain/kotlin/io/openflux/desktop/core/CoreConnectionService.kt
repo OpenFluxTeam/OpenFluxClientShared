@@ -92,6 +92,8 @@ class CoreConnectionService(
     private val captchaBrowser = CaptchaBrowser()
     override val captchaPage: StateFlow<BrowserPage?> = captchaBrowser.page
     private var pendingCaptcha: IpcCookiesRequest? = null
+    /** "Позже": checks for a Yandex page stay quiet until then (the other transports carry on); a new connection resets it. */
+    @Volatile private var captchaSnoozedUntil = 0L
 
     /** One started core: its process, files and the settings it began with. */
     private class Run(
@@ -202,6 +204,7 @@ class CoreConnectionService(
         _exitAddress.value = ExitAddress.Unknown
         _traffic.value = TrafficStats()
         _captcha.value = null
+        captchaSnoozedUntil = 0
         val files = mutableListOf<File>()
         try {
             val core = binary.resolve(current) ?: throw IllegalStateException(
@@ -579,6 +582,8 @@ class CoreConnectionService(
 
     private fun onCaptchaRequest(request: IpcCookiesRequest) {
         if (pendingCaptcha == request) return
+        // A script's own setup page was asked for by the person; only a Yandex check is snoozed.
+        if (!request.isOwn && System.currentTimeMillis() < captchaSnoozedUntil) return
         pendingCaptcha = request
         log(
             LogLevel.Warning,
@@ -658,6 +663,7 @@ class CoreConnectionService(
     }
 
     override fun dismissCaptcha() {
+        if (pendingCaptcha?.isOwn == false) captchaSnoozedUntil = System.currentTimeMillis() + CAPTCHA_SNOOZE_MS
         pendingCaptcha = null
         _captcha.value = null
         captchaBrowser.close()
@@ -687,6 +693,7 @@ class CoreConnectionService(
 
     companion object {
         private const val MAX_LOG_LINES = 5000
+        private const val CAPTCHA_SNOOZE_MS = 10 * 60_000L
         /** How long the core has to open its IPC socket before the log takes over. */
         private const val IPC_WAIT_MS = 8000L
         /** How long a root core has to take its routes down after the stop file appears. */

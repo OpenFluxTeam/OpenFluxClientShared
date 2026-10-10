@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -229,7 +231,10 @@ private fun AppShell(shell: ShellController, toaster: Toaster) {
             if (shell.widthClass == WidthClass.Phone) {
                 Column(Modifier.fillMaxSize()) {
                     content(Modifier.weight(1f).fillMaxWidth())
-                    BottomBar(current = navigator.current, tabs = tabs, onSelect = { navigator.current = it })
+                    // The keyboard takes the room: the tab bar would only float above it.
+                    if (WindowInsets.ime.getBottom(LocalDensity.current) == 0) {
+                        BottomBar(current = navigator.current, tabs = tabs, onSelect = { navigator.current = it })
+                    }
                 }
             } else Row(Modifier.fillMaxSize()) {
                 Sidebar(
