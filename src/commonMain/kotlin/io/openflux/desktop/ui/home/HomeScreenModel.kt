@@ -19,6 +19,8 @@ class HomeScreenModel(private val container: AppContainer) : ScreenModel {
     val connection = container.connection
     val settings = container.settings
     val profiles = container.profiles
+    val subscription = container.subscription
+    val platform = container.platform
 
     /** The profile the connect button uses: the saved choice, else the first. */
     fun selectedProfile(list: List<Profile>, selectedId: String?): Profile? =

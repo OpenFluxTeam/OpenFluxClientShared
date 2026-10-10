@@ -158,6 +158,8 @@ interface PlatformServices {
     val appVersion: String
     /** What this device is called in the account's device list. */
     val deviceName: String get() = "Устройство"
+    /** Seconds east of UTC in this device's zone now, for dates the user reads. */
+    val utcOffsetSeconds: Int get() = 0
     val coreVersion: String
     /** Where this app's own releases are published, e.g. "p1neappleXpress/OpenFluxDesktop". */
     val clientRepo: String
@@ -379,6 +381,9 @@ class AppContainer(
 
     /** An `openflux://` link opened from outside (a scanned code, a chat); the Profiles screen imports it. */
     val incomingLink = MutableStateFlow<String?>(null)
+
+    /** A subscription key opened from outside; the Subscription screen takes it into its field. */
+    val pendingKey = MutableStateFlow<String?>(null)
 }
 
 val LocalAppContainer = staticCompositionLocalOf<AppContainer> { error("AppContainer is not provided") }

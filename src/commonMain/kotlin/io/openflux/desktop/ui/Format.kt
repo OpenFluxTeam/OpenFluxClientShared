@@ -25,6 +25,50 @@ object Format {
 
     private fun two(n: Long) = n.toString().padStart(2, '0')
 
+    private val MONTHS = listOf(
+        "января", "февраля", "марта", "апреля", "мая", "июня",
+        "июля", "августа", "сентября", "октября", "ноября", "декабря",
+    )
+
+    /** "14 октября 2026" for unix [seconds] in the zone [offsetSeconds] east of UTC. */
+    fun date(seconds: Long, offsetSeconds: Int = 0): String {
+        // Days since 1970-01-01 to a civil date (Howard Hinnant's algorithm), with no date library.
+        val z = (seconds + offsetSeconds).floorDiv(86_400L) + 719_468
+        val era = z.floorDiv(146_097L)
+        val doe = z - era * 146_097
+        val yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365
+        val doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
+        val mp = (5 * doy + 2) / 153
+        val day = doy - (153 * mp + 2) / 5 + 1
+        val month = if (mp < 10) mp + 3 else mp - 9
+        val year = yoe + era * 400 + if (month <= 2) 1 else 0
+        return "$day ${MONTHS[(month - 1).toInt()]} $year"
+    }
+
+    /** "1 день", "3 дня", "12 дней". */
+    fun days(n: Int): String = "$n " + plural(n, "день", "дня", "дней")
+
+    /** "осталось 3 дня" / "остался 1 день". */
+    fun daysLeft(n: Int): String = (if (n % 10 == 1 && n % 100 != 11) "остался " else "осталось ") + days(n)
+
+    /** "только что", "5 мин назад", "3 ч назад", "вчера", "4 дн. назад" for the time [agoMillis] ago. */
+    fun ago(agoMillis: Long): String {
+        val min = agoMillis.coerceAtLeast(0) / 60_000
+        return when {
+            min < 1 -> "только что"
+            min < 60 -> "$min мин назад"
+            min < 24 * 60 -> "${min / 60} ч назад"
+            min < 48 * 60 -> "вчера"
+            else -> "${min / (24 * 60)} дн. назад"
+        }
+    }
+
+    private fun plural(n: Int, one: String, few: String, many: String): String = when {
+        n % 10 == 1 && n % 100 != 11 -> one
+        n % 10 in 2..4 && n % 100 !in 12..14 -> few
+        else -> many
+    }
+
     private fun oneDecimal(v: Double): String {
         val tenths = (v * 10).roundToLong()
         return if (tenths % 10 == 0L) "${tenths / 10}" else "${tenths / 10},${tenths % 10}"

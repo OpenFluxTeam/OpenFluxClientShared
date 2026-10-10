@@ -49,6 +49,7 @@ class JvmPlatformServices(
     private val random = SecureRandom()
 
     override val coreVersion: String get() = coreVersionProvider()
+    override val utcOffsetSeconds: Int get() = java.util.TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 1000
     override val deviceName: String
         get() = runCatching { java.net.InetAddress.getLocalHost().hostName }.getOrNull()?.takeIf { it.isNotBlank() }
             ?: System.getenv("COMPUTERNAME") ?: "Компьютер"

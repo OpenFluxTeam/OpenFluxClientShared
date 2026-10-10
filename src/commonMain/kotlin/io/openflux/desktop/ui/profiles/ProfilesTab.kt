@@ -1,5 +1,9 @@
 package io.openflux.desktop.ui.profiles
 
+import io.openflux.desktop.ui.subscription.SubscriptionTab
+import io.openflux.desktop.model.managed
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Star
 import io.openflux.desktop.ui.PlatformBackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -127,9 +131,11 @@ private fun ProfilesScreen(model: ProfilesScreenModel) {
     val incomingLink by container.incomingLink.collectAsState()
 
     // Requests from other screens (Home's empty state).
-    LaunchedEffect(shell.importRequested, shell.newProfileRequested, shell.focusProfileId) {
+    LaunchedEffect(shell.importRequested, shell.newProfileRequested, shell.focusProfileId, shell.nodeWizardRequested, shell.phpWizardRequested) {
         if (shell.importRequested) { model.importOpen = true; shell.importRequested = false }
         if (shell.newProfileRequested) { model.startNew(); shell.newProfileRequested = false }
+        if (shell.nodeWizardRequested) { model.openWizard(); shell.nodeWizardRequested = false }
+        if (shell.phpWizardRequested) { model.openPhpWizard(); shell.phpWizardRequested = false }
         shell.focusProfileId?.let { id -> profiles.firstOrNull { it.id == id }?.let(model::select); shell.focusProfileId = null }
     }
     // A link opened from outside the app (a scanned code, a chat).
@@ -207,7 +213,8 @@ private fun ProfilesScreen(model: ProfilesScreenModel) {
                             resource = AppIcons.Public,
                         ) {
                             ButtonRow(alignment = Alignment.CenterHorizontally) {
-                                AppButton("Импорт", { model.importOpen = true }, leading = Icons.Rounded.ContentPaste)
+                                AppButton("Подписка", { shell.open(SubscriptionTab) }, leading = Icons.Rounded.Star)
+                                AppButton("Импорт", { model.importOpen = true }, style = ButtonStyle.Secondary, leading = Icons.Rounded.ContentPaste)
                                 AppButton("Создать", model::startNew, style = ButtonStyle.Secondary)
                                 AppButton("Своя нода", model::openWizard, style = ButtonStyle.Secondary, leading = Icons.Rounded.Dns)
                                 AppButton("Без сервера", model::openPhpWizard, style = ButtonStyle.Secondary, leading = Icons.Rounded.Cloud)
@@ -227,6 +234,7 @@ private fun ProfilesScreen(model: ProfilesScreenModel) {
 
 @Composable
 private fun ProfileListPane(model: ProfilesScreenModel, profiles: List<Profile>, state: ConnectionState, modifier: Modifier) {
+    val shell = LocalShell.current
     val filtered = model.filter(profiles)
     var addMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
@@ -237,6 +245,7 @@ private fun ProfileListPane(model: ProfilesScreenModel, profiles: List<Profile>,
             Box {
                 AppIconButton("Добавить профиль", { addMenu = true }, resource = AppIcons.Add, tint = AppTheme.colors.accent)
                 AppMenu(addMenu, { addMenu = false }, listOf(
+                    MenuAction("Подписка или ключ", { shell.open(SubscriptionTab) }, Icons.Rounded.Star),
                     MenuAction("Создать вручную", model::startNew, Icons.Rounded.Edit, shortcut = "Ctrl+N"),
                     MenuAction("Импорт ссылки или QR", { model.importOpen = true }, Icons.Rounded.ContentPaste, shortcut = "Ctrl+I"),
                     MenuAction("Создать свою ноду на VDS", model::openWizard, Icons.Rounded.Dns),
@@ -298,6 +307,7 @@ private fun plural(n: Int): String {
 private fun profileActions(model: ProfilesScreenModel, profile: Profile, running: Boolean): List<MenuAction> = listOf(
     if (running) MenuAction("Отключить", model.connection::disconnect, Icons.Rounded.Stop)
     else MenuAction("Подключить", { model.connect(profile) }, Icons.Rounded.PlayArrow),
+) + if (profile.managed) emptyList() else listOf(
     MenuAction("Изменить", { model.startEdit(profile) }, Icons.Rounded.Edit),
     MenuAction("QR и ссылка", { model.shareFor = profile }, Icons.Rounded.QrCode2, enabled = profile.transport.shareable),
     MenuAction("Копировать ссылку", { model.copyLink(profile) }, Icons.Rounded.ContentCopy, enabled = profile.transport.shareable),
@@ -358,7 +368,7 @@ private fun ProfileRow(
             if (!touch && (hovered || moreOpen)) {
                 AppIconButton(if (runningLook != null) "Отключить" else "Подключить", onToggle,
                     icon = if (runningLook != null) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, tint = colors.accent)
-                AppIconButton("Изменить", onEdit, icon = Icons.Rounded.Edit)
+                if (!profile.managed) AppIconButton("Изменить", onEdit, icon = Icons.Rounded.Edit)
                 Box {
                     AppIconButton("Ещё", { moreOpen = true }, icon = Icons.Rounded.MoreVert)
                     AppMenu(moreOpen, { moreOpen = false }, menu())
@@ -401,25 +411,35 @@ private fun ProfileDetails(model: ProfilesScreenModel, profile: Profile, state: 
             ButtonRow {
                 if (running) AppButton("Отключить", model.connection::disconnect, style = ButtonStyle.Danger, leading = Icons.Rounded.Stop)
                 else AppButton("Подключить", { model.connect(profile) }, leading = Icons.Rounded.PlayArrow)
-                AppButton("Изменить", { model.startEdit(profile) }, style = ButtonStyle.Secondary, leading = Icons.Rounded.Edit)
-                if (profile.transport.shareable) {
-                    AppButton("QR и ссылка", { model.shareFor = profile }, style = ButtonStyle.Secondary, leading = Icons.Rounded.QrCode2)
+                if (!profile.managed) {
+                    AppButton("Изменить", { model.startEdit(profile) }, style = ButtonStyle.Secondary, leading = Icons.Rounded.Edit)
+                    if (profile.transport.shareable) {
+                        AppButton("QR и ссылка", { model.shareFor = profile }, style = ButtonStyle.Secondary, leading = Icons.Rounded.QrCode2)
+                    }
                 }
+            }
+            if (profile.managed) {
+                Spacer(Modifier.height(AppTheme.spacing.l))
+                io.openflux.desktop.ui.components.Banner(
+                    "Эта локация приходит с подпиской: список и ключи обновляются сами, менять их нельзя. Управление подпиской на вкладке «Подписка».",
+                    Tone.Accent, icon = Icons.Rounded.Info,
+                )
             }
             Spacer(Modifier.height(AppTheme.spacing.xxl))
             SectionLabel("Транспорты")
             Spacer(Modifier.height(AppTheme.spacing.s))
             AppCard(padding = 0.dp) {
                 profile.carriers.forEachIndexed { index, carrier ->
-                    val value = when (carrier.type.kind) {
-                        ValueKind.Token -> "токен скрыт · UID ${carrier.uid}"
+                    val value = when {
+                        profile.managed -> "скрыто: приходит с подпиской"
+                        carrier.type.kind == ValueKind.Token -> "токен скрыт · UID ${carrier.uid}"
                         else -> carrier.value
                     }
                     KeyValueRow(
                         key = carrier.type.label + if (profile.session) " · приоритет ${carrier.priority}" else "",
                         value = value,
                     ) {
-                        if (carrier.type.kind != ValueKind.Token) {
+                        if (carrier.type.kind != ValueKind.Token && !profile.managed) {
                             AppIconButton("Копировать", {
                                 model.copy(carrier.value)
                                 toaster.show("Скопировано")
@@ -440,7 +460,7 @@ private fun ProfileDetails(model: ProfilesScreenModel, profile: Profile, state: 
                 } else {
                     KeyValueRow("Режим", if (profile.session) "Session (несколько транспортов)" else "Обычный")
                     HorizontalRule()
-                    KeyValueRow("Шифрование", if (profile.secret.isNotEmpty()) "AES-256-GCM, ключ ${profile.secret.length} симв." else "Без ключа")
+                    KeyValueRow("Шифрование", if (profile.secret.isNotEmpty()) "AES-256-GCM" + if (profile.managed) "" else ", ключ ${profile.secret.length} симв." else "Без ключа")
                     if (!profile.session) {
                         HorizontalRule()
                         KeyValueRow("Кодек", profile.codec.label)
@@ -502,7 +522,7 @@ private fun ProfileDetails(model: ProfilesScreenModel, profile: Profile, state: 
                 io.openflux.desktop.ui.components.Banner(problems.joinToString("\n"), Tone.Warning)
             }
             Spacer(Modifier.height(AppTheme.spacing.xl))
-            ButtonRow {
+            if (!profile.managed) ButtonRow {
                 AppButton("Дублировать", { model.duplicate(profile) }, style = ButtonStyle.Ghost, leading = Icons.Rounded.FileCopy)
                 AppButton("Удалить", { model.deleteFor = profile }, style = ButtonStyle.Ghost, leading = Icons.Rounded.Delete)
             }

@@ -94,6 +94,8 @@ import io.openflux.desktop.ui.components.appClickable
 import io.openflux.desktop.ui.logs.LogsTab
 import io.openflux.desktop.ui.look
 import io.openflux.desktop.ui.profiles.ProfilesTab
+import io.openflux.desktop.ui.subscription.SubscriptionStrip
+import io.openflux.desktop.ui.subscription.SubscriptionTab
 import io.openflux.desktop.ui.shell.LocalShell
 import io.openflux.desktop.ui.theme.AppTheme
 import org.jetbrains.compose.resources.painterResource
@@ -131,27 +133,44 @@ private fun HomeScreen(model: HomeScreenModel) {
     Column(Modifier.fillMaxHeight().widthIn(max = 1680.dp).fillMaxWidth().padding(horizontal = AppTheme.spacing.page, vertical = AppTheme.spacing.xl)) {
         PageHeader("Главная", "Состояние подключения и трафик")
         Spacer(Modifier.height(AppTheme.spacing.xl))
+        val subscription by model.subscription.state.collectAsState()
         if (profiles.isEmpty()) {
             val scroll = rememberScrollState()
-            Box(Modifier.fillMaxSize().verticalScroll(scroll), contentAlignment = Alignment.Center) {
-                EmptyState(
-                    title = "Добавьте первый профиль",
-                    message = "Профиль — это нода и способ до неё добраться. Вставьте ссылку openflux:// от владельца ноды или QR-код, либо создайте профиль вручную.",
-                    resource = AppIcons.Public,
-                ) {
-                    ButtonRow(alignment = Alignment.CenterHorizontally) {
-                        AppButton("Импорт ссылки или QR", {
-                            shell.importRequested = true
-                            shell.open(ProfilesTab)
-                        }, leading = Icons.Rounded.ContentPaste)
-                        AppButton("Создать вручную", {
-                            shell.newProfileRequested = true
-                            shell.open(ProfilesTab)
-                        }, style = ButtonStyle.Secondary)
+            Column(Modifier.fillMaxSize().verticalScroll(scroll), horizontalAlignment = Alignment.CenterHorizontally) {
+                val sub = subscription
+                if (sub != null) {
+                    // A subscription that has ended (or is empty) says so and offers to renew, instead of a blank page.
+                    SubscriptionStrip(sub, model.platform, onOpen = { shell.open(SubscriptionTab) }, modifier = Modifier.widthIn(max = 560.dp))
+                    Spacer(Modifier.height(AppTheme.spacing.xl))
+                }
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    EmptyState(
+                        title = if (sub != null) "Локаций пока нет" else "Подключитесь за минуту",
+                        message = if (sub != null) "Когда подписка станет активной, список локаций появится здесь сам."
+                        else "Войдите в аккаунт OpenFlux и нажмите «Подключить»: ничего настраивать не нужно. Пробный период бесплатно.",
+                        resource = AppIcons.Public,
+                    ) {
+                        ButtonRow(alignment = Alignment.CenterHorizontally) {
+                            if (sub == null) {
+                                AppButton("Войти или создать аккаунт", {
+                                    shell.accountRequested = true
+                                    shell.open(SubscriptionTab)
+                                })
+                            }
+                            AppButton(if (sub == null) "Вставить ключ или ссылку" else "Открыть подписку", { shell.open(SubscriptionTab) }, style = ButtonStyle.Secondary, leading = Icons.Rounded.ContentPaste)
+                        }
+                        if (sub == null) {
+                            Spacer(Modifier.height(AppTheme.spacing.s))
+                            TextAction("У меня своя нода", { shell.nodeWizardRequested = true; shell.open(ProfilesTab) })
+                        }
                     }
                 }
             }
             return@Column
+        }
+        subscription?.let { sub ->
+            SubscriptionStrip(sub, model.platform, onOpen = { shell.open(SubscriptionTab) })
+            Spacer(Modifier.height(AppTheme.spacing.l))
         }
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val wide = maxWidth >= 760.dp

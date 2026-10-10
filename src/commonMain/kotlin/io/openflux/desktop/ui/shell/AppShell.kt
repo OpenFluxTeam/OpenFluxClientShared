@@ -95,6 +95,12 @@ class ShellController {
     var newProfileRequested by mutableStateOf(false)
     /** A profile the Profiles screen should select. */
     var focusProfileId by mutableStateOf<String?>(null)
+    /** Set by Home's welcome: the Subscription screen opens the account choice. */
+    var accountRequested by mutableStateOf(false)
+    /** Set by the Subscription screen's "Нода на своём сервере": the Profiles screen opens the wizard. */
+    var nodeWizardRequested by mutableStateOf(false)
+    /** Set by the Subscription screen's "Без сервера": the Profiles screen opens the PHP-hosting wizard. */
+    var phpWizardRequested by mutableStateOf(false)
 
     fun open(tab: Tab) {
         tabNavigator?.current = tab
@@ -110,6 +116,7 @@ val LocalShell = staticCompositionLocalOf { ShellController() }
 fun appTabs(experimental: Boolean, developerMode: Boolean = false): List<Tab> = buildList {
     add(HomeTab)
     add(ProfilesTab)
+    add(io.openflux.desktop.ui.subscription.SubscriptionTab)
     if (developerMode) add(io.openflux.desktop.ui.accounts.AccountsTab)
     if (experimental) add(io.openflux.desktop.ui.scripts.ScriptsTab)
     add(LogsTab)
@@ -162,8 +169,17 @@ private fun AppShell(shell: ShellController, toaster: Toaster) {
         LaunchedEffect(settings.experimental) {
             if (!settings.experimental && navigator.current.key == io.openflux.desktop.ui.scripts.ScriptsTab.key) navigator.current = HomeTab
         }
-        // The Profiles screen imports the link.
-        LaunchedEffect(incomingLink) { if (incomingLink != null) navigator.current = ProfilesTab }
+        // A subscription key goes to the Subscription screen, a profile link to the Profiles screen's import.
+        LaunchedEffect(incomingLink) {
+            val link = incomingLink ?: return@LaunchedEffect
+            if (io.openflux.desktop.model.SubscriptionInvite.looksLike(link)) {
+                container.pendingKey.value = link
+                container.incomingLink.value = null
+                navigator.current = io.openflux.desktop.ui.subscription.SubscriptionTab
+            } else {
+                navigator.current = ProfilesTab
+            }
+        }
         // Back from another section returns home; screens handle their own
         // inner steps first. Only on touch: Esc stays with dialogs on the desktop.
         PlatformBackHandler(enabled = touch && navigator.current.key != HomeTab.key) { navigator.current = HomeTab }

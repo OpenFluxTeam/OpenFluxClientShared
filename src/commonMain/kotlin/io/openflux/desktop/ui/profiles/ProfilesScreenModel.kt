@@ -1,5 +1,6 @@
 package io.openflux.desktop.ui.profiles
 
+import io.openflux.desktop.model.managed
 import io.openflux.desktop.model.DocumentKind
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
@@ -84,6 +85,7 @@ class ProfilesScreenModel(private val container: AppContainer) : ScreenModel {
     }
 
     fun startEdit(profile: Profile) {
+        if (profile.managed) return // the subscription's locations are the service's to change
         selectedId = profile.id
         editor = EditorState(profile, isNew = false)
     }
@@ -173,12 +175,14 @@ class ProfilesScreenModel(private val container: AppContainer) : ScreenModel {
     }
 
     fun duplicate(profile: Profile) {
+        if (profile.managed) return
         val copy = profile.copy(id = profiles.newId(), name = "${profile.name} (копия)", createdAt = platform.now(), source = ProfileSource.Manual)
         profiles.upsert(copy)
         selectedId = copy.id
     }
 
     fun delete(profile: Profile) {
+        if (profile.managed) return
         if (connection.state.value.profile?.id == profile.id && connection.state.value.isActive) connection.disconnect()
         profiles.delete(profile.id)
         if (selectedId == profile.id) selectedId = null
