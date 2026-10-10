@@ -22,6 +22,7 @@ import io.openflux.desktop.model.SubscriptionDocument
 import io.openflux.desktop.model.SubscriptionException
 import io.openflux.desktop.model.SubscriptionKind
 import io.openflux.desktop.model.TrafficStats
+import io.openflux.desktop.model.isActive
 import io.openflux.desktop.model.managed
 import io.openflux.desktop.service.ConnectionService
 import io.openflux.desktop.service.InMemorySubscriptionRepository
