@@ -2,6 +2,8 @@ package io.openflux.desktop.service
 
 import io.openflux.desktop.model.AccountInfo
 import io.openflux.desktop.model.AuthResult
+import io.openflux.desktop.model.isActive
+import io.openflux.desktop.model.profile
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.OrderInfo
 import io.openflux.desktop.model.PlansResult
