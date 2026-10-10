@@ -693,7 +693,6 @@ private fun AboutSettings(model: SettingsScreenModel) {
     AppCard(padding = AppTheme.spacing.s) {
         LinkRow("OpenFlux (ядро, форк)", "github.com/${CoreRepos.FORK}", "https://github.com/${CoreRepos.FORK}", platform::openUrl)
         LinkRow("OpenFlux (ядро, оригинал)", "github.com/${CoreRepos.OFFICIAL}", "https://github.com/${CoreRepos.OFFICIAL}", platform::openUrl)
-        LinkRow("OpenFlux Android", "github.com/damnurmum/OpenFlux-Android", "https://github.com/damnurmum/OpenFlux-Android", platform::openUrl)
         LinkRow("Этот клиент", "github.com/${platform.clientRepo}", "https://github.com/${platform.clientRepo}", platform::openUrl)
     }
     Text(
