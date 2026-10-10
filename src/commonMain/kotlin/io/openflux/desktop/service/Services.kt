@@ -156,6 +156,8 @@ enum class PlatformKind { Desktop, Android }
 interface PlatformServices {
     val kind: PlatformKind get() = PlatformKind.Desktop
     val appVersion: String
+    /** What this device is called in the account's device list. */
+    val deviceName: String get() = "Устройство"
     val coreVersion: String
     /** Where this app's own releases are published, e.g. "p1neappleXpress/OpenFluxDesktop". */
     val clientRepo: String
@@ -358,9 +360,17 @@ class AppContainer(
     val phpHosting: PhpHostingService = PhpHostingService(),
     /** Installed JS script transports; in-memory no-op unless the platform ships one. */
     val scripts: ScriptRepository = InMemoryScriptRepository(),
+    /** The subscription service client and where the subscription is kept; none unless the platform ships them. */
+    val subscriptionApi: SubscriptionApi = NoSubscriptionApi,
+    val subscriptionRepo: SubscriptionRepository = InMemorySubscriptionRepository(),
     /** Shows a script's settings page in the platform's built-in browser. */
     settingsPageHost: SettingsPageHost = NoSettingsPageHost,
 ) {
+    /** Accounts, the subscription document and its profiles. */
+    val subscription: SubscriptionManager by lazy {
+        SubscriptionManager(subscriptionApi, subscriptionRepo, profiles, shareCodec, platform, connection, io.openflux.desktop.model.ServiceDefaults.endpoint)
+    }
+
     /** The "Настройки" of an installed script transport (its wizard page, saved with the script). */
     val scriptSettings: ScriptSettingsService by lazy { ScriptSettingsService(scripts, platform, settingsPageHost) }
 

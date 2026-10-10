@@ -49,6 +49,9 @@ class JvmPlatformServices(
     private val random = SecureRandom()
 
     override val coreVersion: String get() = coreVersionProvider()
+    override val deviceName: String
+        get() = runCatching { java.net.InetAddress.getLocalHost().hostName }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: System.getenv("COMPUTERNAME") ?: "Компьютер"
     override val clientRepo: String get() = RELEASE_REPO
     override val systemProxySupported: Boolean = os.contains("win")
     override val fullTunnelSupported: Boolean = os.contains("win") || MacElevation.mac

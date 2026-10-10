@@ -3,8 +3,10 @@ package io.openflux.desktop.data
 import io.openflux.desktop.model.AppSettings
 import io.openflux.desktop.model.migrated
 import io.openflux.desktop.model.Profile
+import io.openflux.desktop.model.SubscriptionState
 import io.openflux.desktop.service.ProfileRepository
 import io.openflux.desktop.service.SettingsRepository
+import io.openflux.desktop.service.SubscriptionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -85,5 +87,19 @@ class FileSettingsRepository(dir: File, defaults: AppSettings = AppSettings()) :
         state.update { old ->
             transform(old).also { if (it != old) store.write(it) }
         }
+    }
+}
+
+/** The subscription (the device token, the last document's status) in subscription.json, readable by its owner only. */
+class FileSubscriptionRepository(dir: File) : SubscriptionRepository {
+    private val file = File(dir, "subscription.json")
+    private val store = JsonFile(file, SubscriptionState.serializer())
+    private val flow = MutableStateFlow(store.read())
+    override val state: StateFlow<SubscriptionState?> = flow.asStateFlow()
+
+    @Synchronized
+    override fun save(state: SubscriptionState?) {
+        if (state == null) file.delete() else store.write(state)
+        flow.value = state
     }
 }

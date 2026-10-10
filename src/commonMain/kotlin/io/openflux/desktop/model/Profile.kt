@@ -4,7 +4,14 @@ import kotlinx.serialization.Serializable
 
 /** Where a profile came from; shown in the list and details. */
 @Serializable
-enum class ProfileSource(val label: String) { Manual("Вручную"), Link("Ссылка openflux://"), Qr("QR-код"), Node("Своя нода") }
+enum class ProfileSource(val label: String) {
+    Manual("Вручную"), Link("Ссылка openflux://"), Qr("QR-код"), Node("Своя нода"),
+    /** A location that comes with the subscription: the app keeps it up to date and the user cannot change it. */
+    Subscription("Подписка"),
+}
+
+/** A profile of the subscription: read-only, its key and documents are not shown or shared. */
+val Profile.managed: Boolean get() = source == ProfileSource.Subscription
 
 /**
  * The network a carrier leaves through. With bonding, carriers on different

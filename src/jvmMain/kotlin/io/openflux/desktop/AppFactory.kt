@@ -13,6 +13,8 @@ import io.openflux.desktop.node.CorePhpTransport
 import io.openflux.desktop.platform.JvmPlatformServices
 import io.openflux.desktop.service.AppContainer
 import io.openflux.desktop.data.FileAccountRepository
+import io.openflux.desktop.data.FileSubscriptionRepository
+import io.openflux.desktop.data.HttpSubscriptionApi
 import io.openflux.desktop.data.HttpSessionProbe
 import io.openflux.desktop.service.Accounts
 import io.openflux.desktop.web.KcefAccountBrowser
@@ -37,7 +39,7 @@ fun createAppContainer(appVersion: String): AppContainer {
     val phpHosting = PhpHostingService(CorePhpTransport(settings, binary), clock = System::currentTimeMillis)
     val platform = JvmPlatformServices(appVersion, binary) { binary.version() }
     val scripts = DesktopScriptRepository(platform)
-    return AppContainer(
+    val container = AppContainer(
         profiles = FileProfileRepository(AppDirs.config),
         settings = settings,
         // Connecting a profile made by the "без сервера" wizard first asks its node on the hosting to run.
@@ -50,6 +52,11 @@ fun createAppContainer(appVersion: String): AppContainer {
         accounts = accounts,
         phpHosting = phpHosting,
         scripts = scripts,
+        subscriptionApi = HttpSubscriptionApi(),
+        subscriptionRepo = FileSubscriptionRepository(AppDirs.config),
         settingsPageHost = KcefSettingsPageHost,
     )
+    // The subscription's list of locations is refreshed in the background.
+    container.subscription.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
+    return container
 }
