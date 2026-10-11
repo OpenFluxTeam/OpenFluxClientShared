@@ -29,6 +29,27 @@ src/
     data/           Settings and profile storage
 ```
 
+## Navigation
+
+The app has four places, each with its own stack of screens (`ui/nav`):
+
+| Place | What it is for | Screens |
+|---|---|---|
+| Главная | connect, disconnect, state | the connect screen; the account, the journal and the ways to connect open on top of it |
+| Подключения | everything one connects *with* | the list (subscription, own nodes, the rest) → a profile → its fields; add a connection; the OpenFlux account and signing in |
+| Ноды | what one *runs* | the list → a node → change it on its server (profile, SSH access and the channel's transports and mode on one screen); the wizards that make a node (own server, PHP hosting) |
+| Настройки | how the app behaves | categories (connection, accounts of Yandex and Mail.ru, core, interface, experimental, about and updates); the journal; the transport catalogue |
+
+`AppNav` keeps the place and a stack per place. A detail screen opens on top of
+the place the person is in, so "back" returns to where they came from; a tap on
+a place's tab shows where they left it, a second tap its first screen; back from
+a place's first screen goes Home. `AppActions` names every move ("add a
+connection", "manage the node", "make a node"), so screens call it instead of
+knowing where things live, and `AppActions` lets go of what a screen held (a
+wizard's SSH session) when the navigation drops it. In a wide window the lists
+of Connections and Nodes stay at the left and a profile's or node's screen opens
+beside them.
+
 ## Origin and credit
 
 This module's code, architecture, and design come from

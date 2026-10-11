@@ -100,6 +100,10 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
     var useCups by mutableStateOf(false)
     /** How the node forwards traffic: L4 (default) or L3. */
     var mode by mutableStateOf(NodeMode.L4)
+
+    /** Only this fork's installer knows modes: the official one would refuse the line, so it always gets l4. */
+    val modeAvailable: Boolean get() = nodeCore == NodeCoreSource.Fork
+    private val effectiveMode: NodeMode get() = if (modeAvailable) mode else NodeMode.L4
     var mailruInput by mutableStateOf("")
     var boardInput by mutableStateOf("")
     /** The cups.online rooms made for this channel, kept if the user goes back. */
@@ -410,7 +414,7 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
 
     private suspend fun askPlan() {
         busy = "Спрашиваю сервер, что изменится…"
-        plan = onServer(retry = true) { service.plan(channel!!.id, transports, withCookies, autoUpdate, mode) }
+        plan = onServer(retry = true) { service.plan(channel!!.id, transports, withCookies, autoUpdate, effectiveMode) }
     }
 
     fun forgetYandexSignIn() {
@@ -436,7 +440,7 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
             if (e.sudo) { error = "sudo не принял пароль"; true } else false
         }) {
             val cookies = if (withCookies) yandexCookies else ""
-            onServer { service.apply(channel, transports, plan.port, autoUpdate, sudoPassword, cookies, mode) }
+            onServer { service.apply(channel, transports, plan.port, autoUpdate, sudoPassword, cookies, effectiveMode) }
             installed = true
             yandexCookies = ""
             val link = service.shareLink(profileName(), channel.key, host.trim(), plan.port, transports)
@@ -680,7 +684,7 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
         if (needsSudoPassword && sudoPassword.isEmpty()) throw NodeWizardException("Введите пароль sudo")
         busy = "Меняю транспорты канала ${current.id} на сервере…"
         val cookies = if (withCookies) yandexCookies else ""
-        val now = onServer { service.setTransports(current.id, transports, sudoPassword, cookies, mode) }
+        val now = onServer { service.setTransports(current.id, transports, sudoPassword, cookies, if (modeAvailable) mode else null) }
         yandexCookies = ""
         editing = now
         val described = NodeTransports.describe(now.transportTypes)

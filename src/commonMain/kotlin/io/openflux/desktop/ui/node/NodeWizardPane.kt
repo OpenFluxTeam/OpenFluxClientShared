@@ -896,6 +896,7 @@ private fun ColumnScope.NodeEditorResult(model: NodeWizardModel, onShowQr: () ->
 /** How the node forwards traffic: L4 for everyone, L3 for IP packets (and what it asks of the server). */
 @Composable
 private fun ColumnScope.NodeModePicker(model: NodeWizardModel) {
+    if (!model.modeAvailable) return
     val idle = model.busy == null
     Spacer(Modifier.height(AppTheme.spacing.l))
     SectionLabel("Режим ноды")
