@@ -11,6 +11,7 @@ import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.LogLine
 import io.openflux.desktop.model.NewChannel
 import io.openflux.desktop.model.NodeCoreSource
+import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodePlan
 import io.openflux.desktop.model.NodeTransport
 import io.openflux.desktop.model.NodeTransports
@@ -368,6 +369,57 @@ class NodeWizardModelTest {
         wizard.next()
         advanceUntilIdle()
         return wizard
+    }
+
+    @Test
+    fun aNewNodeIsL4UnlessL3IsChosen() = runTest {
+        val env = Env()
+        val plain = installMailru(env)
+        assertEquals(NodeMode.L4, plain.mode)
+        assertEquals(listOf(NodeMode.L4), env.node.plannedModes)
+
+        val env3 = Env()
+        env3.connection.active = "mailru"
+        val wizard = NodeWizardModel(env3.container, this)
+        env3.settings.update { it.copy(knownHostKeys = mapOf("$serverIp:22" to "SHA256:new")) }
+        wizard.host = serverIp
+        wizard.password = "p"
+        wizard.connect()
+        advanceUntilIdle()
+        wizard.mode = NodeMode.L3
+        wizard.useVolga = false
+        wizard.useMailru = true
+        wizard.mailruInput = "https://cloud.mail.ru/public/DEmN/ETbZW2MPY"
+        wizard.next()
+        advanceUntilIdle()
+        assertEquals(listOf(NodeMode.L3), env3.node.plannedModes, "the plan is asked for l3")
+        wizard.install()
+        advanceUntilIdle()
+        assertEquals(listOf(NodeMode.L3), env3.node.appliedModes, "and the node is installed as l3")
+    }
+
+    @Test
+    fun anInstalledNodesModeIsReadAndCanBeChanged() = runTest {
+        val env = Env()
+        installedChannel(env, profile = true)
+        env.node.installed["of-old"] = env.node.installed.getValue("of-old").copy(mode = "l3")
+        val wizard = NodeWizardModel(env.container, this)
+        wizard.host = serverIp
+        wizard.password = "ssh-pass"
+        wizard.connect()
+        advanceUntilIdle()
+        wizard.editChannel("of-old")
+        advanceUntilIdle()
+        assertEquals(NodeMode.L3, wizard.mode, "the screen starts from what the server has")
+        wizard.mode = NodeMode.L4
+        wizard.useBoards = true
+        wizard.boardInput = "$boardLink&from=x"
+        wizard.next()
+        advanceUntilIdle()
+        assertEquals(listOf<NodeMode?>(NodeMode.L4), env.node.modes)
+        assertEquals("l4", env.node.installed.getValue("of-old").mode)
+        wizard.cancelEditing()
+        assertEquals(NodeMode.L4, wizard.mode, "a new node starts as l4 again")
     }
 
     @Test
@@ -837,9 +889,11 @@ class NodeWizardModelTest {
             return installed[channel] ?: throw NodeWizardException("канала $channel нет на сервере")
         }
 
-        override suspend fun setTransports(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String): InstalledChannel {
+        val modes = mutableListOf<NodeMode?>()
+        override suspend fun setTransports(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String, mode: NodeMode?): InstalledChannel {
             setTransportsCalls += channel to transports
-            val now = installed.getValue(channel).copy(transports = transports)
+            modes += mode
+            val now = installed.getValue(channel).copy(transports = transports, mode = (mode ?: installed.getValue(channel).nodeMode).cli)
             installed[channel] = now
             return now
         }
@@ -861,7 +915,10 @@ class NodeWizardModelTest {
         val plannedAutoUpdate = mutableListOf<Boolean>()
         var roomsCreated = 0
 
-        override suspend fun plan(channel: String, transports: List<NodeTransport>, withCookies: Boolean, autoUpdate: Boolean): NodePlan {
+        val plannedModes = mutableListOf<NodeMode>()
+        val appliedModes = mutableListOf<NodeMode>()
+        override suspend fun plan(channel: String, transports: List<NodeTransport>, withCookies: Boolean, autoUpdate: Boolean, mode: NodeMode): NodePlan {
+            plannedModes += mode
             if (dropped) throw NodeWizardException("скрипт установки не ответил: ")
             planError?.let { throw NodeWizardException(it) }
             plannedWithCookies += withCookies
@@ -877,7 +934,9 @@ class NodeWizardModelTest {
             autoUpdate: Boolean,
             sudoPassword: String,
             cookieHeader: String,
+            mode: NodeMode,
         ) {
+            appliedModes += mode
             if (dropped) throw NodeWizardException("не удалось передать конфигурацию на сервер")
             if (sudoFails) throw NodeWizardException("sudo не принял пароль", sudo = true)
             applied += listOf(channel.id, transports.joinToString(" ") { "${it.type}=${it.url}" }, port.toString(),

@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.openflux.desktop.model.NodeCoreSource
+import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodeTransports
 import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.service.LocalAppContainer
@@ -418,6 +419,8 @@ private fun ColumnScope.TransportsEditor(model: NodeWizardModel, heading: Boolea
         HorizontalRule()
         SwitchRow("Direct", "Прямое TCP-подключение к серверу, всегда включено.", checked = true, onCheckedChange = {}, enabled = false)
     }
+
+    NodeModePicker(model)
 
     if (model.useMailru) {
         Spacer(Modifier.height(AppTheme.spacing.l))
@@ -888,4 +891,22 @@ private fun ColumnScope.NodeEditorResult(model: NodeWizardModel, onShowQr: () ->
     }
     Spacer(Modifier.height(AppTheme.spacing.m))
     Banner("В QR и ссылке лежит ключ канала: передавайте их только тому, кто будет им пользоваться.", Tone.Neutral, icon = Icons.Rounded.Lock)
+}
+
+/** How the node forwards traffic: L4 for everyone, L3 for IP packets (and what it asks of the server). */
+@Composable
+private fun ColumnScope.NodeModePicker(model: NodeWizardModel) {
+    val idle = model.busy == null
+    Spacer(Modifier.height(AppTheme.spacing.l))
+    SectionLabel("Режим ноды")
+    Spacer(Modifier.height(AppTheme.spacing.s))
+    Segmented(NodeMode.entries, model.mode, { it.label }, { model.mode = it }, enabled = idle)
+    Note(model.mode.about)
+    if (model.mode == NodeMode.L3 && model.editing?.nodeMode != NodeMode.L3) {
+        Spacer(Modifier.height(AppTheme.spacing.s))
+        Banner(
+            "Перед установкой мастер проверит, что на сервере есть iptables и systemd 231+. Если L3 не подойдёт, вернитесь на L4: канал продолжит работать как раньше.",
+            Tone.Warning, icon = Icons.Rounded.Warning,
+        )
+    }
 }

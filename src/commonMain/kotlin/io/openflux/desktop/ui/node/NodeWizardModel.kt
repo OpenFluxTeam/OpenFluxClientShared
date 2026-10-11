@@ -16,6 +16,7 @@ import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.NewChannel
 import io.openflux.desktop.model.NodeCoreSource
 import io.openflux.desktop.model.NodeDocuments
+import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodePlan
 import io.openflux.desktop.model.NodeTransport
 import io.openflux.desktop.model.NodeTransports
@@ -97,6 +98,8 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
     var useMailru by mutableStateOf(false)
     var useBoards by mutableStateOf(false)
     var useCups by mutableStateOf(false)
+    /** How the node forwards traffic: L4 (default) or L3. */
+    var mode by mutableStateOf(NodeMode.L4)
     var mailruInput by mutableStateOf("")
     var boardInput by mutableStateOf("")
     /** The cups.online rooms made for this channel, kept if the user goes back. */
@@ -407,7 +410,7 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
 
     private suspend fun askPlan() {
         busy = "Спрашиваю сервер, что изменится…"
-        plan = onServer(retry = true) { service.plan(channel!!.id, transports, withCookies, autoUpdate) }
+        plan = onServer(retry = true) { service.plan(channel!!.id, transports, withCookies, autoUpdate, mode) }
     }
 
     fun forgetYandexSignIn() {
@@ -433,7 +436,7 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
             if (e.sudo) { error = "sudo не принял пароль"; true } else false
         }) {
             val cookies = if (withCookies) yandexCookies else ""
-            onServer { service.apply(channel, transports, plan.port, autoUpdate, sudoPassword, cookies) }
+            onServer { service.apply(channel, transports, plan.port, autoUpdate, sudoPassword, cookies, mode) }
             installed = true
             yandexCookies = ""
             val link = service.shareLink(profileName(), channel.key, host.trim(), plan.port, transports)
@@ -610,6 +613,7 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
     private fun startEditing(info: InstalledChannel) {
         fun url(type: TransportType) = info.transports.firstOrNull { it.type == type.cliName }?.url.orEmpty()
         editing = info
+        mode = info.nodeMode
         val yandex = url(TransportType.VYANDEX).ifEmpty { url(TransportType.YANDEX) }
         useVolga = url(TransportType.VYANDEX).isNotEmpty()
         useYandexDocs = url(TransportType.YANDEX).isNotEmpty()
@@ -649,6 +653,7 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
         if (busy != null) return
         editing = null
         editingProfile = null
+        mode = NodeMode.L4
         useVolga = true
         useYandexDocs = false
         useMailru = false
@@ -675,7 +680,7 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
         if (needsSudoPassword && sudoPassword.isEmpty()) throw NodeWizardException("Введите пароль sudo")
         busy = "Меняю транспорты канала ${current.id} на сервере…"
         val cookies = if (withCookies) yandexCookies else ""
-        val now = onServer { service.setTransports(current.id, transports, sudoPassword, cookies) }
+        val now = onServer { service.setTransports(current.id, transports, sudoPassword, cookies, mode) }
         yandexCookies = ""
         editing = now
         val described = NodeTransports.describe(now.transportTypes)

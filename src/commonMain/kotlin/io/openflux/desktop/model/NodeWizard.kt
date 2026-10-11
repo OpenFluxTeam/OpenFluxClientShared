@@ -42,6 +42,25 @@ data class NodePlan(
     val untouched: List<String> = emptyList(),
 )
 
+/**
+ * How a node forwards its clients' traffic: [L4] terminates their TCP streams (needs no special rights, the default),
+ * [L3] passes their IP packets through raw sockets (needs the CAP_NET_RAW capability and a firewall rule, UDP and
+ * non-TCP traffic work).
+ */
+@Serializable
+enum class NodeMode(val cli: String, val label: String, val about: String) {
+    L4("l4", "L4: потоки TCP", "Подходит всем и ничего не требует от сервера. Так работает нода по умолчанию."),
+    L3(
+        "l3", "L3: IP-пакеты",
+        "Пропускает IP-пакеты целиком, с UDP и ICMP. Серверу нужны iptables и systemd 231+: каналу даётся право CAP_NET_RAW, " +
+            "а пока он работает, исходящие TCP-RST ядра с адреса сервера отбрасываются. Это касается и других сервисов на этом адресе.",
+    );
+
+    companion object {
+        fun of(cli: String): NodeMode = entries.firstOrNull { it.cli == cli.trim().lowercase() } ?: L4
+    }
+}
+
 /** A new channel's name on the server and its encryption key. */
 data class NewChannel(val id: String, val key: String) {
     override fun toString() = "NewChannel($id)"
@@ -70,7 +89,10 @@ data class InstalledChannel(
     val port: Int = 0,
     val context: String = "",
     val transports: List<NodeTransport> = emptyList(),
+    /** "l4" or "l3": how the node forwards traffic (an older installer does not say: l4). */
+    val mode: String = "l4",
 ) {
+    val nodeMode: NodeMode get() = NodeMode.of(mode)
     val running: Boolean get() = state == "active"
     val transportTypes: List<TransportType> get() = transports.mapNotNull { TransportType.fromCli(it.type) }
 }

@@ -6,6 +6,7 @@ import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.LogLine
 import io.openflux.desktop.model.NewChannel
 import io.openflux.desktop.model.NodeCoreSource
+import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodePlan
 import io.openflux.desktop.model.NodeTransport
 import io.openflux.desktop.model.NodeWizardException
@@ -79,8 +80,9 @@ class CoreNodeWizard(
         return NewChannel(reply.string("channel"), reply.string("key"))
     }
 
-    override suspend fun plan(channel: String, transports: List<NodeTransport>, withCookies: Boolean, autoUpdate: Boolean): NodePlan {
-        val reply = call("plan", "channel=$channel ${transports.names()} withCookies=$withCookies autoUpdate=$autoUpdate") {
+    override suspend fun plan(channel: String, transports: List<NodeTransport>, withCookies: Boolean, autoUpdate: Boolean, mode: NodeMode): NodePlan {
+        val reply = call("plan", "channel=$channel ${transports.names()} withCookies=$withCookies autoUpdate=$autoUpdate mode=${mode.cli}") {
+            put("mode", mode.cli)
             put("channel", channel)
             put("channelPort", 0)
             put("transports", transports.json())
@@ -97,8 +99,10 @@ class CoreNodeWizard(
         autoUpdate: Boolean,
         sudoPassword: String,
         cookieHeader: String,
+        mode: NodeMode,
     ) {
-        call("apply", "channel=${channel.id} ${transports.names()} port=$port autoUpdate=$autoUpdate") {
+        call("apply", "channel=${channel.id} ${transports.names()} port=$port autoUpdate=$autoUpdate mode=${mode.cli}") {
+            put("mode", mode.cli)
             put("channel", channel.id)
             put("key", channel.key)
             put("transports", transports.json())
@@ -124,8 +128,9 @@ class CoreNodeWizard(
         return json.decodeFromJsonElement(InstalledChannel.serializer(), reply.getValue("channel"))
     }
 
-    override suspend fun setTransports(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String): InstalledChannel {
-        val reply = call("setTransports", "channel=$channel ${transports.names()}") {
+    override suspend fun setTransports(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String, mode: NodeMode?): InstalledChannel {
+        val reply = call("setTransports", "channel=$channel ${transports.names()} mode=${mode?.cli ?: "keep"}") {
+            mode?.let { put("mode", it.cli) }
             put("channel", channel)
             put("transports", transports.json())
             put("sudoPassword", sudoPassword)

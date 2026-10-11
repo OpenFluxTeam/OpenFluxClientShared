@@ -13,6 +13,7 @@ import io.openflux.desktop.model.ExitAddress
 import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.LogLine
 import io.openflux.desktop.model.NewChannel
+import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodePlan
 import io.openflux.desktop.model.InstalledChannel
 import io.openflux.desktop.model.NodeTransport
@@ -314,7 +315,7 @@ interface NodeWizardService {
      * change; the server picks the port. [autoUpdate] turns the server's
      * core updater on or off.
      */
-    suspend fun plan(channel: String, transports: List<NodeTransport>, withCookies: Boolean, autoUpdate: Boolean): NodePlan
+    suspend fun plan(channel: String, transports: List<NodeTransport>, withCookies: Boolean, autoUpdate: Boolean, mode: NodeMode = NodeMode.L4): NodePlan
     /** Install and start the channel. [cookieHeader] "" leaves the node signed out of Yandex. */
     suspend fun apply(
         channel: NewChannel,
@@ -323,6 +324,7 @@ interface NodeWizardService {
         autoUpdate: Boolean,
         sudoPassword: String,
         cookieHeader: String,
+        mode: NodeMode = NodeMode.L4,
     )
     suspend fun remove(channel: String, sudoPassword: String)
 
@@ -334,9 +336,10 @@ interface NodeWizardService {
      * Changes the documents of a channel already on the server (some added,
      * some removed; direct stays). Its key, port and encryption context stay,
      * so its links keep working. [cookieHeader], when not empty, is a new
-     * Yandex sign-in for its Yandex document. Returns the channel as it is now.
+     * Yandex sign-in for its Yandex document. [mode] changes how the node forwards traffic; null keeps its own.
+     * Returns the channel as it is now.
      */
-    suspend fun setTransports(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String = ""): InstalledChannel =
+    suspend fun setTransports(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String = "", mode: NodeMode? = null): InstalledChannel =
         throw NodeWizardException("Изменение каналов на сервере здесь не поддерживается")
 
     /** [shareLink] for a channel already on the server: the link keeps its [context]. */
