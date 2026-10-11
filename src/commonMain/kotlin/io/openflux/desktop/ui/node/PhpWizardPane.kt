@@ -135,7 +135,7 @@ fun PhpWizardPane(model: PhpWizardModel, onClose: () -> Unit, onSaved: (String) 
     if (qrOpen) {
         AppDialog(title = "Отсканируйте в OpenFlux", onDismiss = { qrOpen = false }, secondary = "Закрыть") {
             val matrix = remember(model.shareLink) { model.qr() }
-            val hint = "На другом устройстве: Профили → Импорт → Сканировать QR. В коде нет ключей: режим без сервера их не использует. " +
+            val hint = "На другом устройстве: Подключения → Добавить → Сканировать QR. В коде нет ключей: режим без сервера их не использует. " +
                 "Код даёт только подключение, управлять нодой на хостинге с него нельзя."
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val width = maxWidth

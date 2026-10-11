@@ -129,7 +129,9 @@ fun NodeWizardPane(
             },
             secondary = "Остаться",
         ) {
-            Text("Канал уже установлен на сервере, но профиль не сохранён: без него к каналу не подключиться.",
+            Text(
+                if (model.managing) "Нода уже установлена на сервере, но профиль не сохранён на этом устройстве. Его можно создать позже на экране сервера кнопкой «Подключить себе»."
+                else "Канал уже установлен на сервере, но профиль не сохранён: без него к каналу не подключиться.",
                 style = AppTheme.typography.body, color = AppTheme.colors.text)
             Spacer(Modifier.height(AppTheme.spacing.m))
             TextAction("Выйти, не сохраняя", { confirmClose = false; onClose() }, color = AppTheme.colors.danger)
@@ -138,7 +140,7 @@ fun NodeWizardPane(
     if (qrOpen) {
         AppDialog(title = "Отсканируйте в OpenFlux", onDismiss = { qrOpen = false }, secondary = "Закрыть") {
             val matrix = remember(model.shareLink) { model.qr() }
-            val hint = "На другом устройстве: Профили → Импорт → Сканировать QR. В коде ключ канала: показывайте его только тому, кто будет им пользоваться."
+            val hint = "На другом устройстве: Подключения → Добавить → Сканировать QR. В коде ключ канала: показывайте его только тому, кто будет им пользоваться."
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val width = maxWidth
                 if (width >= 440.dp) {
@@ -597,7 +599,10 @@ private fun ColumnScope.DoneStep(model: NodeWizardModel, onShowQr: () -> Unit, o
             KeyValueRow("Внешний адрес", model.verifiedIp, valueColor = AppTheme.colors.success)
         }
     }
-    Note("Чтобы добавить ещё одного пользователя, запустите мастер снова: появится отдельный канал со своим документом и ключом.")
+    Note(
+        if (model.managing) "Ещё одному пользователю нужен свой канал: «Добавить ноду» на экране сервера."
+        else "Чтобы добавить ещё одного пользователя, запустите мастер снова: появится отдельный канал со своим документом и ключом.",
+    )
     Actions {
         if (model.saved) {
             AppButton("Открыть профиль", { model.profile?.let { onSaved(it.id) } }, leading = Icons.Rounded.CheckCircle)

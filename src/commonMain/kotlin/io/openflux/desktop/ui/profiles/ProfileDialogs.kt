@@ -198,7 +198,7 @@ fun ShareDialog(model: ProfilesScreenModel, profile: Profile) {
             onSuccess = { value ->
                 val matrix = remember(value) { model.qr(value) }
                 val hint = @Composable {
-                    Text("Отсканируйте в OpenFlux на другом устройстве (Профили → Импорт) или вставьте ссылку в OpenFlux на компьютере.",
+                    Text("Отсканируйте в OpenFlux на другом устройстве (Подключения → Добавить) или вставьте ссылку в OpenFlux на компьютере.",
                         style = AppTheme.typography.body, color = AppTheme.colors.textSecondary)
                     Spacer(Modifier.height(AppTheme.spacing.m))
                     Banner(
