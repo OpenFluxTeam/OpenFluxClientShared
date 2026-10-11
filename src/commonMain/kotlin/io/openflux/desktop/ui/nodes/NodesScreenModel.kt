@@ -52,6 +52,19 @@ class NodesScreenModel(private val container: AppContainer) : ScreenModel {
         }
     }
 
+    /**
+     * A new server ([from] = [NEW_SERVER]) that connected is a server like the others: its session moves to its own
+     * id. Returns that id, or null when nothing moved (it is not the session of [from], or the server already has one).
+     */
+    fun settle(from: String, session: NodeWizardModel): String? {
+        if (sessions[from] !== session) return null
+        val id = "${session.host.trim()}:${session.port.trim().toIntOrNull() ?: 22}:${session.user.trim()}"
+        if (id == from || sessions.containsKey(id)) return null
+        sessions.remove(from)
+        sessions[id] = session
+        return id
+    }
+
     /** The wizard making a node on a PHP hosting. */
     fun hostingWizard(dest: Dest): PhpWizardModel = hostings.getOrPut(dest) { PhpWizardModel(container, screenModelScope) }
 

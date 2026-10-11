@@ -92,6 +92,11 @@ fun ServerScreen(dest: Dest.Server) {
     val actions = LocalActions.current
     val m = models.nodes.session(dest.id)
     val connected = m.step == WizardStep.Manage && m.probe != null
+    val nav = io.openflux.desktop.ui.nav.LocalNav.current
+    if (connected && dest.id == NEW_SERVER) {
+        // A server just typed in becomes the server of its own address: the screens above it say so and the list opens it.
+        LaunchedEffect(Unit) { models.nodes.settle(dest.id, m)?.let { nav.replaceTop(Dest.Server(it)) } }
+    }
     DetailScreen(
         title = if (m.host.isBlank()) "Новый сервер" else "${m.user.trim()}@${m.host.trim()}",
         subtitle = if (connected) "Ноды на этом сервере" else "Доступ к серверу нужен только на время работы с ним: OpenFlux его не хранит.",

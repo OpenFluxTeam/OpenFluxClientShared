@@ -47,6 +47,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -865,6 +866,24 @@ class NodeWizardModelTest {
         assertEquals(WizardStep.Manage, m.step)
         assertNull(m.channel)
         assertEquals(listOf("of-old"), m.channels.map { it.id })
+    }
+
+    /** A server typed in on a "new server" screen gets its own id when it connects: the screens above it name it by address. */
+    @Test
+    fun aNewServerThatConnectedMovesToItsOwnId() = runTest {
+        val env = Env()
+        installedChannel(env, profile = false)
+        val nodes = io.openflux.desktop.ui.nodes.NodesScreenModel(env.container)
+        val m = nodes.session(io.openflux.desktop.ui.nodes.NEW_SERVER)
+        m.host = serverIp
+        m.password = "ssh-pass"
+        assertNull(nodes.settle(io.openflux.desktop.ui.nodes.NEW_SERVER, NodeWizardModel(env.container, this)), "only its own session moves")
+        val id = nodes.settle(io.openflux.desktop.ui.nodes.NEW_SERVER, m)
+        assertEquals("$serverIp:22:root", id)
+        assertSame(m, nodes.session(id!!), "the same session, so the connection is kept")
+        assertNull(nodes.settle(io.openflux.desktop.ui.nodes.NEW_SERVER, m), "nothing is left under the placeholder")
+        nodes.release(io.openflux.desktop.ui.nav.Dest.Server(io.openflux.desktop.ui.nodes.NEW_SERVER))
+        assertSame(m, nodes.session(id), "dropping the placeholder screen leaves the moved session alone")
     }
 
     /** Changing an installed node from the server's screen keeps the key, the port and the context. */
