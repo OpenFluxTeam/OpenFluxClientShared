@@ -44,9 +44,11 @@ fun destTitle(dest: Dest, profiles: List<Profile>): String {
         is Dest.ProfileEdit -> if (dest.id == null) "Новый профиль" else name(dest.id)
         Dest.Account -> "Подписка"
         Dest.Auth -> "Аккаунт OpenFlux"
-        is Dest.CreateNode -> "Новая нода"
+        is Dest.Server -> if (dest.id == "+") "Новый сервер" else dest.id.split(':').let { p -> if (p.size >= 3) "${p[2]}@${p[0]}" else dest.id }
+        is Dest.ChannelEdit -> "Нода ${dest.channel}"
+        is Dest.CreateChannel -> "Новая нода"
+        Dest.CreateHosting -> "Нода без сервера"
         is Dest.Node -> name(dest.id)
-        is Dest.NodeEdit -> name(dest.id)
         Dest.Logs -> "Журнал"
         Dest.ScriptTransports -> "Транспорты"
     }

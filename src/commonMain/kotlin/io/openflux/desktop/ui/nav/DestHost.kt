@@ -31,8 +31,10 @@ import io.openflux.desktop.ui.connections.ConnectionsList
 import io.openflux.desktop.ui.connections.ProfileEditScreen
 import io.openflux.desktop.ui.connections.ProfileScreen
 import io.openflux.desktop.ui.logs.LogsPage
-import io.openflux.desktop.ui.nodes.CreateNodeScreen
-import io.openflux.desktop.ui.nodes.NodeEditScreen
+import io.openflux.desktop.ui.nodes.ChannelEditScreen
+import io.openflux.desktop.ui.nodes.CreateChannelScreen
+import io.openflux.desktop.ui.nodes.CreateHostingScreen
+import io.openflux.desktop.ui.nodes.ServerScreen
 import io.openflux.desktop.ui.nodes.NodeScreen
 import io.openflux.desktop.ui.nodes.NodesList
 import io.openflux.desktop.ui.scripts.ScriptsPage
@@ -52,9 +54,11 @@ fun DestContent(dest: Dest) {
         is Dest.ProfileEdit -> ProfileEditScreen(dest)
         Dest.Account -> AccountScreenHost()
         Dest.Auth -> AuthScreen()
-        is Dest.CreateNode -> CreateNodeScreen(dest)
+        is Dest.Server -> ServerScreen(dest)
+        is Dest.ChannelEdit -> ChannelEditScreen(dest)
+        is Dest.CreateChannel -> CreateChannelScreen(dest)
+        Dest.CreateHosting -> CreateHostingScreen()
         is Dest.Node -> NodeScreen(dest.id)
-        is Dest.NodeEdit -> NodeEditScreen(dest)
         Dest.Logs -> LogsPage()
         Dest.ScriptTransports -> ScriptsPage()
     }
@@ -66,12 +70,12 @@ private val Dest.entityId: String?
         is Dest.Profile -> id
         is Dest.ProfileEdit -> id
         is Dest.Node -> id
-        is Dest.NodeEdit -> id
+        is Dest.Server -> id
         else -> null
     }
 
 private val Dest.isEntity: Boolean
-    get() = this is Dest.Profile || this is Dest.ProfileEdit || this is Dest.Node || this is Dest.NodeEdit
+    get() = this is Dest.Profile || this is Dest.ProfileEdit || this is Dest.Node || this is Dest.Server
 
 /**
  * What a place shows: the top screen of its stack. In a wide window the lists of Connections and Nodes keep their
@@ -124,13 +128,13 @@ private fun NothingChosen(section: Section) {
             }
         } else {
             EmptyState(
-                title = "Выберите ноду",
-                message = "Слева ваши ноды. Откройте одну, чтобы посмотреть её сервер, поменять транспорты или добавить пользователя.",
+                title = "Выберите сервер",
+                message = "Слева ваши серверы и ноды. Откройте сервер, чтобы увидеть его ноды: изменить, поделиться, подключить себе или добавить новую.",
                 resource = AppIcons.Public,
             ) {
                 ButtonRow(alignment = Alignment.CenterHorizontally) {
-                    AppButton("На своём сервере", { actions.createNode(NodeKind.Server) }, leading = Icons.Rounded.Dns)
-                    AppButton("Без сервера", { actions.createNode(NodeKind.Hosting) }, style = ButtonStyle.Secondary, leading = Icons.Rounded.Cloud)
+                    AppButton("Добавить сервер", actions::addServer, leading = Icons.Rounded.Dns)
+                    AppButton("Без сервера", actions::createHosting, style = ButtonStyle.Secondary, leading = Icons.Rounded.Cloud)
                 }
             }
         }

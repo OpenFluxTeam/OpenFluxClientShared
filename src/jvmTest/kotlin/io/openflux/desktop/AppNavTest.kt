@@ -2,7 +2,6 @@ package io.openflux.desktop
 
 import io.openflux.desktop.ui.nav.AppNav
 import io.openflux.desktop.ui.nav.Dest
-import io.openflux.desktop.ui.nav.NodeKind
 import io.openflux.desktop.ui.nav.Section
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -54,7 +53,7 @@ class AppNavTest {
         val nav = AppNav()
         nav.select(Section.Nodes)
         nav.push(Dest.Node("n"))
-        nav.push(Dest.NodeEdit("n"))
+        nav.push(Dest.ChannelEdit("s", "n"))
         nav.select(Section.Nodes)
         assertEquals(Dest.Nodes, nav.top)
         assertEquals(1, nav.depth)
@@ -79,9 +78,9 @@ class AppNavTest {
         nav.select(Section.Connections)
         nav.push(Dest.AddConnection)
         // "Своя нода" in the ways to connect: the Nodes place, the wizard on top of the nodes list.
-        nav.goIn(Section.Nodes, Dest.CreateNode(NodeKind.Server))
+        nav.goIn(Section.Nodes, Dest.CreateChannel("s"))
         assertEquals(Section.Nodes, nav.section)
-        assertEquals(Dest.CreateNode(NodeKind.Server), nav.top)
+        assertEquals(Dest.CreateChannel("s"), nav.top)
         assertEquals(Dest.Nodes, nav.below)
         nav.back()
         nav.back()
@@ -105,7 +104,7 @@ class AppNavTest {
     @Test
     fun replaceTopTurnsAFinishedWizardIntoItsResult() {
         val nav = AppNav()
-        nav.goIn(Section.Nodes, Dest.CreateNode(NodeKind.Hosting))
+        nav.goIn(Section.Nodes, Dest.CreateHosting)
         nav.replaceTop(Dest.Node("new"))
         assertEquals(Dest.Node("new"), nav.top)
         assertEquals(Dest.Nodes, nav.below)
@@ -158,12 +157,12 @@ class AppNavTest {
         val gone = mutableListOf<Dest>()
         nav.onRemoved = { gone += it }
         nav.select(Section.Nodes)
-        nav.push(Dest.CreateNode(NodeKind.Server))
+        nav.push(Dest.CreateChannel("s"))
         nav.push(Dest.Node("n"))
         nav.back()
         assertEquals(listOf<Dest>(Dest.Node("n")), gone)
         nav.replaceTop(Dest.Node("made"))
-        assertEquals(listOf<Dest>(Dest.Node("n"), Dest.CreateNode(NodeKind.Server)), gone)
+        assertEquals(listOf<Dest>(Dest.Node("n"), Dest.CreateChannel("s")), gone)
         nav.popToRoot()
         assertEquals(Dest.Node("made"), gone.last())
         nav.push(Dest.Node("x"))

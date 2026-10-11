@@ -7,7 +7,10 @@ import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.SubscriptionInvite
 import io.openflux.desktop.model.managed
 import io.openflux.desktop.service.AppContainer
+import io.openflux.desktop.ui.nodes.NEW_SERVER
 import io.openflux.desktop.ui.nodes.NodesScreenModel
+import io.openflux.desktop.ui.nodes.serverHost
+import io.openflux.desktop.ui.nodes.serverId
 import io.openflux.desktop.ui.profiles.ProfilesScreenModel
 import io.openflux.desktop.ui.settings.SettingsCategory
 import io.openflux.desktop.ui.subscription.AuthStep
@@ -80,7 +83,7 @@ class AppActions(val nav: AppNav, private val models: AppModels, private val con
 
     private fun show(dest: Dest, replace: Boolean) {
         val top = nav.top
-        val onEntity = top is Dest.Profile || top is Dest.Node || top is Dest.ProfileEdit || top is Dest.NodeEdit
+        val onEntity = top is Dest.Profile || top is Dest.Node || top is Dest.ProfileEdit || top is Dest.Server
         if (replace && onEntity) nav.replaceTop(dest) else nav.push(dest)
     }
 
@@ -117,15 +120,34 @@ class AppActions(val nav: AppNav, private val models: AppModels, private val con
 
     // ---- nodes ----
 
-    fun createNode(kind: NodeKind, recentServer: String? = null) = nav.goIn(Section.Nodes, Dest.CreateNode(kind, recentServer))
+    /** A server of one's own: the way in is asked on its screen. */
+    fun openServer(id: String, replace: Boolean = false) = show(Dest.Server(id), replace)
 
-    /** A node of one's own: its server, transports, users. */
+    /** A new server: its address and login are typed on its screen. */
+    fun addServer() = nav.goIn(Section.Nodes, Dest.Server(NEW_SERVER))
+
+    /** The server a node's profile belongs to (its direct address), opened in the Nodes place. */
+    fun openServerOf(profile: Profile) {
+        val host = profile.serverHost
+        if (host.isEmpty()) return
+        val known = container.settings.settings.value.knownServers.firstOrNull { it.host == host }
+            ?: io.openflux.desktop.model.KnownServer(host, 22, "root")
+        nav.goIn(Section.Nodes, Dest.Server(serverId(known)))
+    }
+
+    /** Making a node on a connected server. */
+    fun createChannel(serverId: String) = nav.push(Dest.CreateChannel(serverId))
+
+    /** Changing a node installed on a server. */
+    fun editChannel(serverId: String, channel: String) = nav.push(Dest.ChannelEdit(serverId, channel))
+
+    /** Making a node on an ordinary PHP hosting. */
+    fun createHosting() = nav.goIn(Section.Nodes, Dest.CreateHosting)
+
+    /** A node's profile on this device. */
     fun openNode(id: String, replace: Boolean = false) = show(Dest.Node(id), replace)
 
-    /** Changing the node on its server. */
-    fun editNode(id: String) = nav.push(Dest.NodeEdit(id))
-
-    /** A wizard made a node: its screen replaces the wizard. */
+    /** A hosting wizard made a node: its screen replaces the wizard. */
     fun nodeMade(id: String) {
         if (id.isEmpty()) nav.back() else nav.replaceTop(Dest.Node(id))
     }

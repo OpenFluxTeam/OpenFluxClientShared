@@ -88,7 +88,6 @@ import io.openflux.desktop.ui.nav.DetailScreen
 import io.openflux.desktop.ui.nav.Dest
 import io.openflux.desktop.ui.nav.LocalActions
 import io.openflux.desktop.ui.nav.LocalModels
-import io.openflux.desktop.ui.nav.NodeKind
 import io.openflux.desktop.ui.nodes.ownNode
 import io.openflux.desktop.ui.profiles.ProfileEditor
 import io.openflux.desktop.ui.profiles.ProfilesScreenModel
@@ -296,8 +295,8 @@ fun ProfileScreen(id: String) {
             Spacer(Modifier.height(AppTheme.spacing.l))
             NodeEntryCard(
                 "Это ваша нода",
-                "Сервер, транспорты и новые пользователи меняются на экране ноды.",
-                "Управлять нодой", { actions.openNode(profile.id) },
+                "Её сервер, транспорты и пользователи — в «Нодах». Здесь профиль: как это устройство к ней подключается.",
+                "Открыть ноду", { actions.openNode(profile.id) },
             )
         } else if (profile.editableNode) {
             Spacer(Modifier.height(AppTheme.spacing.l))
@@ -431,8 +430,8 @@ fun AddConnectionScreen() {
             AddConnectionActions(
                 onAccount = { actions.signIn(AuthStep.Choose) },
                 onRestore = { actions.signIn(AuthStep.Recover) },
-                onOwnNode = { actions.createNode(NodeKind.Server) },
-                onNoServer = { actions.createNode(NodeKind.Hosting) },
+                onOwnNode = actions::addServer,
+                onNoServer = actions::createHosting,
                 onManual = actions::newProfile,
                 onProfileLink = { link -> profiles.importText = link; profiles.importOpen = true },
             ),

@@ -91,7 +91,12 @@ data class InstalledChannel(
     val transports: List<NodeTransport> = emptyList(),
     /** "l4" or "l3": how the node forwards traffic (an older installer does not say: l4). */
     val mode: String = "l4",
+    /** The channel's encryption key, which the server gives its root: the owner's link and profile are made from it. */
+    val key: String = "",
 ) {
+    // The key stays out of any log or message.
+    override fun toString() = "InstalledChannel($id, port=$port, $state)"
+
     val nodeMode: NodeMode get() = NodeMode.of(mode)
     val running: Boolean get() = state == "active"
     val transportTypes: List<TransportType> get() = transports.mapNotNull { TransportType.fromCli(it.type) }

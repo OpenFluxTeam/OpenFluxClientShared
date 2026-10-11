@@ -21,6 +21,12 @@ import kotlinx.coroutines.launch
 /** A profile the person runs the node of: made by the wizard, or on a hosting. */
 val Profile.ownNode: Boolean get() = !managed && (source == ProfileSource.Node || phpNode != null)
 
+/** The id of the server "root@203.0.113.10:22" as a screen names it. */
+fun serverId(server: io.openflux.desktop.model.KnownServer) = "${server.host}:${server.port}:${server.user}"
+
+/** The id of a server not yet typed in. */
+const val NEW_SERVER = "+"
+
 /** "203.0.113.10" of a node profile's direct address "203.0.113.10:31337"; empty when it has none. */
 val Profile.serverHost: String
     get() = carriers.firstOrNull { it.type == TransportType.DIRECT }?.value?.substringBeforeLast(':', "")?.trim('[', ']').orEmpty()
@@ -31,36 +37,38 @@ val Profile.serverHost: String
  * something and come back to the same step.
  */
 class NodesScreenModel(private val container: AppContainer) : ScreenModel {
-    private val servers = mutableMapOf<Dest, NodeWizardModel>()
+    private val sessions = mutableMapOf<String, NodeWizardModel>()
     private val hostings = mutableMapOf<Dest, PhpWizardModel>()
 
-    /** The wizard making a node on a server of one's own; [Dest.CreateNode.recentServer] starts it on a known server. */
-    fun serverWizard(dest: Dest.CreateNode): NodeWizardModel = servers.getOrPut(dest) {
+    /**
+     * The session with the server [id] ("host:port:user", [NEW_SERVER] for a new one): it connects over SSH, lists the
+     * server's nodes and is the engine of changing and making them. It lives as long as the server's screen is on a
+     * stack ([release]), so the way in is typed once.
+     */
+    fun session(id: String): NodeWizardModel = sessions.getOrPut(id) {
         NodeWizardModel(container, screenModelScope).also { wizard ->
-            val host = dest.recentServer ?: return@also
-            val known = container.settings.settings.value.knownServers.firstOrNull { it.host == host }
-            if (known != null) wizard.useServer(known) else wizard.host = host
+            wizard.managing = true
+            container.settings.settings.value.knownServers.firstOrNull { serverId(it) == id }?.let(wizard::useServer)
         }
     }
 
     /** The wizard making a node on a PHP hosting. */
-    fun hostingWizard(dest: Dest.CreateNode): PhpWizardModel = hostings.getOrPut(dest) { PhpWizardModel(container, screenModelScope) }
+    fun hostingWizard(dest: Dest): PhpWizardModel = hostings.getOrPut(dest) { PhpWizardModel(container, screenModelScope) }
 
-    /** The node screen of [profile]: its channel is read from the server and its transports changed there. */
-    fun editor(dest: Dest.NodeEdit, profile: Profile): NodeWizardModel = servers.getOrPut(dest) {
-        NodeWizardModel(container, screenModelScope).also { it.forProfile(profile) }
-    }
-
-    /** Lets go of what [dest] held: the SSH session of a wizard, the sign-in window. */
+    /** Lets go of what [dest] held: a server's SSH session, a hosting wizard. A node screen above a server keeps the session. */
     fun release(dest: Dest) {
-        servers.remove(dest)?.close()
-        hostings.remove(dest)?.close()
+        when (dest) {
+            is Dest.Server -> sessions.remove(dest.id)?.close()
+            is Dest.ChannelEdit -> sessions[dest.server]?.backToServer()
+            is Dest.CreateChannel -> sessions[dest.server]?.backToServer()
+            else -> hostings.remove(dest)?.close()
+        }
     }
 
     override fun onDispose() {
-        servers.values.forEach { it.close() }
+        sessions.values.forEach { it.close() }
         hostings.values.forEach { it.close() }
-        servers.clear()
+        sessions.clear()
         hostings.clear()
     }
 

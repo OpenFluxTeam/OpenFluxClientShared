@@ -1,5 +1,9 @@
 package io.openflux.desktop.ui.nodes
 
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import io.openflux.desktop.ui.components.appClickable
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +45,7 @@ import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.model.editableNode
 import io.openflux.desktop.model.isActive
+import io.openflux.desktop.model.managed
 import io.openflux.desktop.model.NodeTransports
 import io.openflux.desktop.model.PhpHosts
 import io.openflux.desktop.model.profile
@@ -72,54 +77,55 @@ import io.openflux.desktop.ui.nav.DetailScreen
 import io.openflux.desktop.ui.nav.Dest
 import io.openflux.desktop.ui.nav.LocalActions
 import io.openflux.desktop.ui.nav.LocalModels
-import io.openflux.desktop.ui.nav.NodeKind
-import io.openflux.desktop.ui.node.NodeWizardPane
 import io.openflux.desktop.ui.node.PhpWizardPane
 import io.openflux.desktop.ui.profiles.ProfilesScreenModel
 import io.openflux.desktop.ui.theme.AppTheme
 
 /**
- * "Ноды": what the person runs. The list of their nodes and the two ways to make one: on a server of their own, or
- * on an ordinary PHP hosting. A node's screen is where it is looked at, changed on its server and given to others.
+ * "Ноды": what the person runs. Their servers (open one to see and change the nodes on it) and the nodes they run on
+ * an ordinary PHP hosting. A server's screen is where nodes are made, changed, shared and connected to.
  */
 @Composable
 fun NodesList(selectedId: String?, split: Boolean, modifier: Modifier = Modifier) {
     val models = LocalModels.current
     val actions = LocalActions.current
     val profilesModel = models.profiles
+    val container = LocalAppContainer.current
     val profiles by profilesModel.profiles.profiles.collectAsState()
+    val settings by container.settings.settings.collectAsState()
     val state by profilesModel.connection.state.collectAsState()
     val touch = LocalTouchUi.current
-    val nodes = profiles.filter { it.ownNode }
-    var createMenu by remember { mutableStateOf(false) }
+    val servers = settings.knownServers
+    val hosting = profiles.filter { it.phpNode != null && it.ownNode }
+    var addMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scrollbars = LocalScrollbars.current
 
-    if (nodes.isEmpty()) {
+    if (servers.isEmpty() && hosting.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             EmptyState(
-                title = "Своих нод пока нет",
-                message = "Нода — это сервер, через который выходит трафик. Поставьте свою: на сервере с Linux за пару минут или без сервера, на обычном PHP-хостинге. " +
-                    "Потом раздайте её людям по ссылке или QR.",
+                title = "Своих серверов пока нет",
+                message = "Введите доступ к своему серверу (VDS с Linux): OpenFlux покажет ноды на нём, поможет поставить новые, " +
+                    "поменять транспорты, поделиться ссылкой и подключить ноду себе. Без сервера можно поднять ноду на обычном PHP-хостинге.",
                 resource = AppIcons.Public,
             ) {
                 ButtonRow(alignment = Alignment.CenterHorizontally) {
-                    AppButton("На своём сервере", { actions.createNode(NodeKind.Server) }, leading = Icons.Rounded.Dns)
-                    AppButton("Без сервера", { actions.createNode(NodeKind.Hosting) }, style = ButtonStyle.Secondary, leading = Icons.Rounded.Cloud)
+                    AppButton("Добавить сервер", actions::addServer, leading = Icons.Rounded.Dns)
+                    AppButton("Без сервера", actions::createHosting, style = ButtonStyle.Secondary, leading = Icons.Rounded.Cloud)
                 }
                 Spacer(Modifier.height(AppTheme.spacing.s))
-                TextAction("У меня уже есть нода: добавить подключение", actions::addConnection)
+                TextAction("У меня уже есть ссылка на ноду: добавить подключение", actions::addConnection)
             }
         }
         return
     }
     Column(modifier.padding(top = AppTheme.spacing.xl)) {
-        PageHeader("Ноды", "${nodes.size} ${plural(nodes.size)}", Modifier.padding(horizontal = AppTheme.spacing.xl)) {
+        PageHeader("Ноды", "${servers.size} ${serverPlural(servers.size)}", Modifier.padding(horizontal = AppTheme.spacing.xl)) {
             Box {
-                AppButton("Создать", { createMenu = true }, leading = Icons.Rounded.Add)
-                AppMenu(createMenu, { createMenu = false }, listOf(
-                    MenuAction("На своём сервере (VDS)", { actions.createNode(NodeKind.Server) }, Icons.Rounded.Dns),
-                    MenuAction("Без сервера: на PHP-хостинге", { actions.createNode(NodeKind.Hosting) }, Icons.Rounded.Cloud),
+                AppButton("Добавить", { addMenu = true }, leading = Icons.Rounded.Add)
+                AppMenu(addMenu, { addMenu = false }, listOf(
+                    MenuAction("Сервер (VDS)", actions::addServer, Icons.Rounded.Dns),
+                    MenuAction("Без сервера: на PHP-хостинге", actions::createHosting, Icons.Rounded.Cloud),
                 ))
             }
         }
@@ -130,19 +136,36 @@ fun NodesList(selectedId: String?, split: Boolean, modifier: Modifier = Modifier
                 modifier = Modifier.fillMaxSize().padding(horizontal = AppTheme.spacing.m),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                items(nodes, key = { it.id }) { node ->
-                    val running = state.isActive && state.profile?.id == node.id
-                    ProfileRow(
-                        profile = node,
-                        selected = node.id == selectedId,
-                        runningLook = if (running) state.look() else null,
-                        onClick = { actions.openNode(node.id, replace = split) },
-                        onDoubleClick = { profilesModel.connect(node) },
-                        menu = { nodeActions(profilesModel, actions, node, running) },
-                        onToggle = { if (running) profilesModel.connection.disconnect() else profilesModel.connect(node) },
-                        onEdit = { if (node.editableNode) actions.editNode(node.id) else actions.openNode(node.id) },
-                        touch = touch,
-                    )
+                if (servers.isNotEmpty()) {
+                    item(key = "servers") { GroupTitle("Серверы") }
+                    items(servers, key = { serverId(it) }) { server ->
+                        val id = serverId(server)
+                        val mine = profiles.count { it.ownNode && it.serverHost == server.host }
+                        ServerRow(
+                            server = server,
+                            subtitle = "${server.user}@${server.host}:${server.port}" + if (mine > 0) " · профилей на устройстве: $mine" else "",
+                            selected = id == selectedId,
+                            onClick = { actions.openServer(id, replace = split) },
+                            onForget = { container.settings.update { st -> st.copy(knownServers = st.knownServers.filterNot { it == server }) } },
+                        )
+                    }
+                }
+                if (hosting.isNotEmpty()) {
+                    item(key = "hosting") { GroupTitle("Без сервера: на PHP-хостинге") }
+                    items(hosting, key = { it.id }) { node ->
+                        val running = state.isActive && state.profile?.id == node.id
+                        ProfileRow(
+                            profile = node,
+                            selected = node.id == selectedId,
+                            runningLook = if (running) state.look() else null,
+                            onClick = { actions.openNode(node.id, replace = split) },
+                            onDoubleClick = { profilesModel.connect(node) },
+                            menu = { nodeActions(profilesModel, actions, node, running) },
+                            onToggle = { if (running) profilesModel.connection.disconnect() else profilesModel.connect(node) },
+                            onEdit = { actions.openNode(node.id) },
+                            touch = touch,
+                        )
+                    }
                 }
                 item { Spacer(Modifier.height(AppTheme.spacing.l)) }
             }
@@ -151,13 +174,49 @@ fun NodesList(selectedId: String?, split: Boolean, modifier: Modifier = Modifier
     }
 }
 
-private fun plural(n: Int): String {
+@Composable
+private fun GroupTitle(text: String) {
+    Text(
+        text.uppercase(), style = AppTheme.typography.label, color = AppTheme.colors.textSecondary,
+        modifier = Modifier.padding(start = AppTheme.spacing.m, top = AppTheme.spacing.m, bottom = AppTheme.spacing.xs),
+    )
+}
+
+/** One of the person's servers in the list: the address and the way into its screen. */
+@Composable
+private fun ServerRow(server: io.openflux.desktop.model.KnownServer, subtitle: String, selected: Boolean, onClick: () -> Unit, onForget: () -> Unit) {
+    val colors = AppTheme.colors
+    var menu by remember { mutableStateOf(false) }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(AppTheme.dimens.listRow)
+            .clip(AppTheme.shapes.card)
+            .background(if (selected) colors.accentSoft else androidx.compose.ui.graphics.Color.Transparent)
+            .appClickable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, onClick = onClick)
+            .padding(horizontal = AppTheme.spacing.m),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconBubble(Icons.Rounded.Dns)
+        Spacer(Modifier.width(AppTheme.spacing.m))
+        Column(Modifier.weight(1f)) {
+            Text(server.host, style = AppTheme.typography.bodyStrong, color = colors.text, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(subtitle, style = AppTheme.typography.caption, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        }
+        Box {
+            AppIconButton("Ещё", { menu = true }, icon = Icons.Rounded.MoreVert)
+            AppMenu(menu, { menu = false }, listOf(MenuAction("Забыть сервер", onForget, Icons.Rounded.Delete, danger = true)))
+        }
+    }
+}
+
+private fun serverPlural(n: Int): String {
     val mod10 = n % 10
     val mod100 = n % 100
     return when {
-        mod10 == 1 && mod100 != 11 -> "нода"
-        mod10 in 2..4 && mod100 !in 12..14 -> "ноды"
-        else -> "нод"
+        mod10 == 1 && mod100 != 11 -> "сервер"
+        mod10 in 2..4 && mod100 !in 12..14 -> "сервера"
+        else -> "серверов"
     }
 }
 
@@ -166,7 +225,6 @@ private fun nodeActions(model: ProfilesScreenModel, actions: AppActions, node: P
         if (running) MenuAction("Отключить", model.connection::disconnect, Icons.Rounded.Stop)
         else MenuAction("Подключить", { model.connect(node) }, Icons.Rounded.PlayArrow),
     )
-    if (node.editableNode) add(MenuAction("Изменить ноду на сервере", { actions.editNode(node.id) }, Icons.Rounded.Dns))
     add(MenuAction("QR и ссылка", { model.shareFor = node }, Icons.Rounded.QrCode2, enabled = node.transport.shareable))
     add(MenuAction("Параметры профиля", { actions.editProfile(node) }, Icons.Rounded.Edit))
     add(MenuAction("Убрать из приложения", { model.deleteFor = node }, Icons.Rounded.Delete, danger = true))
@@ -201,8 +259,8 @@ fun NodeScreen(id: String) {
         ButtonRow {
             if (running) AppButton("Отключить", model.connection::disconnect, style = ButtonStyle.Danger, leading = Icons.Rounded.Stop)
             else AppButton("Подключить", { model.connect(node) }, leading = Icons.Rounded.PlayArrow)
-            if (node.editableNode) {
-                AppButton("Изменить на сервере", { actions.editNode(node.id) }, style = ButtonStyle.Secondary, leading = Icons.Rounded.Dns)
+            if (node.serverHost.isNotEmpty() && !node.managed) {
+                AppButton("Управлять сервером", { actions.openServerOf(node) }, style = ButtonStyle.Secondary, leading = Icons.Rounded.Dns)
             }
             if (node.transport.shareable) {
                 AppButton("QR и ссылка", { model.shareFor = node }, style = ButtonStyle.Secondary, leading = Icons.Rounded.QrCode2)
@@ -237,16 +295,16 @@ fun NodeScreen(id: String) {
 
         if (!onHosting && host.isNotEmpty()) {
             Spacer(Modifier.height(AppTheme.spacing.xl))
-            SectionLabel("Пользователи")
+            SectionLabel("Сервер и пользователи")
             Spacer(Modifier.height(AppTheme.spacing.s))
             AppCard {
                 Text(
-                    "У каждого пользователя свой канал: свой документ и свой ключ. Добавьте ещё один на этот же сервер: " +
-                        "мастер заполнит адрес сервера, останется выбрать документы.",
+                    "У каждого пользователя свой канал: свой документ и свой ключ. Все ноды этого сервера, их изменение, " +
+                        "ссылки и новые пользователи: на экране сервера.",
                     style = AppTheme.typography.body, color = AppTheme.colors.textSecondary,
                 )
                 Spacer(Modifier.height(AppTheme.spacing.m))
-                AppButton("Добавить пользователя", { actions.createNode(NodeKind.Server, recentServer = host) }, style = ButtonStyle.Secondary, leading = Icons.Rounded.PersonAdd)
+                AppButton("Открыть сервер", { actions.openServerOf(node) }, style = ButtonStyle.Secondary, leading = Icons.Rounded.Dns)
             }
         }
 
@@ -306,34 +364,13 @@ private fun HostingControls(profile: Profile, siteUrl: String, token: String) {
     )
 }
 
-// ---- making and changing ----
+// ---- a node without a server ----
 
-/** The wizard that makes a node: on a server of one's own, or on a PHP hosting. Done, it becomes the node's screen. */
+/** The wizard that makes a node on a PHP hosting. Done, it becomes the node's screen. */
 @Composable
-fun CreateNodeScreen(dest: Dest.CreateNode) {
+fun CreateHostingScreen() {
     val models = LocalModels.current
     val actions = LocalActions.current
-    when (dest.kind) {
-        NodeKind.Server -> NodeWizardPane(models.nodes.serverWizard(dest), onClose = actions::back, onSaved = actions::nodeMade)
-        NodeKind.Hosting -> PhpWizardPane(models.nodes.hostingWizard(dest), onClose = actions::back, onSaved = actions::nodeMade)
-    }
-}
-
-/** Changing a node on its server: its profile, the way into the server and the transports of its channel on one screen. */
-@Composable
-fun NodeEditScreen(dest: Dest.NodeEdit) {
-    val models = LocalModels.current
-    val actions = LocalActions.current
-    val node = models.profiles.profiles.profiles.collectAsState().value.firstOrNull { it.id == dest.id }
-    if (node == null) {
-        LaunchedEffect(Unit) { actions.back() }
-        return
-    }
-    val wizard = models.nodes.editor(dest, node)
-    NodeWizardPane(
-        wizard,
-        onClose = actions::back,
-        onSaved = { actions.back() },
-        onAdvanced = { actions.editProfile(it) },
-    )
+    val nav = io.openflux.desktop.ui.nav.LocalNav.current
+    PhpWizardPane(models.nodes.hostingWizard(nav.top), onClose = actions::back, onSaved = actions::nodeMade)
 }

@@ -21,11 +21,8 @@ enum class Section(val title: String) {
     Settings("Настройки"),
 }
 
-/** How a new node is made: on a server of one's own over SSH, or on an ordinary PHP hosting. */
-enum class NodeKind { Server, Hosting }
-
 /**
- * A screen. Detail screens ([Profile], [ProfileEdit], [Node], [NodeEdit], [CreateNode], [AddConnection], [Account],
+ * A screen. Detail screens ([Profile], [ProfileEdit], [Node], [Server], [ChannelEdit], [CreateChannel], [CreateHosting], [AddConnection], [Account],
  * [Auth]) are not tied to a place: they open on top of the stack of the place the person is in, so "back" returns
  * to where they came from, whichever place that was.
  */
@@ -49,12 +46,19 @@ sealed interface Dest {
     data object Auth : Dest
 
     // ---- nodes ----
-    /** Making a node; [recentServer] the server of an existing node ("add another user to it"). */
-    data class CreateNode(val kind: NodeKind, val recentServer: String? = null) : Dest
-    /** One node of the person's own: its server, channel, transports and who it can be given to. */
+    /**
+     * One of the person's servers, by its id ("host:port:user", "+" for a new one): the way in, then every node
+     * (channel) on it: change, share, connect to, delete, add.
+     */
+    data class Server(val id: String) : Dest
+    /** Changing a node installed on a server: its transports and mode. */
+    data class ChannelEdit(val server: String, val channel: String) : Dest
+    /** Making a new node on a connected server. */
+    data class CreateChannel(val server: String) : Dest
+    /** Making a node on an ordinary PHP hosting (no server of one's own). */
+    data object CreateHosting : Dest
+    /** A node's profile on this device: where it is, how it connects, what it can be given to. Hosting nodes are run from here. */
     data class Node(val id: String) : Dest
-    /** Changing a node on its server: transports, mode, documents. */
-    data class NodeEdit(val id: String) : Dest
 
     // ---- settings ----
     data object Logs : Dest
@@ -185,6 +189,5 @@ private fun Dest.shows(id: String): Boolean = when (this) {
     is Dest.Profile -> this.id == id
     is Dest.ProfileEdit -> this.id == id
     is Dest.Node -> this.id == id
-    is Dest.NodeEdit -> this.id == id
     else -> false
 }

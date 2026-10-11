@@ -36,14 +36,19 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class WizardStep(val number: Int) { Server(1), Document(2), Plan(3), Verify(4), Done(4) }
+/**
+ * The wizard's steps. [Manage] is the connected server's own screen (its nodes), not a step of making one.
+ */
+enum class WizardStep(val number: Int) { Manage(0), Server(1), Document(2), Plan(3), Verify(4), Done(4) }
 
 /** A server key to confirm: new ([mismatch] false) or changed. */
 data class HostKeyPrompt(val fingerprint: String, val mismatch: Boolean)
 
 /**
- * "Своя нода": installs a new, independent channel on the user's VDS and
- * hands back a verified profile, like the Android NodeWizardActivity. Steps:
+ * The session with one of the person's servers, and what is done on it: a new node (channel) is made, an installed one
+ * is changed, shared, connected to or deleted. In [managing] mode (the server's screen) it connects, lists the
+ * server's nodes and stays there; otherwise it is the wizard that installs a new, independent channel on the
+ * user's VDS and hands back a verified profile, like the Android NodeWizardActivity. Steps:
  * SSH to the server, the channel's transports (any of a Yandex document, a
  * Mail.ru document and cups.online rooms, direct always as the backup),
  * what will change on the server, install, then a real connection through
@@ -163,30 +168,123 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
         private set
     private var stopWaitingForPrimary = false
 
-    // The wizard opened from a profile's settings.
-    /**
-     * The profile whose node is being changed: the wizard was opened from its
-     * settings, so the server's address and the channel come from the profile
-     * and only the password is asked. Null for a wizard that makes a channel.
-     */
-    var profileTarget by mutableStateOf<Profile?>(null)
-        private set
-    /** The profile's direct port: the channel on the server that listens on it is the profile's. */
-    private var profileChannelPort = 0
+    // ---- the server's own screen ----
 
-    /** Prepares the wizard for [profile] (see [Profile.editableNode]): its address in the form, the fork's installer. */
-    fun forProfile(profile: Profile) {
-        val direct = profile.carriers.firstOrNull { it.type == TransportType.DIRECT }?.value.orEmpty()
-        val channelPort = direct.substringAfterLast(':', "").toIntOrNull() ?: return
-        val hostPart = direct.substringBeforeLast(':').trim('[', ']')
-        if (hostPart.isEmpty()) return
-        profileTarget = profile
-        profileChannelPort = channelPort
-        host = hostPart
-        settings.settings.value.knownServers.firstOrNull { it.host == hostPart }?.let { port = it.port.toString(); user = it.user }
-        name = profile.name
-        // Only the fork's installer can read and change a running channel.
-        nodeCore = NodeCoreSource.Fork
+    /** True on the server's screen: after connecting the nodes on the server are listed and the session stays there. */
+    var managing by mutableStateOf(false)
+
+    /** The nodes (channels) installed on the connected server, as the server reports them. */
+    var channels by mutableStateOf<List<InstalledChannel>>(emptyList())
+        private set
+
+    private suspend fun loadChannels() {
+        if (needsSudoPassword && sudoPassword.isEmpty() && !useKey) sudoPassword = password
+        if (needsSudoPassword && sudoPassword.isEmpty()) throw NodeWizardException("Введите пароль sudo")
+        val found = mutableListOf<InstalledChannel>()
+        for (id in probe?.channels.orEmpty()) {
+            busy = "Читаю канал $id на сервере…"
+            found += onServer { service.showChannel(id, sudoPassword) }
+        }
+        channels = found.sortedBy { it.port }
+    }
+
+    /** Reads the server's nodes again. */
+    fun refreshChannels() {
+        launchCall("Читаю ноды на сервере…", onFailure = { e -> if (e.sudo) { error = "sudo не принял пароль"; true } else false }) {
+            probe = service.connect(target ?: return@launchCall, nodeCore).also { lastServerReply = container.platform.now() }
+            loadChannels()
+        }
+    }
+
+    /** Closes the SSH session; the server's screen asks for the way in again. */
+    fun disconnect() {
+        if (busy != null) return
+        job?.cancel()
+        service.close()
+        target = null
+        probe = null
+        channels = emptyList()
+        password = ""
+        privateKey = ""
+        passphrase = ""
+        sudoPassword = ""
+        resetResult()
+        step = WizardStep.Server
+    }
+
+    /** Starts a new node on the connected server. */
+    fun startCreate() {
+        if (busy != null || target == null) return
+        cancelEditing()
+        resetResult()
+        launchCall("Готовлю новую ноду…") {
+            channel = service.newChannel()
+            name = "Нода ${host.trim()}"
+            step = WizardStep.Document
+        }
+    }
+
+    /** Opens the installed node [info] to change its transports and mode. */
+    fun openChannel(info: InstalledChannel) {
+        if (busy != null) return
+        resetResult()
+        startEditing(info)
+        step = WizardStep.Document
+    }
+
+    /** Deletes the node [id] from the server (its profiles here stay and stop working). */
+    fun deleteChannel(id: String) {
+        launchCall("Удаляю канал $id с сервера…", onFailure = { e -> if (e.sudo) { error = "sudo не принял пароль"; true } else false }) {
+            onServer { service.remove(id, sudoPassword) }
+            probe = service.connect(target ?: throw NodeWizardException("Нет подключения к серверу"), nodeCore)
+            lastServerReply = container.platform.now()
+            loadChannels()
+            notice = "Канал $id удалён с сервера"
+        }
+    }
+
+    /** Back to the server's screen from making or changing a node: what was done is forgotten, the list is read again. */
+    fun backToServer() {
+        if (busy != null) return
+        cancelEditing()
+        resetResult()
+        channel = null
+        step = WizardStep.Manage
+        if (target != null) refreshChannels()
+    }
+
+    private fun resetResult() {
+        installed = false
+        saved = false
+        profile = null
+        shareLink = ""
+        verifiedIp = ""
+        sessionProven = false
+        primaryUp = false
+        verifyFailed = null
+        plan = null
+        transports = emptyList()
+        error = null
+        notice = null
+    }
+
+    /** The profile on this device that reaches [info] (made by the wizard or imported from its link), if any. */
+    fun profileOf(info: InstalledChannel): Profile? = channelProfile(info)
+
+    /**
+     * The profile of the node [info]: the one on this device, or a new one made from the key the server gave, saved
+     * as one's own node. Needed to share it or connect to it.
+     */
+    suspend fun adopt(info: InstalledChannel): Profile {
+        channelProfile(info)?.let { return it }
+        if (info.key.isEmpty()) throw NodeWizardException("Сервер не отдал ключ канала: обновите установщик (откройте сервер заново)")
+        val others = container.profiles.profiles.value.count { it.source == ProfileSource.Node && it.name.startsWith("Нода ${host.trim()}") }
+        val label = if (others == 0) "Нода ${host.trim()}" else "Нода ${host.trim()} · ${info.id}"
+        val link = service.channelShareLink(label, info.key, host.trim(), info.port, info.transports, info.context)
+        val made = Profile.fromShare(container.shareCodec.decode(link), container.profiles.newId(), container.platform.now(), ProfileSource.Node)
+            .copy(icon = "ic_terminal", name = label)
+        container.profiles.upsert(made)
+        return made
     }
 
     // Changing the documents of a channel already on the server.
@@ -255,8 +353,9 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
             this.target = target
             lastServerReply = container.platform.now()
             settings.update { s -> s.copy(knownServers = NodeServers.remember(s.knownServers, KnownServer(host, port, user))) }
-            if (profileTarget != null) {
-                openProfileChannel()
+            if (managing) {
+                loadChannels()
+                step = WizardStep.Manage
                 return@launchCall
             }
             if (channel == null) channel = service.newChannel()
@@ -458,13 +557,6 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
     fun back() {
         if (busy != null) return
         error = null
-        if (step == WizardStep.Document && editing != null && profileTarget != null) {
-            editing = null
-            editingProfile = null
-            error = null
-            step = WizardStep.Server
-            return
-        }
         if (step == WizardStep.Document && editing != null) { cancelEditing(); return }
         step = when (step) {
             WizardStep.Document -> WizardStep.Server
@@ -597,23 +689,6 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
         }
     }
 
-    /** Finds the channel on the server that listens on the profile's port and opens it for editing. */
-    private suspend fun openProfileChannel() {
-        if (needsSudoPassword && sudoPassword.isEmpty() && !useKey) sudoPassword = password
-        if (needsSudoPassword && sudoPassword.isEmpty()) throw NodeWizardException("Введите пароль sudo")
-        var found: InstalledChannel? = null
-        for (id in probe?.channels.orEmpty()) {
-            busy = "Ищу канал профиля на сервере…"
-            val info = onServer { service.showChannel(id, sudoPassword) }
-            if (info.port == profileChannelPort) { found = info; break }
-        }
-        val channel = found ?: throw NodeWizardException(
-            "На сервере нет канала с портом $profileChannelPort. Возможно, этот профиль относится к другому серверу.",
-        )
-        startEditing(channel)
-        step = WizardStep.Document
-    }
-
     private fun startEditing(info: InstalledChannel) {
         fun url(type: TransportType) = info.transports.firstOrNull { it.type == type.cliName }?.url.orEmpty()
         editing = info
@@ -632,7 +707,7 @@ class NodeWizardModel(private val container: AppContainer, private val scope: Co
         cupsRooms = url(TransportType.CUPSONLINE)
         yandexCookies = ""
         cookiesDocument = ""
-        editingProfile = profileTarget ?: channelProfile(info)
+        editingProfile = channelProfile(info)
         editingProfile?.let { name = it.name }
         notice = null
         val types = info.transports.joinToString(",") { it.type }.ifEmpty { "direct" }

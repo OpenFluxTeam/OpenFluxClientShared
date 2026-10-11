@@ -757,56 +757,138 @@ class NodeWizardModelTest {
         assertTrue(wizard.error.orEmpty().contains("нет на сервере"), wizard.error ?: "")
     }
 
-    /** From a profile's settings: the address and channel come from the profile, only the password is asked. */
-    @Test
-    fun aProfilesNodeIsChangedFromItsSettings() = runTest {
-        val env = Env()
-        val before = installedChannel(env, profile = true)!!
-        env.connection.active = "mailru"
-        assertTrue(before.editableNode)
-        val wizard = NodeWizardModel(env.container, this)
-        wizard.forProfile(before)
-        assertEquals(serverIp, wizard.host)
-        assertEquals("Моя нода", wizard.name)
-        assertEquals(NodeCoreSource.Fork, wizard.nodeCore)
-        wizard.password = "ssh-pass"
-        wizard.connect()
-        advanceUntilIdle()
-        // No Plan or Document of a new channel: the profile's channel is opened at once.
-        assertNull(wizard.error, wizard.error ?: "")
-        assertEquals(WizardStep.Document, wizard.step)
-        assertEquals("of-old", wizard.editing?.id)
-        assertTrue(wizard.useVolga && wizard.useMailru)
+    private val channelKey = "ab".repeat(32)
 
-        wizard.useVolga = false
-        wizard.useBoards = true
-        wizard.boardInput = boardLink
-        wizard.next()
+    /** The server's own screen: connected, it lists the nodes on the server and stays there. */
+    @Test
+    fun aServerShowsItsNodesAndStaysOnItsScreen() = runTest {
+        val env = Env()
+        installedChannel(env, profile = true)
+        env.node.installed["of-old"] = env.node.installed.getValue("of-old").copy(key = channelKey, mode = "l3")
+        val m = NodeWizardModel(env.container, this)
+        m.managing = true
+        m.host = serverIp
+        m.password = "ssh-pass"
+        m.connect()
         advanceUntilIdle()
-        assertEquals(WizardStep.Done, wizard.step, wizard.verifyFailed ?: wizard.error ?: "")
+        assertNull(m.error, m.error ?: "")
+        assertEquals(WizardStep.Manage, m.step, "no wizard step is opened: the server's nodes are shown")
+        assertEquals(listOf("of-old"), m.channels.map { it.id })
+        assertEquals(NodeMode.L3, m.channels.single().nodeMode)
+        assertNull(m.channel, "nothing new is being made")
         assertTrue(env.node.applied.isEmpty())
-        assertEquals(listOf(docUrl), env.node.linkContexts, "the link keeps the key's context")
-        val saved = wizard.save()!!
-        assertEquals(before.id, saved.id)
-        assertEquals(before.secret, saved.secret)
-        assertEquals(listOf(saved), env.profiles.profiles.value, "the profile is replaced, not added")
-        assertTrue(saved.carriers.any { it.type == TransportType.BOARDS })
     }
 
-    /** A profile of another server (no such port there) is reported, and Back returns to the password. */
+    /** "Подключить себе" / "Поделиться": a node without a profile here gets one, made from the key the server gave. */
     @Test
-    fun aProfileWhoseChannelIsNotOnTheServerIsReported() = runTest {
+    fun aNodeWithoutAProfileHereGetsOneMadeFromTheServersKey() = runTest {
         val env = Env()
-        val before = installedChannel(env, profile = true)!!
-        val other = Profile.fromShare(env.container.shareCodec.decode(profileLink(env, 40000)), "p-other", 8L, ProfileSource.Node)
-        val wizard = NodeWizardModel(env.container, this)
-        wizard.forProfile(other)
-        wizard.password = "ssh-pass"
-        wizard.connect()
+        installedChannel(env, profile = false)
+        env.node.installed["of-old"] = env.node.installed.getValue("of-old").copy(key = channelKey)
+        val m = NodeWizardModel(env.container, this)
+        m.managing = true
+        m.host = serverIp
+        m.password = "ssh-pass"
+        m.connect()
         advanceUntilIdle()
-        assertTrue(wizard.error.orEmpty().contains("нет канала с портом 40000"), wizard.error ?: "")
-        assertNull(wizard.editing)
-        assertEquals(WizardStep.Server, wizard.step)
+        val info = m.channels.single()
+        assertNull(m.profileOf(info))
+        val made = m.adopt(info)
+        assertEquals(ProfileSource.Node, made.source)
+        assertEquals(channelKey, made.secret)
+        assertEquals(docUrl, made.context, "the link keeps the channel's own context")
+        assertEquals("$serverIp:31337", made.carriers.last().value)
+        assertEquals(listOf(made), env.profiles.profiles.value)
+        // Asked again, it is the same profile, not a second one.
+        assertEquals(made.id, m.adopt(info).id)
+        assertEquals(1, env.profiles.profiles.value.size)
+    }
+
+    @Test
+    fun aNodeTheServerGaveNoKeyForCannotBeAdopted() = runTest {
+        val env = Env()
+        installedChannel(env, profile = false)
+        val m = NodeWizardModel(env.container, this)
+        m.managing = true
+        m.host = serverIp
+        m.password = "ssh-pass"
+        m.connect()
+        advanceUntilIdle()
+        val error = runCatching { m.adopt(m.channels.single()) }.exceptionOrNull()
+        assertTrue(error is NodeWizardException && error.message.orEmpty().contains("ключ"), error?.message ?: "")
+        assertTrue(env.profiles.profiles.value.isEmpty())
+    }
+
+    @Test
+    fun aNodeIsDeletedFromTheServerAndTheListIsReadAgain() = runTest {
+        val env = Env()
+        installedChannel(env, profile = false)
+        val m = NodeWizardModel(env.container, this)
+        m.managing = true
+        m.host = serverIp
+        m.password = "ssh-pass"
+        m.connect()
+        advanceUntilIdle()
+        assertEquals(1, m.channels.size)
+        m.deleteChannel("of-old")
+        advanceUntilIdle()
+        assertEquals(listOf("of-old"), env.node.removed)
+        assertTrue(m.channels.isEmpty())
+        assertTrue(m.notice.orEmpty().contains("удалён"), m.notice ?: "")
+    }
+
+    /** A new node on the connected server goes through the wizard's steps without asking for the way in again. */
+    @Test
+    fun aNewNodeIsMadeOnTheConnectedServerAndTheScreenReturnsToItsList() = runTest {
+        val env = Env()
+        installedChannel(env, profile = false)
+        val m = NodeWizardModel(env.container, this)
+        m.managing = true
+        m.host = serverIp
+        m.password = "ssh-pass"
+        m.connect()
+        advanceUntilIdle()
+        m.startCreate()
+        advanceUntilIdle()
+        assertEquals(WizardStep.Document, m.step)
+        assertEquals("of-test12", m.channel?.id)
+        m.useVolga = false
+        m.useMailru = true
+        m.mailruInput = mailruLink
+        m.next()
+        advanceUntilIdle()
+        assertEquals(WizardStep.Plan, m.step)
+        assertEquals(1, env.node.connects, "the session is the one that was opened: no second sign-in")
+
+        m.backToServer()
+        advanceUntilIdle()
+        assertEquals(WizardStep.Manage, m.step)
+        assertNull(m.channel)
+        assertEquals(listOf("of-old"), m.channels.map { it.id })
+    }
+
+    /** Changing an installed node from the server's screen keeps the key, the port and the context. */
+    @Test
+    fun anInstalledNodeIsChangedFromTheServersScreen() = runTest {
+        val env = Env()
+        installedChannel(env, profile = true)
+        env.connection.active = "mailru"
+        val m = NodeWizardModel(env.container, this)
+        m.managing = true
+        m.host = serverIp
+        m.password = "ssh-pass"
+        m.connect()
+        advanceUntilIdle()
+        m.openChannel(m.channels.single())
+        assertEquals("of-old", m.editing?.id)
+        m.useVolga = false
+        m.useBoards = true
+        m.boardInput = boardLink
+        m.next()
+        advanceUntilIdle()
+        assertEquals(WizardStep.Done, m.step, m.verifyFailed ?: m.error ?: "")
+        assertEquals(listOf(docUrl), env.node.linkContexts)
+        assertTrue(env.node.applied.isEmpty())
     }
 
     @Test
@@ -948,7 +1030,11 @@ class NodeWizardModelTest {
             return "WyJyb29tLTEiXQ"
         }
 
-        override suspend fun remove(channel: String, sudoPassword: String) = Unit
+        val removed = mutableListOf<String>()
+        override suspend fun remove(channel: String, sudoPassword: String) {
+            removed += channel
+            installed.remove(channel)
+        }
         override suspend fun checkDocument(documentUrl: String) = Unit
 
         override suspend fun shareLink(name: String, key: String, host: String, port: Int, transports: List<NodeTransport>) =

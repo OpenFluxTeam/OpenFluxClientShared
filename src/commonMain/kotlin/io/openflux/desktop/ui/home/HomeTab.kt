@@ -96,7 +96,6 @@ import io.openflux.desktop.ui.nav.Dest
 import io.openflux.desktop.ui.nav.LocalActions
 import io.openflux.desktop.ui.nav.LocalNav
 import io.openflux.desktop.ui.nav.Section
-import io.openflux.desktop.ui.nav.NodeKind
 import io.openflux.desktop.ui.look
 import io.openflux.desktop.ui.subscription.SubscriptionStrip
 import io.openflux.desktop.ui.theme.AppTheme
@@ -162,7 +161,7 @@ private fun HomeScreen(model: HomeScreenModel) {
                         }
                         if (sub == null) {
                             Spacer(Modifier.height(AppTheme.spacing.s))
-                            TextAction("У меня своя нода", { actions.createNode(NodeKind.Server) })
+                            TextAction("У меня свой сервер", actions::addServer)
                         }
                     }
                 }
