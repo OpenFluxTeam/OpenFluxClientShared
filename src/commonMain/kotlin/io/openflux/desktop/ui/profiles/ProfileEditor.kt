@@ -43,6 +43,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.input.KeyboardType
@@ -83,6 +85,7 @@ import io.openflux.desktop.service.PlatformKind
 import io.openflux.desktop.ui.components.TextAction
 import io.openflux.desktop.ui.components.Tone
 import io.openflux.desktop.ui.components.appClickable
+import io.openflux.desktop.ui.nav.DetailScreen
 import io.openflux.desktop.ui.theme.AppTheme
 import org.jetbrains.compose.resources.painterResource
 
@@ -92,9 +95,12 @@ private const val WEAK_SECRET = 24
 /** How a profile connects: one carrier, several at once, or a PHP node on a web hosting. */
 private enum class EditMode(val label: String) { Classic("Обычный"), Session("Session"), Stream("Без сервера") }
 
-/** Creates or changes a profile; Ctrl+S saves, Esc cancels. */
+/**
+ * Creates or changes the fields of a profile; Ctrl+S saves, Esc cancels. [onClose] leaves the screen (after a save, or
+ * a cancel): where it goes is the navigation's business.
+ */
 @Composable
-fun ProfileEditor(model: ProfilesScreenModel, state: EditorState, onBack: (() -> Unit)?) {
+fun ProfileEditor(model: ProfilesScreenModel, state: EditorState, onClose: () -> Unit) {
     val draft = state.draft
     // A phone has mobile data and Wi-Fi; a PC has Ethernet and Wi-Fi, and
     // now and then a modem.
@@ -105,41 +111,36 @@ fun ProfileEditor(model: ProfilesScreenModel, state: EditorState, onBack: (() ->
     }
     val toaster = LocalToaster.current
     val shortcuts = LocalShortcuts.current
-    val scroll = rememberScrollState()
-    val scrollbars = LocalScrollbars.current
+    val save = {
+        if (model.save() != null) {
+            toaster.show(if (state.isNew) "Профиль добавлен" else "Профиль сохранён", Tone.Success)
+            onClose()
+        }
+    }
+    val currentSave by rememberUpdatedState(save)
+    val currentClose by rememberUpdatedState(onClose)
     DisposableEffect(model) {
         val unregister = shortcuts.register { event ->
-            if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) { model.cancelEdit(); true } else false
+            when {
+                event.type != KeyEventType.KeyDown -> false
+                event.key == Key.Escape -> { currentClose(); true }
+                event.isCtrlPressed && event.key == Key.S -> { currentSave(); true }
+                else -> false
+            }
         }
         onDispose { unregister() }
     }
-    val save = {
-        if (model.save()) toaster.show(if (state.isNew) "Профиль добавлен" else "Профиль сохранён", Tone.Success)
-    }
 
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = AppTheme.spacing.page, vertical = AppTheme.spacing.xl)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (onBack != null) {
-                    AppIconButton("Назад", onBack, resource = AppIcons.Back)
-                    Spacer(Modifier.width(AppTheme.spacing.s))
-                }
-                Text(
-                    if (state.isNew) "Новый профиль" else "Изменить профиль",
-                    style = AppTheme.typography.pageTitle,
-                    color = AppTheme.colors.text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                AppButton("Отмена", model::cancelEdit, style = ButtonStyle.Secondary)
-                Spacer(Modifier.width(AppTheme.spacing.s))
-                AppButton("Сохранить", save)
-            }
-            if (!LocalTouchUi.current) Text("Ctrl+S — сохранить, Esc — отменить", style = AppTheme.typography.caption, color = AppTheme.colors.textHint)
-            Spacer(Modifier.height(AppTheme.spacing.xl))
-
-            Column(Modifier.widthIn(max = 720.dp), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.xl)) {
+    DetailScreen(
+        title = if (state.isNew) "Новый профиль" else "Изменить профиль",
+        subtitle = if (LocalTouchUi.current) null else "Ctrl+S — сохранить, Esc — отменить",
+        actions = {
+            AppButton("Отмена", onClose, style = ButtonStyle.Secondary)
+            Spacer(Modifier.width(AppTheme.spacing.xs))
+            AppButton("Сохранить", save)
+        },
+    ) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.xl)) {
                 if (state.showProblems) {
                     val problems = draft.problems()
                     if (problems.isNotEmpty()) Banner(problems.joinToString("\n"), Tone.Danger, icon = Icons.Rounded.WarningAmber)
@@ -295,8 +296,6 @@ fun ProfileEditor(model: ProfilesScreenModel, state: EditorState, onBack: (() ->
                 }
             }
             Spacer(Modifier.height(AppTheme.spacing.xxxl))
-        }
-        scrollbars.Vertical(scroll, Modifier.align(Alignment.CenterEnd))
     }
 }
 

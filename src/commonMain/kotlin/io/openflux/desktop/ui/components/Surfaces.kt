@@ -144,6 +144,17 @@ fun ParamsCard(rows: List<Pair<String, String>>, modifier: Modifier = Modifier) 
 }
 
 /** An icon on a tonal square, as the Android settings list draws them. */
+/** [IconBubble] for a Material vector icon. */
+@Composable
+fun IconBubble(icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier, tint: Color = AppTheme.colors.accent, size: Dp = AppTheme.dimens.iconBubble) {
+    Box(
+        modifier.size(size).clip(AppTheme.shapes.field).background(AppTheme.colors.accentSoft),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(size * 0.55f))
+    }
+}
+
 @Composable
 fun IconBubble(resource: DrawableResource, modifier: Modifier = Modifier, tint: Color = AppTheme.colors.accent, size: Dp = AppTheme.dimens.iconBubble) {
     Box(

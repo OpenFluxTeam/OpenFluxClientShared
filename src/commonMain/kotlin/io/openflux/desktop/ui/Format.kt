@@ -49,7 +49,7 @@ object Format {
     fun days(n: Int): String = "$n " + plural(n, "день", "дня", "дней")
 
     /** "осталось 3 дня" / "остался 1 день". */
-    fun daysLeft(n: Int): String = (if (n % 10 == 1 && n % 100 != 11) "остался " else "осталось ") + days(n)
+    fun daysLeft(n: Int): String = if (n <= 0) "осталось меньше суток" else (if (n % 10 == 1 && n % 100 != 11) "остался " else "осталось ") + days(n)
 
     /** "только что", "5 мин назад", "3 ч назад", "вчера", "4 дн. назад" for the time [agoMillis] ago. */
     fun ago(agoMillis: Long): String {

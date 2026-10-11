@@ -63,13 +63,15 @@ class SubscriptionInviteTest {
     }
 
     @Test
-    fun daysLeftRoundsUpAndEndsAtZero() {
+    fun daysLeftCountsWholeDaysWithAnHourOfGrace() {
         val ep = ServiceEndpoint("https://h")
         fun state(expires: Long) = SubscriptionState(ep, SubscriptionKind.Account, expires = expires, status = SubStatus.ACTIVE)
         val now = 1_000_000L
         assertEquals(3, state(now + 3 * 86_400).daysLeft(now))
-        assertEquals(1, state(now + 60).daysLeft(now), "the last day counts as a day")
-        assertEquals(4, state(now + 3 * 86_400 + 1).daysLeft(now))
+        assertEquals(0, state(now + 60).daysLeft(now), "under a day is zero, not a day")
+        assertEquals(1, state(now + 86_400 - 1_800).daysLeft(now), "a day less half an hour is a day")
+        assertEquals(3, state(now + 3 * 86_400 + 1).daysLeft(now), "a fresh 3-day plan is 3 days")
+        assertEquals(2, state(now + 3 * 86_400 - 7_200).daysLeft(now))
         assertNull(state(now).daysLeft(now), "over")
         assertNull(state(now - 5).daysLeft(now))
         assertNull(state(0).daysLeft(now), "never ends")

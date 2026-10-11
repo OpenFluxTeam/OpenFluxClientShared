@@ -66,6 +66,7 @@ import io.openflux.desktop.ui.components.PageHeader
 import io.openflux.desktop.ui.components.SectionLabel
 import io.openflux.desktop.ui.components.Tone
 import io.openflux.desktop.ui.components.toneColor
+import io.openflux.desktop.ui.nav.BackBar
 import io.openflux.desktop.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -87,13 +88,14 @@ private data class Preview(
     val paramCount: Int,
 )
 
-/** Top-level tab: the full transport catalogue with convenient import. */
-object ScriptsTab : Tab {
-    override val options: TabOptions
-        @Composable get() = TabOptions(index = 4u, title = "Транспорты", icon = painterResource(AppIcons.Swap))
-
-    @Composable
-    override fun Content() = ScriptsScreen(LocalAppContainer.current)
+/** The full transport catalogue with convenient import: a page of Settings, under "Экспериментальные функции". */
+@Composable
+fun ScriptsPage() {
+    val container = LocalAppContainer.current
+    Column(Modifier.fillMaxSize()) {
+        BackBar()
+        Box(Modifier.weight(1f)) { ScriptsScreen(container) }
+    }
 }
 
 @Composable

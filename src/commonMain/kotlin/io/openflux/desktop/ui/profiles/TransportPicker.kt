@@ -39,8 +39,7 @@ import io.openflux.desktop.ui.components.TextAction
 import io.openflux.desktop.ui.components.Tone
 import io.openflux.desktop.ui.components.appClickable
 import io.openflux.desktop.ui.components.toneColor
-import io.openflux.desktop.ui.scripts.ScriptsTab
-import io.openflux.desktop.ui.shell.LocalShell
+import io.openflux.desktop.ui.nav.LocalActions
 import io.openflux.desktop.ui.theme.AppTheme
 import org.jetbrains.compose.resources.painterResource
 
@@ -71,10 +70,10 @@ internal fun TransportPickerDialog(
     onSelect: (TransportType, String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val shell = LocalShell.current
+    val actions = LocalActions.current
     AppDialog(title = "Транспорт", onDismiss = onDismiss, secondary = "Закрыть", enterSubmits = false) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-            if (showScripts) TextAction("Управлять транспортами", { onDismiss(); shell.open(ScriptsTab) })
+            if (showScripts) TextAction("Управлять транспортами", { onDismiss(); actions.openScriptTransports() })
             SectionLabel("Встроенные")
             native.forEach { type ->
                 TransportRow(

@@ -60,8 +60,8 @@ private fun AuthFrame(title: String, subtitle: String, onBack: (() -> Unit)?, co
 
 /** What an account gives and how to start: create one or sign in. */
 @Composable
-fun AuthChoose(model: SubscriptionScreenModel) {
-    AuthFrame("Аккаунт OpenFlux", "Войдите, и список локаций появится сам: ничего настраивать не нужно.", onBack = { model.go(AuthStep.Add) }) {
+fun AuthChoose(model: SubscriptionScreenModel, onBack: () -> Unit) {
+    AuthFrame("Аккаунт OpenFlux", "Войдите, и список локаций появится сам: ничего настраивать не нужно.", onBack = onBack) {
         AppCard {
             Benefit("Пробный период бесплатно", "Попробуйте сервис, прежде чем платить.")
             HorizontalRule()

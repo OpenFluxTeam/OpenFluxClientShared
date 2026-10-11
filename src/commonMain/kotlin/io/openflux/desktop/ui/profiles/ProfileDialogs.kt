@@ -44,8 +44,6 @@ import io.openflux.desktop.ui.components.KeyValueRow
 import io.openflux.desktop.ui.components.LocalToaster
 import io.openflux.desktop.ui.components.QrCode
 import io.openflux.desktop.ui.components.Tone
-import io.openflux.desktop.ui.shell.LocalShell
-import io.openflux.desktop.ui.subscription.SubscriptionTab
 import io.openflux.desktop.ui.theme.AppTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -60,7 +58,7 @@ fun ImportDialog(model: ProfilesScreenModel) {
     val toaster = LocalToaster.current
     val container = LocalAppContainer.current
     val platform = container.platform
-    val shell = LocalShell.current
+    val actions = io.openflux.desktop.ui.nav.LocalActions.current
     val scope = rememberCoroutineScope()
     var text by remember { mutableStateOf("") }
     var source by remember { mutableStateOf(ProfileSource.Link) }
@@ -89,6 +87,7 @@ fun ImportDialog(model: ProfilesScreenModel) {
             ready?.let {
                 val profile = model.import(it)
                 toaster.show("Профиль «${profile.name}» добавлен", Tone.Success)
+                actions.openProfile(profile.id)
             }
         },
     ) {
@@ -114,7 +113,7 @@ fun ImportDialog(model: ProfilesScreenModel) {
             AppButton("Открыть подписку", {
                 container.pendingKey.value = text
                 model.importOpen = false
-                shell.open(SubscriptionTab)
+                actions.addConnection()
             })
         }
         Spacer(Modifier.height(AppTheme.spacing.m))
@@ -241,13 +240,14 @@ fun ShareDialog(model: ProfilesScreenModel, profile: Profile) {
 @Composable
 fun DeleteDialog(model: ProfilesScreenModel, profile: Profile) {
     val toaster = LocalToaster.current
+    val actions = io.openflux.desktop.ui.nav.LocalActions.current
     AppDialog(
         title = "Удалить профиль?",
         onDismiss = { model.deleteFor = null },
         primary = "Удалить",
         primaryStyle = ButtonStyle.Danger,
         onPrimary = {
-            model.delete(profile)
+            actions.deleteProfile(profile)
             model.deleteFor = null
             toaster.show("Профиль «${profile.name}» удалён")
         },

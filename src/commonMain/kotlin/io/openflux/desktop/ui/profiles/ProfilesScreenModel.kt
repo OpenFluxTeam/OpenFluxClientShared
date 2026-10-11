@@ -1,28 +1,23 @@
 package io.openflux.desktop.ui.profiles
 
-import io.openflux.desktop.model.managed
-import io.openflux.desktop.model.editableNode
-import io.openflux.desktop.model.DocumentKind
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.CancellationException
-import io.openflux.desktop.model.NodeDocuments
-import io.openflux.desktop.model.AccountKind
-import io.openflux.desktop.model.PhpMessages
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import io.openflux.desktop.model.AccountKind
+import io.openflux.desktop.model.DocumentKind
+import io.openflux.desktop.model.NodeDocuments
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.ShareConfig
 import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.model.isActive
+import io.openflux.desktop.model.managed
 import io.openflux.desktop.model.profile
 import io.openflux.desktop.service.AccountException
 import io.openflux.desktop.service.AppContainer
-import io.openflux.desktop.ui.node.NodeWizardModel
-import io.openflux.desktop.ui.node.PhpWizardModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** A profile being edited; [isNew] until it is saved once. */
@@ -35,32 +30,27 @@ sealed interface ImportPreview {
     data class Invalid(val message: String) : ImportPreview
 }
 
+/**
+ * What is done with profiles: found in the list, edited field by field, connected, copied, deleted, imported from a
+ * link or a code, shared. Where the person goes between those screens is the navigation's business
+ * ([io.openflux.desktop.ui.nav.AppNav]); this holds only the state of what they are doing.
+ */
 class ProfilesScreenModel(private val container: AppContainer) : ScreenModel {
     val profiles = container.profiles
     val connection = container.connection
     val settings = container.settings
     val platform = container.platform
+    val accounts = container.accounts
 
     var query by mutableStateOf("")
-    var selectedId by mutableStateOf<String?>(null)
-    var editor by mutableStateOf<EditorState?>(null)
-        private set
+
+    // ---- dialogs over the screens ----
+
     var importOpen by mutableStateOf(false)
     /** A link the import dialog starts with (opened from outside), else the clipboard's. */
     var importText: String? = null
     var shareFor by mutableStateOf<Profile?>(null)
     var deleteFor by mutableStateOf<Profile?>(null)
-    /** The "Своя нода" wizard while it is open. */
-    var wizard by mutableStateOf<NodeWizardModel?>(null)
-        private set
-    /** The "без сервера" (PHP hosting) wizard while it is open. */
-    var phpWizard by mutableStateOf<PhpWizardModel?>(null)
-        private set
-    /** What the node controls of the selected hosting profile last said, and whether one is running. */
-    var nodeMessage by mutableStateOf<String?>(null)
-        private set
-    var nodeBusy by mutableStateOf(false)
-        private set
 
     fun filter(list: List<Profile>): List<Profile> {
         val q = query.trim().lowercase()
@@ -71,33 +61,30 @@ class ProfilesScreenModel(private val container: AppContainer) : ScreenModel {
         }
     }
 
-    fun select(profile: Profile) {
-        if (editor != null && editor?.draft?.id != profile.id) editor = null
-        if (selectedId != profile.id) nodeMessage = null
-        selectedId = profile.id
-    }
+    // ---- editing the fields of a profile ----
 
-    fun startNew() {
-        editor = EditorState(
-            Profile(id = profiles.newId(), name = "", transport = TransportType.VYANDEX, createdAt = platform.now()),
-            isNew = true,
-        )
-        selectedId = null
-    }
+    var editor by mutableStateOf<EditorState?>(null)
+        private set
 
-    /** A node of the person's own opens its screen (profile, server, transports); any other profile, the editor. */
-    fun startEdit(profile: Profile) {
-        if (profile.editableNode) openWizardForProfile(profile) else startProfileEdit(profile)
-    }
-
-    /** The editor of the profile's own fields, for any profile. */
-    fun startProfileEdit(profile: Profile) {
-        if (profile.managed) return // the subscription's locations are the service's to change
-        selectedId = profile.id
+    /** Starts editing profile [id], or a new one when [id] is null. A subscription's locations are not the person's to change. */
+    fun beginEdit(id: String?) {
+        if (id == null) {
+            editor = EditorState(
+                Profile(id = profiles.newId(), name = "", transport = TransportType.VYANDEX, createdAt = platform.now()),
+                isNew = true,
+            )
+            return
+        }
+        val profile = profiles.profiles.value.firstOrNull { it.id == id } ?: return
+        if (profile.managed) return
         editor = EditorState(profile, isNew = false)
     }
 
-    val accounts = container.accounts
+    /** Drops the draft (the screen was left). */
+    fun endEdit() {
+        editor = null
+    }
+
     /** The carrier (0 the main one) whose document is being created. */
     var documentBusy by mutableStateOf<Int?>(null)
         private set
@@ -163,36 +150,36 @@ class ProfilesScreenModel(private val container: AppContainer) : ScreenModel {
         editor = editor?.let { it.copy(draft = transform(it.draft)) }
     }
 
-    fun cancelEdit() {
-        editor = null
-    }
-
-    /** Saves the draft when it can connect; otherwise shows what is missing. */
-    fun save(): Boolean {
-        val state = editor ?: return false
+    /**
+     * Saves the draft when it can connect and returns it; otherwise shows what is missing and returns null.
+     * The editor is closed by the screen (it goes back).
+     */
+    fun save(): Profile? {
+        val state = editor ?: return null
         val draft = state.draft.copy(name = state.draft.name.trim())
         if (draft.problems().isNotEmpty()) {
             editor = state.copy(showProblems = true)
-            return false
+            return null
         }
-        profiles.upsert(if (draft.session) draft else draft.copy(extras = emptyList()))
-        selectedId = draft.id
-        editor = null
-        return true
+        val saved = if (draft.session) draft else draft.copy(extras = emptyList())
+        profiles.upsert(saved)
+        return saved
     }
 
-    fun duplicate(profile: Profile) {
-        if (profile.managed) return
+    // ---- what is done with a profile ----
+
+    /** A copy of [profile] as a manual one; null for a subscription's location. */
+    fun duplicate(profile: Profile): Profile? {
+        if (profile.managed) return null
         val copy = profile.copy(id = profiles.newId(), name = "${profile.name} (копия)", createdAt = platform.now(), source = ProfileSource.Manual)
         profiles.upsert(copy)
-        selectedId = copy.id
+        return copy
     }
 
     fun delete(profile: Profile) {
         if (profile.managed) return
         if (connection.state.value.profile?.id == profile.id && connection.state.value.isActive) connection.disconnect()
         profiles.delete(profile.id)
-        if (selectedId == profile.id) selectedId = null
         if (editor?.draft?.id == profile.id) editor = null
         if (settings.settings.value.selectedProfileId == profile.id) settings.update { it.copy(selectedProfileId = null) }
     }
@@ -207,88 +194,10 @@ class ProfilesScreenModel(private val container: AppContainer) : ScreenModel {
         return state.isActive && state.profile?.id == profile.id
     }
 
-    // ---- own node ----
-
-    fun openWizard() {
-        if (wizard == null) wizard = NodeWizardModel(container, screenModelScope)
-        editor = null
-    }
-
-    /** The wizard opened from [profile]'s settings: its node's transports are changed in place. */
-    fun openWizardForProfile(profile: Profile) {
-        if (wizard != null || !profile.editableNode) return
-        wizard = NodeWizardModel(container, screenModelScope).also { it.forProfile(profile) }
-        cancelEdit()
-    }
-
-    /** Leaves the wizard; [focusId] selects the profile it saved. */
-    fun closeWizard(focusId: String? = null) {
-        wizard?.close()
-        wizard = null
-        if (focusId != null) selectedId = focusId
-    }
-
-    fun openPhpWizard() {
-        if (phpWizard == null) phpWizard = PhpWizardModel(container, screenModelScope)
-        editor = null
-    }
-
-    fun closePhpWizard(focusId: String? = null) {
-        phpWizard?.close()
-        phpWizard = null
-        if (focusId != null) selectedId = focusId
-    }
-
-    /** Runs the node of a hosting profile (idempotent: one already running is left alone). */
-    fun startNode(profile: Profile) = nodeControl(profile, "Запускаю ноду…") { node ->
-        val state = container.phpHosting.start(node.siteUrl, node.token, profile.transport.cliName, profile.value.trim(), chain = true)
-        if (state.running) "Нода: ${PhpMessages.nodeStatus(state)}" else "Нода не ответила"
-    }
-
-    /** Asks the node how it is: running, which generation serves now, when it hands over. */
-    fun refreshNode(profile: Profile) = nodeControl(profile, "Спрашиваю ноду…", unreachable = "Состояние ноды неизвестно: хостинг не ответил") { node ->
-        "Нода: " + PhpMessages.nodeStatus(container.phpHosting.node(node.siteUrl, node.token, profile.transport.cliName, profile.value.trim()))
-    }
-
-    /** Opens the node's control panel (its page in the browser: state, generation, log, Start/Stop). */
-    fun openNodePanel(profile: Profile) = nodeControl(profile, "Открываю панель ноды…") { node ->
-        container.platform.openUrl(container.phpHosting.page(node.siteUrl, node.token, profile.transport.cliName, profile.value.trim()))
-        "" // keep what was shown before
-    }
-
-    /** Stops the node on the hosting (the whole chain); a connection through it stops working. */
-    fun stopNode(profile: Profile) = nodeControl(profile, "Останавливаю ноду…") { node ->
-        container.phpHosting.stop(node.siteUrl, node.token, profile.transport.cliName, profile.value.trim())
-        "Нода остановлена"
-    }
-
-    private fun nodeControl(
-        profile: Profile,
-        busyText: String,
-        unreachable: String? = null,
-        action: suspend (io.openflux.desktop.model.PhpNodeRef) -> String,
-    ) {
-        val node = profile.phpNode ?: return
-        if (nodeBusy) return
-        nodeBusy = true
-        val before = nodeMessage
-        nodeMessage = busyText
-        screenModelScope.launch {
-            nodeMessage = try {
-                action(node).ifEmpty { before }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                unreachable ?: e.message ?: "Не удалось связаться с хостингом"
-            } finally {
-                nodeBusy = false
-            }
-        }
-    }
-
-    override fun onDispose() {
-        wizard?.close()
-        phpWizard?.close()
+    /** The profile is the person's own node (they run it): it is listed with the nodes and managed there. */
+    fun markAsOwnNode(profile: Profile) {
+        if (profile.managed) return
+        profiles.upsert(profile.copy(source = ProfileSource.Node))
     }
 
     // ---- import ----
@@ -319,7 +228,6 @@ class ProfilesScreenModel(private val container: AppContainer) : ScreenModel {
     fun import(preview: ImportPreview.Ready): Profile {
         val profile = Profile.fromShare(preview.config, profiles.newId(), platform.now(), preview.source)
         profiles.upsert(profile)
-        selectedId = profile.id
         importOpen = false
         return profile
     }

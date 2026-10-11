@@ -41,9 +41,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.rememberScreenModel
-import cafe.adriel.voyager.navigator.tab.Tab
-import cafe.adriel.voyager.navigator.tab.TabOptions
 import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.LogLine
 import io.openflux.desktop.service.AppContainer
@@ -58,8 +55,8 @@ import io.openflux.desktop.ui.components.LocalToaster
 import io.openflux.desktop.ui.components.PageHeader
 import io.openflux.desktop.ui.components.Segmented
 import io.openflux.desktop.ui.components.Tone
+import io.openflux.desktop.ui.nav.BackBar
 import io.openflux.desktop.ui.theme.AppTheme
-import org.jetbrains.compose.resources.painterResource
 
 enum class LogFilter(val label: String) { All("Все"), Important("Важные"), Errors("Ошибки") }
 
@@ -96,14 +93,13 @@ class LogsScreenModel(private val container: AppContainer) : ScreenModel {
     fun setAutoScroll(on: Boolean) = settings.update { it.copy(logAutoScroll = on) }
 }
 
-object LogsTab : Tab {
-    override val options: TabOptions
-        @Composable get() = TabOptions(index = 3u, title = "Логи", icon = painterResource(AppIcons.Terminal))
-
-    @Composable
-    override fun Content() {
-        val container = LocalAppContainer.current
-        val model = rememberScreenModel { LogsScreenModel(container) }
+/** The journal: a page of Settings, opened from there or from Home. */
+@Composable
+fun LogsPage() {
+    val container = LocalAppContainer.current
+    val model = remember { LogsScreenModel(container) }
+    Column(Modifier.fillMaxSize()) {
+        BackBar()
         LogsScreen(model)
     }
 }

@@ -75,8 +75,10 @@ import io.openflux.desktop.ui.components.Segmented
 import io.openflux.desktop.ui.components.SwitchRow
 import io.openflux.desktop.ui.Format
 import io.openflux.desktop.ui.components.Tone
-import io.openflux.desktop.ui.logs.LogsTab
-import io.openflux.desktop.ui.shell.LocalShell
+import io.openflux.desktop.ui.nav.LocalActions
+import io.openflux.desktop.ui.nav.LocalModels
+import io.openflux.desktop.ui.nav.PlaceHost
+import io.openflux.desktop.ui.nav.Section
 import io.openflux.desktop.ui.components.appClickable
 import io.openflux.desktop.ui.theme.AppTheme
 import kotlinx.coroutines.launch
@@ -151,22 +153,22 @@ class SettingsScreenModel(val container: AppContainer) : ScreenModel {
 
 object SettingsTab : Tab {
     override val options: TabOptions
-        @Composable get() = TabOptions(index = 4u, title = "Настройки", icon = painterResource(AppIcons.Settings))
+        @Composable get() = TabOptions(index = 3u, title = "Настройки", icon = painterResource(AppIcons.Settings))
 
     @Composable
-    override fun Content() {
-        val container = LocalAppContainer.current
-        val model = rememberScreenModel { SettingsScreenModel(container) }
-        SettingsScreen(model)
-    }
+    override fun Content() = PlaceHost(Section.Settings)
 }
+
+/** The first screen of Settings: the categories and the page of the chosen one. */
+@Composable
+fun SettingsRoot() = SettingsScreen(LocalModels.current.settings)
 
 @Composable
 private fun SettingsScreen(model: SettingsScreenModel) {
     // Another screen sent the person to one of the pages ("Войти в Яндекс" in a check).
-    val shell = LocalShell.current
-    LaunchedEffect(shell.settingsCategory) {
-        shell.settingsCategory?.let { model.category = it; model.mobileDetailOpen = true; shell.settingsCategory = null }
+    val models = LocalModels.current
+    LaunchedEffect(models.settingsCategory) {
+        models.settingsCategory?.let { model.category = it; model.mobileDetailOpen = true; models.settingsCategory = null }
     }
     // Categories beside the page when both fit, else one at a time.
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -563,7 +565,7 @@ private fun debugLevelLabel(level: Int): String = when (level) {
 @Composable
 private fun InterfaceSettings(model: SettingsScreenModel) {
     val settings by model.container.settings.settings.collectAsState()
-    val shell = LocalShell.current
+    val actions = LocalActions.current
     AppCard {
         Text("Журнал работы", style = AppTheme.typography.bodyStrong, color = AppTheme.colors.text)
         Spacer(Modifier.height(AppTheme.spacing.xs))
@@ -572,7 +574,7 @@ private fun InterfaceSettings(model: SettingsScreenModel) {
             style = AppTheme.typography.bodySmall, color = AppTheme.colors.textSecondary,
         )
         Spacer(Modifier.height(AppTheme.spacing.m))
-        AppButton("Открыть журнал", { shell.open(LogsTab) }, style = ButtonStyle.Secondary)
+        AppButton("Открыть журнал", actions::openLogs, style = ButtonStyle.Secondary)
     }
     AppCard {
         SectionLabel("Тема")

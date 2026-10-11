@@ -41,7 +41,7 @@ import io.openflux.desktop.ui.theme.AppTheme
 fun CaptchaDialog() {
     val connection = LocalAppContainer.current.connection
     val accounts = LocalAppContainer.current.accounts
-    val shell = LocalShell.current
+    val actions = io.openflux.desktop.ui.nav.LocalActions.current
     val prompt by connection.captcha.collectAsState()
     // Re-read when a sign-in appears or goes.
     val sessions by accounts.sessions.collectAsState()
@@ -104,7 +104,7 @@ fun CaptchaDialog() {
             Spacer(Modifier.height(AppTheme.spacing.xs))
             TextAction("Не хочу проходить каждый раз: войти в аккаунт Яндекса", {
                 connection.dismissCaptcha()
-                shell.openSettings(SettingsCategory.Accounts)
+                actions.openSettings(SettingsCategory.Accounts)
             })
         }
     }

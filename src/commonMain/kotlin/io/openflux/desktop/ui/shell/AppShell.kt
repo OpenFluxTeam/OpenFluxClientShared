@@ -1,6 +1,5 @@
 package io.openflux.desktop.ui.shell
 
-import io.openflux.desktop.ui.PlatformBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -8,21 +7,20 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -32,7 +30,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -42,6 +39,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.tab.Tab
@@ -54,18 +52,30 @@ import io.openflux.desktop.service.PlatformKind
 import io.openflux.desktop.ui.BrowserViews
 import io.openflux.desktop.ui.LocalBrowserViews
 import io.openflux.desktop.ui.LocalScrollbars
-import io.openflux.desktop.ui.NoBrowserViews
 import io.openflux.desktop.ui.LocalShortcuts
 import io.openflux.desktop.ui.LocalTouchUi
+import io.openflux.desktop.ui.NoBrowserViews
+import io.openflux.desktop.ui.PlatformBackHandler
 import io.openflux.desktop.ui.Scrollbars
 import io.openflux.desktop.ui.Shortcuts
+import io.openflux.desktop.ui.accounts.SignInDialog
 import io.openflux.desktop.ui.components.LocalToaster
 import io.openflux.desktop.ui.components.ToastHost
 import io.openflux.desktop.ui.components.Toaster
-import io.openflux.desktop.ui.accounts.SignInDialog
+import io.openflux.desktop.ui.connections.ConnectionsTab
 import io.openflux.desktop.ui.home.HomeTab
-import io.openflux.desktop.ui.logs.LogsTab
-import io.openflux.desktop.ui.profiles.ProfilesTab
+import io.openflux.desktop.ui.nav.AppActions
+import io.openflux.desktop.ui.nav.AppModels
+import io.openflux.desktop.ui.nav.AppNav
+import io.openflux.desktop.ui.nav.Dest
+import io.openflux.desktop.ui.nav.LocalActions
+import io.openflux.desktop.ui.nav.LocalModels
+import io.openflux.desktop.ui.nav.LocalNav
+import io.openflux.desktop.ui.nav.Section
+import io.openflux.desktop.ui.nodes.NodesTab
+import io.openflux.desktop.ui.profiles.DeleteDialog
+import io.openflux.desktop.ui.profiles.ImportDialog
+import io.openflux.desktop.ui.profiles.ShareDialog
 import io.openflux.desktop.ui.settings.SettingsTab
 import io.openflux.desktop.ui.theme.AppTheme
 import io.openflux.desktop.ui.theme.OpenFluxTheme
@@ -83,56 +93,31 @@ fun widthClassOf(width: Dp): WidthClass = when {
     else -> WidthClass.Expanded
 }
 
-/** Cross-screen requests: open a section, start an import. */
+/** What the window looks like to the screens in it. Where the person is lives in [AppNav]. */
 @Stable
 class ShellController {
     var widthClass by mutableStateOf(WidthClass.Medium)
         internal set
-    internal var tabNavigator: TabNavigator? = null
-
-    /** Set by Home's empty state; the Profiles screen opens the import dialog. */
-    var importRequested by mutableStateOf(false)
-    /** Set by Home; the Profiles screen opens a new profile in the editor. */
-    var newProfileRequested by mutableStateOf(false)
-    /** A profile the Profiles screen should select. */
-    var focusProfileId by mutableStateOf<String?>(null)
-    /** Set by Home's welcome: the Subscription screen opens the account choice. */
-    var accountRequested by mutableStateOf(false)
-    /** Set by the Subscription screen's "Нода на своём сервере": the Profiles screen opens the wizard. */
-    var nodeWizardRequested by mutableStateOf(false)
-    /** Set by the Subscription screen's "Без сервера": the Profiles screen opens the PHP-hosting wizard. */
-    var phpWizardRequested by mutableStateOf(false)
-
-    /** Set where a screen sends the person to a page of Settings ("Войти в Яндекс"); Settings takes it and clears it. */
-    var settingsCategory by mutableStateOf<io.openflux.desktop.ui.settings.SettingsCategory?>(null)
-
-    fun open(tab: Tab) {
-        tabNavigator?.current = tab
-    }
-
-    /** Opens Settings on [category]. */
-    fun openSettings(category: io.openflux.desktop.ui.settings.SettingsCategory) {
-        settingsCategory = category
-        open(io.openflux.desktop.ui.settings.SettingsTab)
-    }
 }
 
 val LocalShell = staticCompositionLocalOf { ShellController() }
 
-/**
- * The sections of the app: Accounts only in developer mode; «Транспорты» (JS
- * transports) only while the experimental features are on.
- */
-fun appTabs(experimental: Boolean, developerMode: Boolean = false): List<Tab> = buildList {
-    add(HomeTab)
-    add(ProfilesTab)
-    add(io.openflux.desktop.ui.subscription.SubscriptionTab)
-    if (experimental) add(io.openflux.desktop.ui.scripts.ScriptsTab)
-    add(SettingsTab)
+/** The four places of the app, in the order of the sidebar and the bottom bar. */
+val appTabs: List<Tab> = listOf(HomeTab, ConnectionsTab, NodesTab, SettingsTab)
+
+fun tabOf(section: Section): Tab = when (section) {
+    Section.Home -> HomeTab
+    Section.Connections -> ConnectionsTab
+    Section.Nodes -> NodesTab
+    Section.Settings -> SettingsTab
 }
 
-/** The tabs on show for these settings. */
-fun visibleTabs(developerMode: Boolean, experimental: Boolean = false): List<Tab> = appTabs(experimental, developerMode)
+fun sectionOf(tab: Tab): Section = when (tab) {
+    ConnectionsTab -> Section.Connections
+    NodesTab -> Section.Nodes
+    SettingsTab -> Section.Settings
+    else -> Section.Home
+}
 
 @Composable
 fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shortcuts, browsers: BrowserViews = NoBrowserViews) {
@@ -148,6 +133,10 @@ fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shor
     }
     val toaster = remember { Toaster() }
     val shell = remember { ShellController() }
+    val nav = remember { AppNav() }
+    val models = remember { AppModels(container) }
+    val actions = remember { AppActions(nav, models, container) }
+    DisposableEffect(models) { onDispose { models.dispose() } }
     val touch = container.platform.kind == PlatformKind.Android
     OpenFluxTheme(dark, touch) {
         CompositionLocalProvider(
@@ -158,6 +147,9 @@ fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shor
             LocalBrowserViews provides browsers,
             LocalShortcuts provides shortcuts,
             LocalShell provides shell,
+            LocalNav provides nav,
+            LocalModels provides models,
+            LocalActions provides actions,
         ) {
             AppShell(shell, toaster)
         }
@@ -169,55 +161,51 @@ private fun AppShell(shell: ShellController, toaster: Toaster) {
     val container = LocalAppContainer.current
     val shortcuts = LocalShortcuts.current
     val touch = LocalTouchUi.current
+    val nav = LocalNav.current
+    val actions = LocalActions.current
+    val models = LocalModels.current
     val settings by container.settings.settings.collectAsState()
     val incomingLink by container.incomingLink.collectAsState()
-    val tabs = appTabs(settings.experimental, settings.developerMode)
-    val currentTabs by rememberUpdatedState(tabs)
+
+    // The journal and the transport catalogue are pages of Settings: with the experimental features off, the catalogue is gone.
+    LaunchedEffect(settings.experimental) {
+        if (!settings.experimental && nav.section == Section.Settings && nav.top == Dest.ScriptTransports) nav.back()
+    }
+    // A key or a profile link that came from outside (a scanned code, a chat) goes where it is read.
+    LaunchedEffect(incomingLink) {
+        val link = incomingLink ?: return@LaunchedEffect
+        actions.incomingLink(link)
+    }
+    // Back goes up the current place's screens; from the first screen of a place, to Home; on Home the system leaves the app.
+    // Only on touch: Esc stays with dialogs on the desktop.
+    PlatformBackHandler(enabled = touch && nav.canGoBack) { nav.back() }
+    DisposableEffect(nav) {
+        val unregister = shortcuts.register { event ->
+            if (event.type != KeyEventType.KeyDown || !event.isCtrlPressed) return@register false
+            val place = when (event.key) {
+                Key.One -> Section.Home
+                Key.Two -> Section.Connections
+                Key.Three -> Section.Nodes
+                Key.Four -> Section.Settings
+                else -> null
+            }
+            when {
+                place != null -> { nav.select(place); true }
+                event.key == Key.Enter -> {
+                    val state = container.connection.state.value
+                    if (state.isActive) container.connection.disconnect() else HomeTab.connectSelected(container)
+                    true
+                }
+                // A wizard or an editor owns the keys while it is open.
+                event.key == Key.N && nav.top.root != null -> { actions.newProfile(); true }
+                event.key == Key.I && nav.top.root != null -> { models.profiles.importOpen = true; true }
+                else -> false
+            }
+        }
+        onDispose { unregister() }
+    }
+    val current = tabOf(nav.section)
     TabNavigator(HomeTab) { navigator ->
-        shell.tabNavigator = navigator
-        // Turned off while that section is open: it is gone, go home.
-        LaunchedEffect(settings.experimental) {
-            if (!settings.experimental && navigator.current.key == io.openflux.desktop.ui.scripts.ScriptsTab.key) navigator.current = HomeTab
-        }
-        // A subscription key goes to the Subscription screen, a profile link to the Profiles screen's import.
-        LaunchedEffect(incomingLink) {
-            val link = incomingLink ?: return@LaunchedEffect
-            if (io.openflux.desktop.model.SubscriptionInvite.looksLike(link)) {
-                container.pendingKey.value = link
-                container.incomingLink.value = null
-                navigator.current = io.openflux.desktop.ui.subscription.SubscriptionTab
-            } else {
-                navigator.current = ProfilesTab
-            }
-        }
-        // Back from another section returns home; screens handle their own
-        // inner steps first. Only on touch: Esc stays with dialogs on the desktop.
-        PlatformBackHandler(enabled = touch && navigator.current.key != HomeTab.key) {
-            navigator.current = if (navigator.current == LogsTab) SettingsTab else HomeTab
-        }
-        DisposableEffect(navigator) {
-            val unregister = shortcuts.register { event ->
-                if (event.type != KeyEventType.KeyDown || !event.isCtrlPressed) return@register false
-                val index = when (event.key) {
-                    Key.One -> 0
-                    Key.Two -> 1
-                    Key.Three -> 2
-                    Key.Four -> 3
-                    Key.Five -> 4
-                    else -> -1
-                }
-                when {
-                    index >= 0 -> { currentTabs.getOrNull(index)?.let { navigator.current = it }; true }
-                    event.key == Key.Enter -> {
-                        val state = container.connection.state.value
-                        if (state.isActive) container.connection.disconnect() else HomeTab.connectSelected(container)
-                        true
-                    }
-                    else -> false
-                }
-            }
-            onDispose { unregister() }
-        }
         // Edge to edge on Android: the background runs under the system bars, the content stays clear of them.
         BoxWithConstraints(Modifier.fillMaxSize().background(AppTheme.colors.background).windowInsetsPadding(WindowInsets.safeDrawing)) {
             shell.widthClass = widthClassOf(maxWidth)
@@ -227,7 +215,7 @@ private fun AppShell(shell: ShellController, toaster: Toaster) {
                     // A new release of the app, when there is one.
                     UpdateBanner()
                     AnimatedContent(
-                        targetState = navigator.current,
+                        targetState = current,
                         transitionSpec = {
                             (fadeIn(tween(220, delayMillis = 40)) + slideInVertically(tween(260)) { it / 40 })
                                 .togetherWith(fadeOut(tween(120)))
@@ -239,26 +227,21 @@ private fun AppShell(shell: ShellController, toaster: Toaster) {
                     }
                 }
             }
-            val tabs = visibleTabs(settings.developerMode, settings.experimental)
-            // Developer mode turned off while on Accounts: back to Settings.
-            // The journal is a page of Settings, not a tab of its own.
-            LaunchedEffect(tabs) { if (navigator.current !in tabs && navigator.current != LogsTab) navigator.current = SettingsTab }
-            val highlighted = if (navigator.current == LogsTab) SettingsTab else navigator.current
             if (shell.widthClass == WidthClass.Phone) {
                 Column(Modifier.fillMaxSize()) {
                     content(Modifier.weight(1f).fillMaxWidth())
                     // The keyboard takes the room: the tab bar would only float above it.
                     if (WindowInsets.ime.getBottom(LocalDensity.current) == 0) {
-                        BottomBar(current = highlighted, tabs = tabs, onSelect = { navigator.current = it })
+                        BottomBar(current = current, tabs = appTabs, onSelect = { nav.select(sectionOf(it)) })
                     }
                 }
             } else Row(Modifier.fillMaxSize()) {
                 Sidebar(
-                    current = highlighted,
-                    tabs = tabs,
+                    current = current,
+                    tabs = appTabs,
                     collapsed = collapsed,
                     canExpand = shell.widthClass != WidthClass.Compact,
-                    onSelect = { navigator.current = it },
+                    onSelect = { nav.select(sectionOf(it)) },
                     onToggleCollapsed = { container.settings.update { s -> s.copy(sidebarCollapsed = !s.sidebarCollapsed) } },
                     modifier = Modifier.fillMaxHeight().width(if (collapsed) AppTheme.dimens.sidebarCompactWidth else AppTheme.dimens.sidebarWidth),
                 )
@@ -270,6 +253,11 @@ private fun AppShell(shell: ShellController, toaster: Toaster) {
             CaptchaDialog()
             SignInDialog()
             ScriptSettingsDialog()
+            // The dialogs of profiles: import, share, delete. They open over whichever screen asked.
+            val profiles = models.profiles
+            if (profiles.importOpen) ImportDialog(profiles)
+            profiles.shareFor?.let { ShareDialog(profiles, it) }
+            profiles.deleteFor?.let { DeleteDialog(profiles, it) }
         }
     }
 }

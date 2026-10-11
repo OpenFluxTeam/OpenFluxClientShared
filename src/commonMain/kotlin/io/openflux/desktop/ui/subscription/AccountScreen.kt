@@ -53,9 +53,6 @@ fun AccountScreen(model: SubscriptionScreenModel, state: SubscriptionState, loca
     val look = state.look(nowMillis, model.platform.utcOffsetSeconds)
     val account = state.account
     Column(Modifier.widthIn(max = 640.dp)) {
-        Text("Подписка", style = AppTheme.typography.pageTitle, color = AppTheme.colors.text)
-        Spacer(Modifier.height(AppTheme.spacing.xl))
-
         AppCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

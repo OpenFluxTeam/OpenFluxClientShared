@@ -44,8 +44,7 @@ import io.openflux.desktop.ui.components.PageHeader
 import io.openflux.desktop.ui.components.StatusBadge
 import io.openflux.desktop.ui.components.TextAction
 import io.openflux.desktop.ui.components.Tone
-import io.openflux.desktop.ui.profiles.ProfilesTab
-import io.openflux.desktop.ui.shell.LocalShell
+import io.openflux.desktop.ui.nav.LocalActions
 import io.openflux.desktop.ui.theme.AppTheme
 
 /**
@@ -86,7 +85,7 @@ fun AccountsSettings() {
 private fun AccountCardView(card: AccountCard, model: AccountsScreenModel, now: Long) {
     val (text, tone) = AccountsScreenModel.statusText(card.status, now)
     val busy = card.status is AuthStatus.Busy || card.status is AuthStatus.Checking
-    val shell = LocalShell.current
+    val actions = LocalActions.current
     val toaster = LocalToaster.current
     val appSettings by LocalAppContainer.current.settings.settings.collectAsState()
     val developer = appSettings.developerMode
@@ -163,8 +162,7 @@ private fun AccountCardView(card: AccountCard, model: AccountsScreenModel, now: 
             FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                 AppButton("Создать профиль", {
                     model.createProfileFromDocument()?.let { profile ->
-                        shell.focusProfileId = profile.id
-                        shell.open(ProfilesTab)
+                        actions.openProfile(profile.id)
                         toaster.show("Профиль «${profile.name}» создан: ноде нужны тот же документ и ключ", Tone.Success)
                     }
                 })

@@ -91,12 +91,10 @@ import io.openflux.desktop.ui.components.SwitchRow
 import io.openflux.desktop.ui.components.TextAction
 import io.openflux.desktop.ui.components.Tone
 import io.openflux.desktop.ui.components.appClickable
-import io.openflux.desktop.ui.logs.LogsTab
+import io.openflux.desktop.ui.nav.LocalActions
+import io.openflux.desktop.ui.nav.NodeKind
 import io.openflux.desktop.ui.look
-import io.openflux.desktop.ui.profiles.ProfilesTab
 import io.openflux.desktop.ui.subscription.SubscriptionStrip
-import io.openflux.desktop.ui.subscription.SubscriptionTab
-import io.openflux.desktop.ui.shell.LocalShell
 import io.openflux.desktop.ui.theme.AppTheme
 import org.jetbrains.compose.resources.painterResource
 
@@ -126,7 +124,7 @@ private fun HomeScreen(model: HomeScreenModel) {
     val settings by model.settings.settings.collectAsState()
     val state by model.connection.state.collectAsState()
     val selected = model.selectedProfile(profiles, settings.selectedProfileId)
-    val shell = LocalShell.current
+    val actions = LocalActions.current
 
     // Very wide windows keep the page to a readable width, centred.
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -140,7 +138,7 @@ private fun HomeScreen(model: HomeScreenModel) {
                 val sub = subscription
                 if (sub != null) {
                     // A subscription that has ended (or is empty) says so and offers to renew, instead of a blank page.
-                    SubscriptionStrip(sub, model.platform, onOpen = { shell.open(SubscriptionTab) }, modifier = Modifier.widthIn(max = 560.dp))
+                    SubscriptionStrip(sub, model.platform, onOpen = { actions.showAccount(true) }, modifier = Modifier.widthIn(max = 560.dp))
                     Spacer(Modifier.height(AppTheme.spacing.xl))
                 }
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -152,16 +150,13 @@ private fun HomeScreen(model: HomeScreenModel) {
                     ) {
                         ButtonRow(alignment = Alignment.CenterHorizontally) {
                             if (sub == null) {
-                                AppButton("Войти или создать аккаунт", {
-                                    shell.accountRequested = true
-                                    shell.open(SubscriptionTab)
-                                })
+                                AppButton("Войти или создать аккаунт", { actions.showAccount(false) })
                             }
-                            AppButton(if (sub == null) "Вставить ключ или ссылку" else "Открыть подписку", { shell.open(SubscriptionTab) }, style = ButtonStyle.Secondary, leading = Icons.Rounded.ContentPaste)
+                            AppButton(if (sub == null) "Вставить ключ или ссылку" else "Открыть подписку", { if (sub == null) actions.addConnection() else actions.showAccount(true) }, style = ButtonStyle.Secondary, leading = Icons.Rounded.ContentPaste)
                         }
                         if (sub == null) {
                             Spacer(Modifier.height(AppTheme.spacing.s))
-                            TextAction("У меня своя нода", { shell.nodeWizardRequested = true; shell.open(ProfilesTab) })
+                            TextAction("У меня своя нода", { actions.createNode(NodeKind.Server) })
                         }
                     }
                 }
@@ -169,7 +164,7 @@ private fun HomeScreen(model: HomeScreenModel) {
             return@Column
         }
         subscription?.let { sub ->
-            SubscriptionStrip(sub, model.platform, onOpen = { shell.open(SubscriptionTab) })
+            SubscriptionStrip(sub, model.platform, onOpen = { actions.showAccount(true) })
             Spacer(Modifier.height(AppTheme.spacing.l))
         }
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -363,7 +358,7 @@ private fun ProfilePicker(profiles: List<Profile>, selected: Profile?, onSelect:
 @Composable
 private fun DetailsColumn(model: HomeScreenModel, selected: Profile?, state: ConnectionState, twoColumns: Boolean) {
     val toaster = LocalToaster.current
-    val shell = LocalShell.current
+    val actions = LocalActions.current
     val traffic by model.connection.traffic.collectAsState()
     val scripts by LocalAppContainer.current.scripts.scripts.collectAsState()
     val socks by model.connection.socksAddress.collectAsState()
@@ -385,7 +380,7 @@ private fun DetailsColumn(model: HomeScreenModel, selected: Profile?, state: Con
         if (state is ConnectionState.Failed) {
             Banner(state.message, Tone.Danger, icon = Icons.Rounded.ErrorOutline) {
                 Row {
-                    TextAction("Журнал", { shell.open(LogsTab) })
+                    TextAction("Журнал", actions::openLogs)
                     state.profile?.let { failed -> TextAction("Повторить", { model.connection.connect(failed) }) }
                 }
             }

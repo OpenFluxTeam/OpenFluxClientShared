@@ -140,9 +140,12 @@ data class SubscriptionState(
     val active: Boolean get() = status == SubStatus.ACTIVE
     val signedIn: Boolean get() = kind == SubscriptionKind.Key || deviceToken.isNotEmpty()
 
-    /** Whole days left at [now] (unix seconds); null when it never ends or is over. */
+    /**
+     * Whole days left at [now] (unix seconds); null when it never ends or is over, 0 when less than a day is left.
+     * An hour of grace: a plan of 3 days just taken reads "3 дня", not "4".
+     */
     fun daysLeft(now: Long): Int? =
-        if (expires == 0L || expires <= now) null else (((expires - now) + 86_399) / 86_400).toInt()
+        if (expires == 0L || expires <= now) null else (((expires - now) + 3_600) / 86_400).toInt()
 
     override fun toString() = "SubscriptionState($kind, $status)"
 }

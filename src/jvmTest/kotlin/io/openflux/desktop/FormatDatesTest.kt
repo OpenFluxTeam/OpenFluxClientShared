@@ -33,6 +33,7 @@ class FormatDatesTest {
         assertEquals("осталось 3 дня", Format.daysLeft(3))
         assertEquals("осталось 11 дней", Format.daysLeft(11))
         assertEquals("остался 21 день", Format.daysLeft(21))
+        assertEquals("осталось меньше суток", Format.daysLeft(0))
     }
 
     @Test

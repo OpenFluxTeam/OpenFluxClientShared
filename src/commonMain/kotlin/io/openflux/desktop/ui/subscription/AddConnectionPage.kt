@@ -69,8 +69,6 @@ class AddConnectionActions(
 fun AddConnectionPage(model: SubscriptionScreenModel, actions: AddConnectionActions, modifier: Modifier = Modifier) {
     val idle = model.busy == null
     Column(modifier.widthIn(max = 640.dp)) {
-        PageHeader("Подключение", "Вставьте ключ подписки или ссылку, отсканируйте QR-код или войдите в аккаунт")
-        Spacer(Modifier.height(AppTheme.spacing.xl))
         KeyBox(model, actions)
         model.error?.let {
             Spacer(Modifier.height(AppTheme.spacing.m))
