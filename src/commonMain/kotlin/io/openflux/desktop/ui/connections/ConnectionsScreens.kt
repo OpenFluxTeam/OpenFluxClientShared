@@ -407,6 +407,13 @@ fun AddConnectionScreen() {
     val model = models.account
     val profiles = models.profiles
     val container = LocalAppContainer.current
+    // A subscription taken here (a key confirmed) is shown at once: the account replaces this screen.
+    val nav = io.openflux.desktop.ui.nav.LocalNav.current
+    val subscription by model.manager.state.collectAsState()
+    val hadSubscription = remember { subscription != null }
+    LaunchedEffect(subscription != null) {
+        if (subscription != null && !hadSubscription && nav.top == Dest.AddConnection) nav.replaceTop(Dest.Account)
+    }
     // A key that came from outside (a link opened in the app): the field takes it.
     val pendingKey by container.pendingKey.collectAsState()
     LaunchedEffect(pendingKey) {
