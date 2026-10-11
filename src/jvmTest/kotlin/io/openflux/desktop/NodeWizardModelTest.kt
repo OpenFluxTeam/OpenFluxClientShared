@@ -516,9 +516,8 @@ class NodeWizardModelTest {
         assertTrue(settings.tapVersion()!!.startsWith("Режим разработчика включён"))
         assertTrue(env.settings.settings.value.developerMode)
         assertEquals("Режим разработчика уже включён", settings.tapVersion())
-        // Developer mode no longer adds a tab: sign-ins are a page of Settings for everyone.
-        assertEquals(io.openflux.desktop.ui.shell.visibleTabs(false), io.openflux.desktop.ui.shell.visibleTabs(true))
-        assertFalse(io.openflux.desktop.ui.logs.LogsTab in io.openflux.desktop.ui.shell.visibleTabs(true), "the journal is a page of Settings")
+        // Developer mode adds no place: sign-ins and the journal are pages of Settings for everyone.
+        assertEquals(4, io.openflux.desktop.ui.shell.appTabs.size)
     }
 
     @Test

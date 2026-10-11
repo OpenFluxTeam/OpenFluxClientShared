@@ -616,6 +616,19 @@ private fun ExperimentalSettings(model: SettingsScreenModel) {
             { v -> model.update { it.copy(experimental = v) } },
         )
     }
+    if (settings.experimental) {
+        val actions = LocalActions.current
+        AppCard {
+            Text("Транспорты на JS", style = AppTheme.typography.bodyStrong, color = AppTheme.colors.text)
+            Spacer(Modifier.height(AppTheme.spacing.xs))
+            Text(
+                "Каталог установленных транспортов: добавить свой, проверить обновления, посмотреть подпись автора.",
+                style = AppTheme.typography.bodySmall, color = AppTheme.colors.textSecondary,
+            )
+            Spacer(Modifier.height(AppTheme.spacing.m))
+            AppButton("Открыть каталог", actions::openScriptTransports, style = ButtonStyle.Secondary)
+        }
+    }
     AppCard {
         SectionLabel("Что это включает")
         Spacer(Modifier.height(AppTheme.spacing.s))

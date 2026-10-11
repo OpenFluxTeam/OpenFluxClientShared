@@ -8,8 +8,13 @@ import io.openflux.desktop.model.ExtraTransport
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ScriptCarrierLookup
 import io.openflux.desktop.model.TransportType
-import io.openflux.desktop.ui.profiles.ProfilesTab
-import io.openflux.desktop.ui.scripts.ScriptsTab
+import io.openflux.desktop.ui.connections.ConnectionsTab
+import io.openflux.desktop.ui.home.HomeTab
+import io.openflux.desktop.ui.nav.Section
+import io.openflux.desktop.ui.nodes.NodesTab
+import io.openflux.desktop.ui.settings.SettingsTab
+import io.openflux.desktop.ui.shell.sectionOf
+import io.openflux.desktop.ui.shell.tabOf
 import io.openflux.desktop.ui.shell.appTabs
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -41,11 +46,11 @@ class ExperimentalGateTest {
     }
 
     @Test
-    fun theTransportsTabIsThereOnlyWithTheFeaturesOn() {
-        assertFalse(ScriptsTab in appTabs(false), "the Transports tab is hidden by default")
-        assertTrue(ScriptsTab in appTabs(true))
-        assertEquals(appTabs(true) - ScriptsTab, appTabs(false), "nothing else changes")
-        assertTrue(ProfilesTab in appTabs(false))
+    fun theAppHasFourPlacesAndTheTransportCatalogueIsNotOneOfThem() {
+        assertEquals(listOf(HomeTab, ConnectionsTab, NodesTab, SettingsTab), appTabs)
+        // The catalogue, the journal and the sign-ins are pages of Settings, reached from it.
+        assertEquals(Section.Settings, sectionOf(SettingsTab))
+        assertEquals(appTabs, Section.entries.map(::tabOf))
     }
 
     @Test
