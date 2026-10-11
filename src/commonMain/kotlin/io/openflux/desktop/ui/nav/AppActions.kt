@@ -1,5 +1,7 @@
 package io.openflux.desktop.ui.nav
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.SubscriptionInvite
@@ -19,7 +21,7 @@ class AppModels(container: AppContainer) {
     val settings = io.openflux.desktop.ui.settings.SettingsScreenModel(container)
 
     /** The page of Settings another screen asked for ("Войти в Яндекс"); Settings takes it and clears it. */
-    var settingsCategory: SettingsCategory? by androidx.compose.runtime.mutableStateOf(null)
+    var settingsCategory by androidx.compose.runtime.mutableStateOf<SettingsCategory?>(null)
 
     fun dispose() {
         profiles.onDispose()
