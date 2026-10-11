@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -135,7 +136,7 @@ fun TextAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
     val hovered by interaction.collectIsHoveredAsState()
     Box(
         modifier = modifier
-            .height(32.dp)
+            .heightIn(min = 32.dp)
             .clip(AppTheme.shapes.small)
             .background(if (hovered && enabled) AppTheme.colors.accentSoft else Color.Transparent)
             .appClickable(interaction, enabled, onClick = onClick)

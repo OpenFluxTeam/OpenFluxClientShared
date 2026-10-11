@@ -114,7 +114,7 @@ fun NodesList(selectedId: String?, split: Boolean, modifier: Modifier = Modifier
                     AppButton("Без сервера", actions::createHosting, style = ButtonStyle.Secondary, leading = Icons.Rounded.Cloud)
                 }
                 Spacer(Modifier.height(AppTheme.spacing.s))
-                TextAction("У меня уже есть ссылка на ноду: добавить подключение", actions::addConnection)
+                TextAction("Есть ссылка на ноду: добавить подключение", actions::addConnection)
             }
         }
         return
