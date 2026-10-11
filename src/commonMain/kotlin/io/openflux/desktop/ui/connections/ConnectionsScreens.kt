@@ -278,7 +278,7 @@ fun ProfileScreen(id: String) {
             if (running) AppButton("Отключить", model.connection::disconnect, style = ButtonStyle.Danger, leading = Icons.Rounded.Stop)
             else AppButton("Подключить", { model.connect(profile) }, leading = Icons.Rounded.PlayArrow)
             if (!profile.managed) {
-                AppButton("Изменить", { actions.editProfile(profile) }, style = ButtonStyle.Secondary, leading = Icons.Rounded.Edit)
+                AppButton(if (profile.ownNode) "Параметры профиля" else "Изменить", { actions.editProfile(profile) }, style = ButtonStyle.Secondary, leading = Icons.Rounded.Edit)
                 if (profile.transport.shareable) {
                     AppButton("QR и ссылка", { model.shareFor = profile }, style = ButtonStyle.Secondary, leading = Icons.Rounded.QrCode2)
                 }

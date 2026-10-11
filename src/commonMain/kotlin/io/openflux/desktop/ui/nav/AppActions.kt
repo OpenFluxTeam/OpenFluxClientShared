@@ -54,8 +54,11 @@ class AppActions(val nav: AppNav, private val models: AppModels, private val con
 
     // ---- connections ----
 
+    // A screen opens on top of the place the person is in, so "back" returns to where they came from: the account
+    // opened from Home goes back to Home, from the list of connections to the list.
+
     /** The ways to connect: a key or link, an account, a node, by hand. */
-    fun addConnection() = nav.goIn(Section.Connections, Dest.AddConnection)
+    fun addConnection() = nav.push(Dest.AddConnection)
 
     /** A key or a profile link that came from outside the app (a scanned code, a chat). */
     fun incomingLink(link: String) {
@@ -90,7 +93,7 @@ class AppActions(val nav: AppNav, private val models: AppModels, private val con
 
     fun newProfile() {
         models.profiles.beginEdit(null)
-        nav.goIn(Section.Connections, Dest.ProfileEdit(null))
+        nav.push(Dest.ProfileEdit(null))
     }
 
     /** Leaves the editor after a save or a cancel. */
@@ -104,12 +107,12 @@ class AppActions(val nav: AppNav, private val models: AppModels, private val con
     }
 
     fun showAccount(signedIn: Boolean) {
-        if (signedIn) nav.goIn(Section.Connections, Dest.Account) else signIn(AuthStep.Choose)
+        if (signedIn) nav.push(Dest.Account) else signIn(AuthStep.Choose)
     }
 
     fun signIn(step: AuthStep = AuthStep.Choose) {
         models.account.go(step)
-        nav.goIn(Section.Connections, Dest.Auth)
+        nav.push(Dest.Auth)
     }
 
     // ---- nodes ----
@@ -134,9 +137,9 @@ class AppActions(val nav: AppNav, private val models: AppModels, private val con
         nav.goIn(Section.Settings, Dest.Settings)
     }
 
-    fun openLogs() = nav.goIn(Section.Settings, Dest.Logs)
+    fun openLogs() = nav.push(Dest.Logs)
 
-    fun openScriptTransports() = nav.goIn(Section.Settings, Dest.ScriptTransports)
+    fun openScriptTransports() = nav.push(Dest.ScriptTransports)
 }
 
 val LocalNav = staticCompositionLocalOf<AppNav> { error("AppNav is not provided") }

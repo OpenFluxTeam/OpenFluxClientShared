@@ -91,7 +91,11 @@ import io.openflux.desktop.ui.components.SwitchRow
 import io.openflux.desktop.ui.components.TextAction
 import io.openflux.desktop.ui.components.Tone
 import io.openflux.desktop.ui.components.appClickable
+import io.openflux.desktop.ui.nav.DestContent
+import io.openflux.desktop.ui.nav.Dest
 import io.openflux.desktop.ui.nav.LocalActions
+import io.openflux.desktop.ui.nav.LocalNav
+import io.openflux.desktop.ui.nav.Section
 import io.openflux.desktop.ui.nav.NodeKind
 import io.openflux.desktop.ui.look
 import io.openflux.desktop.ui.subscription.SubscriptionStrip
@@ -114,7 +118,9 @@ object HomeTab : Tab {
     override fun Content() {
         val container = LocalAppContainer.current
         val model = rememberScreenModel { HomeScreenModel(container) }
-        HomeScreen(model)
+        // Home has screens above it too: the account, the journal and the ways to connect open here, and back returns here.
+        val top = LocalNav.current.stack(Section.Home).last()
+        if (top == Dest.Home) HomeScreen(model) else DestContent(top)
     }
 }
 

@@ -225,8 +225,10 @@ fun NodeScreen(id: String) {
             KeyValueRow("Транспорты", node.carriers.joinToString(", ") { it.type.shortLabel })
             HorizontalRule()
             KeyValueRow("Режим", if (node.stream) "Без ключа" else if (node.session) "Session: несколько транспортов" else "Обычный")
-            HorizontalRule()
-            KeyValueRow("Создана", io.openflux.desktop.ui.Format.date(node.createdAt / 1000, model.platform.utcOffsetSeconds))
+            if (node.createdAt > 0) {
+                HorizontalRule()
+                KeyValueRow("Создана", io.openflux.desktop.ui.Format.date(node.createdAt / 1000, model.platform.utcOffsetSeconds))
+            }
         }
 
         node.phpNode?.let { php ->
