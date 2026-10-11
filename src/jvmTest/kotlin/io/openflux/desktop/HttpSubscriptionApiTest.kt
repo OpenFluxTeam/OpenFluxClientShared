@@ -46,6 +46,7 @@ class HttpSubscriptionApiTest {
             "/api/v1/account" -> if (ex.requestHeaders.getFirst("Authorization") == "Bearer tok") 200 to """{"login":"ivan","status":"active"}""" else 401 to """{"error":"unauthorized","message":"Войдите в аккаунт."}"""
             "/api/v1/subscription" -> 200 to """{"version":1,"title":"OpenFlux","status":"active","expires":2000000000,"updateHours":6,"profiles":[{"id":"de","name":"Германия","link":"openflux://v1/x"}]}"""
             "/sub/KEY" -> 200 to """{"version":1,"status":"expired","profiles":[]}"""
+            "/sub/NULL" -> 200 to """{"version":1,"status":"active","profiles":null}"""
             "/api/v1/orders/o%2F1" -> 200 to """{"orderId":"o/1","status":"paid","expires":5}"""
             "/api/v1/account/delete" -> 401 to """{"error":"invalid_credentials","message":"Неверный пароль."}"""
             "/api/v1/logout" -> 200 to """{"ok":true}"""
@@ -157,6 +158,14 @@ class HttpSubscriptionApiTest {
         assertEquals(SubscriptionException.BAD_RESPONSE, garbage.code)
         assertEquals(SubscriptionException.BAD_RESPONSE, assertFailsWith<SubscriptionException> { api.keyDocument(ep, ep.base + "/api/v1/huge") }.code, "an answer is limited in size")
         assertEquals(SubscriptionException.BAD_RESPONSE, assertFailsWith<SubscriptionException> { api.keyDocument(ep, ep.base + "/api/v1/redirect") }.code, "a redirect would carry the token elsewhere")
+    }
+
+    @Test
+    fun aNullProfilesAnswerIsAnEmptyListNotABrokenAnswer() = runBlocking {
+        val ep = http()
+        val doc = api.keyDocument(ep, ep.base + "/sub/NULL")
+        assertEquals(SubStatus.ACTIVE, doc.status)
+        assertTrue(doc.profiles.isEmpty(), "a service answering profiles:null must not break the client")
     }
 
     @Test

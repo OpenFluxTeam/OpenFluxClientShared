@@ -34,7 +34,9 @@ import javax.net.ssl.X509TrustManager
  * other server. Plain http is accepted for this machine only (tests).
  */
 class HttpSubscriptionApi : SubscriptionApi {
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    // coerceInputValues: a service answering "profiles":null (no usable pool) is
+    // read as the empty list the field promises, not as a broken answer.
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true }
 
     @Serializable
     private class ErrorBody(val error: String = "", val message: String = "", val devices: List<DeviceInfo> = emptyList())
