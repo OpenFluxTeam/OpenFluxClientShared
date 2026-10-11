@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import io.openflux.desktop.model.SubscriptionState
 import io.openflux.desktop.service.PlatformServices
 import io.openflux.desktop.ui.components.AppButton
@@ -48,6 +49,9 @@ fun SubscriptionStrip(state: SubscriptionState, platform: PlatformServices, onOp
     val now = rememberNowMillis(platform)
     val look = state.look(now, platform.utcOffsetSeconds)
     AppCard(modifier.fillMaxWidth(), padding = AppTheme.spacing.m) {
+      // On a phone the badge would squeeze the title: the line under it says the same.
+      androidx.compose.foundation.layout.BoxWithConstraints {
+        val roomForBadge = maxWidth >= 480.dp
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconBubble(AppIcons.Person)
             Spacer(Modifier.width(AppTheme.spacing.m))
@@ -57,7 +61,7 @@ fun SubscriptionStrip(state: SubscriptionState, platform: PlatformServices, onOp
                         state.title.ifBlank { "Подписка" }, style = AppTheme.typography.bodyStrong, color = AppTheme.colors.text,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
                     )
-                    if (look.attention) {
+                    if (look.attention && roomForBadge) {
                         Spacer(Modifier.width(AppTheme.spacing.s))
                         StatusBadge(look.badge, look.tone)
                     }
@@ -70,5 +74,6 @@ fun SubscriptionStrip(state: SubscriptionState, platform: PlatformServices, onOp
                 style = if (look.attention) ButtonStyle.Primary else ButtonStyle.Ghost,
             )
         }
+      }
     }
 }
