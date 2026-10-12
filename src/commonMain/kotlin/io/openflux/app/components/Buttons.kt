@@ -1,0 +1,121 @@
+package io.openflux.app.components
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.MinTouch
+
+private val ButtonPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+
+@Composable
+private fun ButtonLabel(text: String, leading: ImageVector?) {
+    if (leading != null) {
+        Icon(leading, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(AppTheme2.spacing.s))
+    }
+    Text(text, style = AppTheme2.type.title, maxLines = 1)
+}
+
+/** The one main action of a screen. */
+@Composable
+fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, leading: ImageVector? = null) {
+    val c = AppTheme2.colors
+    Button(
+        onClick = onClick,
+        modifier = modifier.defaultMinSize(minHeight = MinTouch),
+        enabled = enabled,
+        shape = RoundedCornerShape(AppTheme2.shapes.medium),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = c.accent, contentColor = c.onAccent,
+            disabledContainerColor = c.surfaceHigh, disabledContentColor = c.textMuted,
+        ),
+        contentPadding = ButtonPadding,
+    ) { ButtonLabel(text, leading) }
+}
+
+@Composable
+fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, leading: ImageVector? = null) {
+    val c = AppTheme2.colors
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.defaultMinSize(minHeight = MinTouch),
+        enabled = enabled,
+        shape = RoundedCornerShape(AppTheme2.shapes.medium),
+        border = BorderStroke(1.dp, c.border),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = c.text, disabledContentColor = c.textMuted),
+        contentPadding = ButtonPadding,
+    ) { ButtonLabel(text, leading) }
+}
+
+/** Deletes or breaks something: the colour says so before the dialog does. */
+@Composable
+fun DangerButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val c = AppTheme2.colors
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.defaultMinSize(minHeight = MinTouch),
+        enabled = enabled,
+        shape = RoundedCornerShape(AppTheme2.shapes.medium),
+        border = BorderStroke(1.dp, c.danger),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = c.danger, disabledContentColor = c.textMuted),
+        contentPadding = ButtonPadding,
+    ) { ButtonLabel(text, null) }
+}
+
+@Composable
+fun TextButton2(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, color: Color = AppTheme2.colors.accent) {
+    TextButton(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        colors = ButtonDefaults.textButtonColors(contentColor = color, disabledContentColor = AppTheme2.colors.textMuted),
+    ) { Text(text, style = AppTheme2.type.title, maxLines = 1) }
+}
+
+/** An icon with a tooltip naming it (and its shortcut, when [description] carries one: "Добавить · Ctrl+N"). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun IconButton2(icon: ImageVector, description: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val c = AppTheme2.colors
+    val button = @Composable {
+        IconButton(
+            onClick = onClick,
+            modifier = modifier,
+            enabled = enabled,
+            colors = IconButtonDefaults.iconButtonColors(contentColor = c.text, disabledContentColor = c.textMuted),
+        ) { Icon(icon, contentDescription = description.substringBefore(" · ")) }
+    }
+    if (AppTheme2.touch) {
+        button()
+    } else {
+        TooltipBox(
+            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+            tooltip = { PlainTooltip { Text(description) } },
+            state = rememberTooltipState(),
+        ) { button() }
+    }
+}
