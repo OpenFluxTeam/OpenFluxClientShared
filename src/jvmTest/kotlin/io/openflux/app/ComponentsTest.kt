@@ -14,7 +14,16 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.unit.dp
 import io.openflux.app.components.Collapsible
+import io.openflux.app.components.ScreenScaffold
+import io.openflux.app.nav.LocalInPane
 import io.openflux.app.components.RowItem
 import io.openflux.app.components.SecretField
 import io.openflux.app.components.Segmented
@@ -62,5 +71,18 @@ class ComponentsTest {
         setContent { AppTheme2(dark = true, touch = false) { RowItem("Сервер", onClick = { clicks++ }) } }
         onNodeWithText("Сервер").performClick()
         assertEquals(1, clicks)
+    }
+
+    @Test
+    fun scaffoldHasNoBackArrowBesideItsList() = runComposeUiTest {
+        setContent {
+            AppTheme2(dark = true, touch = false) {
+                Column {
+                    ScreenScaffold("Один", Modifier.height(100.dp), onBack = {}) {}
+                    CompositionLocalProvider(LocalInPane provides true) { ScreenScaffold("Два", Modifier.height(100.dp), onBack = {}) {} }
+                }
+            }
+        }
+        onAllNodesWithContentDescription("Назад").assertCountEquals(1)
     }
 }

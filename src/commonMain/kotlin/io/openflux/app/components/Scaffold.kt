@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.openflux.app.nav.LocalInPane
 import io.openflux.app.theme.AppTheme2
 import io.openflux.desktop.ui.LocalScrollbars
 
@@ -44,14 +45,16 @@ fun ScreenScaffold(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val sp = AppTheme2.spacing
+    // Beside its list (a wide window) the list is the way back.
+    val back = onBack.takeUnless { LocalInPane.current }
     Column(modifier.fillMaxSize()) {
-        if (title != null || onBack != null) {
+        if (title != null || back != null) {
             Row(
-                Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = if (onBack != null) sp.xs else sp.page, end = sp.xs),
+                Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = if (back != null) sp.xs else sp.page, end = sp.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (onBack != null) {
-                    IconButton2(Icons.AutoMirrored.Rounded.ArrowBack, "Назад", onBack)
+                if (back != null) {
+                    IconButton2(Icons.AutoMirrored.Rounded.ArrowBack, "Назад", back)
                     Spacer(Modifier.width(sp.xs))
                 }
                 Text(
