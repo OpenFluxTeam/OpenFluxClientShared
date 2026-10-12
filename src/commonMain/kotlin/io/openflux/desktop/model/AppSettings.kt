@@ -149,6 +149,8 @@ data class AppSettings(
     val useAccountSessions: Boolean = true,
     /** Node wizard: servers used before, newest first. No passwords. */
     val knownServers: List<KnownServer> = emptyList(),
+    /** The new interface's place and screens (JSON of io.openflux.app.nav.NavState), restored at the next start on the desktop. */
+    val navState: String = "",
 )
 
 /** Settings from an older version, brought up to date once on load. */

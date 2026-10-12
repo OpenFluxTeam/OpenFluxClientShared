@@ -22,6 +22,7 @@ import io.openflux.app.components.ToastHost2
 import io.openflux.app.components.Toaster2
 import io.openflux.app.nav.AppNavHost
 import io.openflux.app.nav.AppNavigator
+import io.openflux.app.nav.rememberAppNavigator
 import io.openflux.app.theme.AppTheme2
 import io.openflux.desktop.model.ThemeMode
 import io.openflux.desktop.service.AppContainer
@@ -56,7 +57,7 @@ fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, shortcuts: Sho
     }
     val touch = container.platform.kind == PlatformKind.Android
     val toaster = remember { Toaster2() }
-    val navigator = remember { AppNavigator() }
+    val navigator = rememberAppNavigator(container)
     var addOpen by rememberSaveable { mutableStateOf(false) }
     AppTheme2(dark, touch) {
         CompositionLocalProvider(
