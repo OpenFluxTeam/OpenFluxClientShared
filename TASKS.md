@@ -7,14 +7,14 @@
 - План части 1: [`docs/plans/2026-10-12-ui-part1-skeleton.md`](docs/plans/2026-10-12-ui-part1-skeleton.md)
 - Репозитории: этот сабмодуль `OpenFluxDesktop/shared` (ветка `nav3`), `OpenFluxDesktop` (ветка `nav3`), `OpenFluxAndroid` (ветка `nav3` появится в C10).
 
-## Общий статус: 6 / 46 — 13 %
+## Общий статус: 15 / 46 — 33 %
 
 **Текущая цель:** часть 1 — дизайн-система и каркас навигации в пакете `io.openflux.app` (группа C).
-**Ближайший этап:** C1 — зависимости Navigation 3 и тестовая оснастка.
+**Ближайший этап:** C10 — проверка на эмуляторе (заблокирована, см. ниже); затем итоговый обзор части 1 и план части 2 (D1).
 
 ## Критические проблемы и блокировки
 
-Нет.
+- [!] C10: на эмуляторе нет места для отладочной сборки (418 МБ свободно, установлен `io.openflux.client` 2.14.1). Нужно решение владельца: удалить что-то на эмуляторе или проверить на другом устройстве. Сборки и десктоп проверены.
 
 ## Крупные задачи
 
@@ -22,7 +22,7 @@
 |---|---|---|
 | A. Проектирование | 3 / 3 | 100 % |
 | B. Часть 0 — подготовка | 3 / 3 | 100 % |
-| C. Часть 1 — дизайн-система и каркас | 0 / 10 | 0 % |
+| C. Часть 1 — дизайн-система и каркас | 9 / 10 | 90 % |
 | D. Часть 2 — свой сервер, мастер, редактор ноды | 0 / 7 | 0 % |
 | E. Часть 3 — Главная, шторка, профиль | 0 / 5 | 0 % |
 | F. Часть 4 — ＋ и Поделиться | 0 / 4 | 0 % |
@@ -43,20 +43,47 @@
 - [x] B2. `nav3` = `818bb07` + коммиты спецификации. Проверка: `git status --short` пуст.
 - [x] B3. Базовые тесты до изменений. Проверка: `./gradlew :shared:jvmTest -PskipCore=true` → exit 0, 40 наборов, без `<failure>`.
 
-### C. Часть 1 — дизайн-система и каркас — 0 %
+### C. Часть 1 — дизайн-система и каркас — 90 %
 
 Подзадачи = задачи плана части 1; критерии — шаги «прогон → PASS» в плане.
 
-- [ ] C1. Task 0: зависимости Navigation 3 / lifecycle / ui-test, дымовой тест `SmokeTest`. Где: `OpenFluxDesktop/gradle/libs.versions.toml`, `shared/build.gradle.kts`. Готово, когда: `SmokeTest` и весь `:shared:jvmTest` PASS, `:shared:compileDebugKotlinAndroid` SUCCESS.
-- [ ] C2. Task 1: токены и тема `AppTheme2`. Где: `app/theme/Tokens.kt`. Готово: `TokensTest` (контраст обеих тем) PASS.
-- [ ] C3. Task 2: базовые компоненты. Где: `app/components/*`. Готово: `ComponentsTest` PASS.
-- [ ] C4. Task 3: каталог компонентов в PNG. Готово: `CatalogTest` PASS, PNG осмотрены глазами.
-- [ ] C5. Task 4: `Section`, `Dest`, `NavState`. Готово: `DestTest` PASS.
-- [ ] C6. Task 5: `AppNavigator`. Готово: `AppNavigatorTest` PASS.
-- [ ] C7. Task 6: `AppNavHost`, `ListDetailSceneStrategy`. Готово: `ListDetailTest`, `AppNavHostTest` PASS (модели не очищаются при смене раздела, очищаются при «назад»).
-- [ ] C8. Task 7: оболочка, меню ＋, `OpenFluxApp2`. Готово: `ShellTest` PASS, кадры оболочки осмотрены.
-- [ ] C9. Task 8: сохранение/восстановление стеков, поле `AppSettings.navState`. Готово: `NavStateTest` и `SettingsMigrationTest` PASS.
-- [ ] C10. Task 9: запуск в приложениях (`OPENFLUX_UI=new`, отладочный значок Android). Готово: `:desktopApp:compileKotlin`, `:androidApp:assembleDebug` SUCCESS, ручная проверка на десктопе и эмуляторе.
+- [x] C1. Task 0: зависимости Navigation 3 / lifecycle / ui-test, дымовой тест `SmokeTest`. Где: `OpenFluxDesktop/gradle/libs.versions.toml`, `shared/build.gradle.kts`. Готово, когда: `SmokeTest` и весь `:shared:jvmTest` PASS, `:shared:compileDebugKotlinAndroid` SUCCESS.
+  - Сделано: `navigation3-ui 1.1.2`, `lifecycle-viewmodel-compose`/`-navigation3 2.11.0` в `commonMain`; `compose.desktop.currentOs` и `compose-uiTest` в `jvmTest`; `SmokeTest` рисует `NavDisplay` на JVM. Коммиты: `b00d783` (shared), `293fba4` (OpenFluxDesktop, каталог версий).
+  - Проверки: RED — компиляция теста падала без зависимостей; GREEN — `SmokeTest` 1/1; весь `:shared:jvmTest` — 41 набор без failure/error; `:shared:compileDebugKotlinAndroid` — SUCCESS.
+  - Найдено: у `OpenFluxDesktop` нет `local.properties` — Android-вариант собирается только с `ANDROID_HOME` в окружении (скрипт `.superpowers/t.sh`); файл не добавлял.
+- [x] C2. Task 1: токены и тема `AppTheme2`. Где: `app/theme/Tokens.kt`. Готово: `TokensTest` (контраст обеих тем) PASS.
+  - Сделано: цвета тёмной/светлой темы, типографика (touch +1 sp), отступы, радиусы, `AppTheme2` поверх M3. Коммит `3e2228f`.
+  - Проверки: RED (нет темы) → GREEN 2/2; весь `:shared:jvmTest` зелёный. Тест поймал недостаточный контраст белого текста на светлом акценте — акцент затемнён до `#A0561A`.
+- [x] C3. Task 2: базовые компоненты. Где: `app/components/*`. Готово: `ComponentsTest` PASS.
+  - Сделано: `Buttons.kt` (основная, вторичная, опасная, текстовая, значок с подсказкой), `Rows.kt` (`RowItem`, `ValueRow`, `Section` с линиями между строками, `Collapsible`, `StatusDot`), `Inputs.kt` (`Field`, `SecretField`, `Segmented`, `Toggle`, `Chip`), `Feedback.kt` (`Banner`, `Toaster2`/`ToastHost2`, `ConfirmDialog`), `Sheet.kt` (шторка < 600 dp, иначе диалог), `Scaffold.kt` (`ScreenScaffold`). Коммит `63150a0`.
+  - Проверки: RED (компоненты отсутствуют) → GREEN 4/4; мутация: без маскировки пароля тест `SecretField` падает; весь `:shared:jvmTest` зелёный.
+  - Отклонение от плана: содержимое `Section` — `@Composable () -> Unit`, а не `ColumnScope` (свой Layout рисует линии между строками). Цена: внутри `Section` нельзя `Modifier.weight`.
+- [x] C4. Task 3: каталог компонентов в PNG. Готово: `CatalogTest` PASS, PNG осмотрены глазами.
+  - Сделано: `Shots.kt` (кадры телефон / 320 dp ×1,3 / 1280 dp, тёмная и светлая темы), `CatalogTest.kt` (витрина всех компонентов, шторка, диалог); `/shots/` в `.gitignore`. Коммит `9e5a4f7`.
+  - Проверки: `CatalogTest` 5/5, 10 PNG. Осмотр нашёл и исправил: (1) `ValueRow` рвал адрес посреди числа на 320 dp — значение целиком уходит под название; (2) в широком окне содержимое растягивалось на всю ширину — `ScreenScaffold` ограничивает его 720 dp, как старый `DetailScreen`.
+- [x] C5. Task 4: `Section`, `Dest`, `NavState`. Готово: `DestTest` PASS.
+  - Сделано: `app/nav/Dest.kt` — четыре раздела, экраны с разделом-хозяином (`Profile`, `Server`, `Node`, `Give`, `SettingsPage` + корни), `NavState` в JSON с `type`-дискриминатором; битая строка или неизвестный экран → `null`. Коммит `0f29753`.
+  - Проверки: RED (нет типов) → GREEN 4/4 (корни, хозяева, туда-обратно, мусор); весь `:shared:jvmTest` зелёный.
+- [x] C6. Task 5: `AppNavigator`. Готово: `AppNavigatorTest` PASS.
+  - Сделано: `app/nav/AppNavigator.kt` — `open` (раздел-хозяин, без повторов подряд), `select` (повторное нажатие — к корню), `back` (с корня — на Главную, с Главной — `false`), `replaceTop`, `forget`, `snapshot`/`restore` (экраны с исчезнувшими объектами и всё выше них отбрасываются, стек всегда начинается с корня). Коммит `4635e3b`.
+  - Проверки: RED → GREEN 12/12; весь `:shared:jvmTest` зелёный.
+- [x] C7. Task 6: `AppNavHost`, `ListDetailSceneStrategy`. Готово: `ListDetailTest`, `AppNavHostTest` PASS (модели не очищаются при смене раздела, очищаются при «назад»).
+  - Сделано: `app/nav/AppNavHost.kt` — стек каждого раздела декорируется отдельно (`rememberDecoratedNavEntries` + декораторы сохранённого состояния и `ViewModelStore`), `NavDisplay` получает «Главная + текущий раздел»; `app/nav/ListDetail.kt` — метки «список/деталь» и сцена из двух панелей (≥ 900 dp), `LocalInPane`; `ScreenScaffold` не рисует «назад» в правой панели. Коммит `ea5b9ca`.
+  - Проверки: RED → GREEN: `ListDetailTest` 3/3, `AppNavHostTest` 3/3, новый `scaffoldHasNoBackArrowBesideItsList`. Мутация: если декорировать только видимые записи, `switchingSectionKeepsViewModels` падает. Весь `:shared:jvmTest` зелёный.
+  - Найдено: в `navigation3-ui 1.1.2` перегрузка `NavDisplay(entries, sceneStrategy=…)` скрыта — используется `sceneStrategies`.
+- [x] C8. Task 7: оболочка, меню ＋, `OpenFluxApp2`. Готово: `ShellTest` PASS, кадры оболочки осмотрены.
+  - Сделано: `app/shell/Shell.kt` (нижняя панель из пяти мест с ＋ по центру на телефоне; боковая колонка — значки < 1000 dp, с подписями шире; Ctrl+1…4, Ctrl+N, Ctrl+Enter; точка состояния подключения на «Главной»; `toggleConnection`), `AddMenu.kt` (шесть пунктов ＋, «Сканировать QR» только с камерой), `Placeholder.kt` (заглушки экранов), `OpenFluxApp2.kt` (тема из настроек, `CompositionLocal`-ы, проверка обновлений). Тестовый контейнер на фейках `jvmTest/.../app/TestContainer.kt`. Коммит `919f3a2`.
+  - Проверки: RED → GREEN `ShellTest` 3/3 (классы ширины, разделы и меню ＋, нижняя панель на 320 dp ×1,3); кадры `shell`, `shell-small`, `shell-wide`, `add-menu` осмотрены: на узком экране подписи уменьшаются, а не обрезаются. Весь `:shared:jvmTest` зелёный.
+  - Отложено на C10: системное «назад» отдано `NavDisplay`, отдельный `PlatformBackHandler` не ставился — проверить на эмуляторе.
+- [x] C9. Task 8: сохранение/восстановление стеков, поле `AppSettings.navState`. Готово: `NavStateTest` и `SettingsMigrationTest` PASS.
+  - Сделано: `AppSettings.navState` (новое поле в конце, по умолчанию `""`); `app/nav/RememberNavigator.kt` — `rememberSaveable` (Android, смерть процесса), запись в настройки на десктопе с задержкой 500 мс и восстановление при запуске, `aliveIn` (экраны удалённых профилей/забытых серверов не восстанавливаются), закрытие таких экранов на лету. `OpenFluxApp2` использует `rememberAppNavigator`. Коммит `fa957b3`.
+  - Проверки: `NavStateTest` 5/5 (в т. ч. файл настроек 2.14.x без поля загружается, значение переживает перезапуск репозитория); `SettingsMigrationTest` PASS; мутации: без закрытия экранов падает `deletedProfileClosesItsScreens`, без записи — `desktopSavesWhereThePersonIs`. Весь `:shared:jvmTest` зелёный.
+  - Для части 2 (D3): экран мастера нового сервера не должен быть `Dest.Server` с ещё неизвестным id — его закроет «забытый сервер». Нужен отдельный экран без `serverId`.
+- [!] C10. Task 9: запуск в приложениях (`OPENFLUX_UI=new`, отладочный значок Android). Готово: `:desktopApp:compileKotlin`, `:androidApp:assembleDebug` SUCCESS, ручная проверка на десктопе и эмуляторе.
+  - Сделано: десктоп — `OPENFLUX_UI=new` в `main.kt` (коммит `34036ba`); Android — ветка `nav3`, сабмодуль `shared` → `fa957b3`, отладочный значок «OpenFlux · новый» (`activity-alias NewUiActivity` в `src/debug`), переключатель в `MainActivity` (коммит `427fbf7`). `lifecycle` понижен до 2.10.0 в обоих каталогах.
+  - Проверки: `:desktopApp:compileKotlin`, `:androidApp:assembleDebug` — SUCCESS; весь `:shared:jvmTest` (50 наборов) зелёный на 2.10.0; десктоп запущен с `OPENFLUX_UI=new` — открылась новая оболочка, исключений в журнале нет.
+  - **Блокировка:** на эмуляторе `emulator-5554` стоит `io.openflux.client` 2.14.1 и свободно 418 МБ из 5,8 ГБ — установка отклонена (`INSUFFICIENT_STORAGE`; очистка кешей не помогла). Чтобы проверить predictive back и восстановление после смерти процесса, нужно освободить место (удалить приложение/данные на эмуляторе) — решение владельца. Не проверено: жест «назад» на устройстве, «Не сохранять действия».
+  - Найдено: `lifecycle 2.11.0` требует compileSdk 37 и AGP 9.1 — новая задача N5.
 
 ### D. Часть 2 — свой сервер — 0 % (план будет написан после C)
 
@@ -110,6 +137,7 @@
 - N1 (средний, → G7). Противоречие текстов: «Экспериментальное» в Настройках говорит, что JS-транспорты работают «в песочнице ядра», каталог транспортов — «без песочницы». Проверено по ядру: `transport/script/host_httpserver.go` — «no capability sandboxing». Верен каталог. Исправляется в новом интерфейсе; в старом не трогаем (spec 1a).
 - N2 (низкий, решение владельца). Ветка `wip/nav3-old-ui-migration` только локальная. По правилу production.md 5.4 долгоживущие wip-ветки пушатся в форк — нужно согласие владельца.
 - N3 (низкий, → H5). Три клона одного репозитория: `OpenFluxClientShared`, `OpenFluxAndroid/shared`, `OpenFluxDesktop/shared`. Работа идёт в `OpenFluxDesktop/shared`; Android получает её через `git fetch ../../OpenFluxDesktop/shared nav3` (C10). Перед H6 — свести клоны.
+- N5 (средний, перед H6). `lifecycle 2.11.0` требует compileSdk 37 и AGP 9.1; сейчас 2.10.0. Перейти на 2.11+ вместе с обновлением AGP/compileSdk приложений — отдельной задачей, не в этой ветке.
 - N4 (информация). Локальная ветка `main` в клоне `OpenFluxDesktop/shared` отстаёт от `818bb07` (база `nav3`); `git log main..nav3` показывает старую историю. Не мешает; при H6 сравнивать с `meepo/main`.
 
 ## Переносы, удаления, архитектурные изменения
@@ -129,10 +157,10 @@
 - 2026-10-12 — Дизайн по частям 1–5 утверждён; спецификация `03077a7`, `cafba14`. Решение владельца: интерфейс пишется заново, параллельно старому, своя дизайн-система в духе Amnezia; `node-install.sh` не меняется.
 - 2026-10-12 — Часть 0: незаконченная миграция старого UI сохранена в `wip/nav3-old-ui-migration` (`9ac5482`), `nav3` очищена. Базовые тесты `:shared:jvmTest` — exit 0.
 - 2026-10-12 — План части 1 написан; API Navigation 3 сверено по исходникам. Создан `TASKS.md`.
+- 2026-10-12 — Часть 1, C1–C9 выполнены с тестами (RED → GREEN, мутационные проверки ключевых свойств): тема, компоненты, каталог PNG, навигация на Navigation 3, оболочка, сохранение стеков. Коммиты `b00d783`…`fa957b3` (shared), `293fba4`, `34036ba` (OpenFluxDesktop), `427fbf7` (OpenFluxAndroid). C10: сборки и десктоп проверены, эмулятор заблокирован нехваткой места.
 
 ## Следующие действия
 
-1. C1: зависимости и `SmokeTest`.
-2. C2–C4: тема, компоненты, каталог PNG.
-3. C5–C9: навигация.
-4. C10: запуск в обоих приложениях, ручная проверка.
+1. Владелец: решить, как проверить Android (место на эмуляторе или другое устройство); пушить ли `wip/nav3-old-ui-migration` (N2).
+2. Итоговый обзор ветки части 1 (сделан самопроверкой; по желанию — свежий ревьюер).
+3. D1: план части 2 — свой сервер, мастер и редактор ноды.
