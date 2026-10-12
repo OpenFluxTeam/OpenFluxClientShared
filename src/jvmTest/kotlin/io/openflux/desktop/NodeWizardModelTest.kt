@@ -587,7 +587,7 @@ class NodeWizardModelTest {
         val b = KnownServer("b", 22, "root")
         assertEquals(listOf(b, a), NodeServers.remember(listOf(a), b))
         assertEquals(listOf(KnownServer("A", 22, "admin"), b), NodeServers.remember(listOf(a, b), KnownServer("A", 22, "admin")))
-        assertEquals(NodeServers.MAX_KNOWN, NodeServers.remember((1..9).map { KnownServer("h$it", 22, "u") }, a).size)
+        assertEquals(NodeServers.MAX_KNOWN, NodeServers.remember((1..60).map { KnownServer("h$it", 22, "u") }, a).size)
         assertNull(NodeServers.port("0"))
         assertNull(NodeServers.port("70000"))
         assertEquals(2222, NodeServers.port(" 2222 "))

@@ -32,8 +32,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /** An app over in-memory fakes, for the new UI's tests: nothing touches the network, the disk or a server. */
-fun testContainer(): AppContainer = AppContainer(
-    TestProfiles(), TestSettings(), TestConnection(), TestPlatform(), FakeShareLinkCodec(), NoServer(),
+fun testContainer(
+    node: NodeWizardService = NoServer(),
+    platform: TestPlatform = TestPlatform(),
+    connection: ConnectionService = TestConnection(),
+): AppContainer = AppContainer(
+    TestProfiles(), TestSettings(), connection, platform, FakeShareLinkCodec(), node,
     testAccounts(CoroutineScope(Dispatchers.Unconfined)),
 )
 
@@ -77,8 +81,8 @@ class TestPlatform : PlatformServices {
     override val fullTunnelSupported = false
     override val elevated = false
     override fun restartElevated() = false
-    override fun clipboardText(): String? = null
-    override fun setClipboardText(text: String) = Unit
+    override fun clipboardText(): String? = clipboard
+    override fun setClipboardText(text: String) { clipboard = text }
     override fun qrFromClipboardImage(): String? = null
     override fun qrFromFile(path: String): String? = null
     override suspend fun pickFile(title: String, extensions: List<String>): String? = null
@@ -86,7 +90,10 @@ class TestPlatform : PlatformServices {
     override fun qrMatrix(text: String): List<BooleanArray> = emptyList()
     override fun openUrl(url: String) = Unit
     override fun newSecret() = "00".repeat(32)
-    override fun now() = 1_000_000L
+    /** The clock; tests move it. */
+    var clock = 1_000_000L
+    var clipboard: String? = null
+    override fun now() = clock
     override suspend fun latestRelease(): String? = null
 }
 

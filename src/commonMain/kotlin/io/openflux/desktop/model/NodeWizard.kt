@@ -202,7 +202,8 @@ object NodeDocuments {
 }
 
 object NodeServers {
-    const val MAX_KNOWN = 5
+    /** The person's servers: the Servers list shows them all, so not just a few recent ones. */
+    const val MAX_KNOWN = 50
 
     /** The key [AppSettings.knownHostKeys] keeps a server's fingerprint under. */
     fun hostKeyId(host: String, port: Int) = "${host.trim().lowercase()}:$port"
