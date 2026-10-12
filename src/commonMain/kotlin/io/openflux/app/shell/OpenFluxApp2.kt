@@ -1,0 +1,90 @@
+package io.openflux.app.shell
+
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import io.openflux.app.components.LocalToaster2
+import io.openflux.app.components.ToastHost2
+import io.openflux.app.components.Toaster2
+import io.openflux.app.nav.AppNavHost
+import io.openflux.app.nav.AppNavigator
+import io.openflux.app.theme.AppTheme2
+import io.openflux.desktop.model.ThemeMode
+import io.openflux.desktop.service.AppContainer
+import io.openflux.desktop.service.LocalAppContainer
+import io.openflux.desktop.service.PlatformKind
+import io.openflux.desktop.ui.BrowserViews
+import io.openflux.desktop.ui.LocalBrowserViews
+import io.openflux.desktop.ui.LocalScrollbars
+import io.openflux.desktop.ui.LocalShortcuts
+import io.openflux.desktop.ui.LocalTouchUi
+import io.openflux.desktop.ui.NoBrowserViews
+import io.openflux.desktop.ui.Scrollbars
+import io.openflux.desktop.ui.Shortcuts
+
+/** Where the person is in the new interface; screens open others through it. */
+val LocalNavigator = staticCompositionLocalOf<AppNavigator> { error("AppNavigator is not provided") }
+
+/**
+ * The new interface (shared/docs/specs/2026-10-12-ui-redesign-design.md), with the same parameters as the old
+ * OpenFluxApp so an app switches with one line.
+ */
+@Composable
+fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shortcuts, browsers: BrowserViews = NoBrowserViews) {
+    val settings by container.settings.settings.collectAsState()
+    // The app's own updates; the script transports' updates only with the experimental features on.
+    LaunchedEffect(Unit) { container.updates.start() }
+    LaunchedEffect(settings.experimental) { if (settings.experimental) runCatching { container.scriptUpdater.autoCheck() } }
+    val dark = when (settings.theme) {
+        ThemeMode.System -> isSystemInDarkTheme()
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
+    val touch = container.platform.kind == PlatformKind.Android
+    val toaster = remember { Toaster2() }
+    val navigator = remember { AppNavigator() }
+    var addOpen by rememberSaveable { mutableStateOf(false) }
+    AppTheme2(dark, touch) {
+        CompositionLocalProvider(
+            LocalTouchUi provides touch,
+            LocalAppContainer provides container,
+            LocalScrollbars provides scrollbars,
+            LocalShortcuts provides shortcuts,
+            LocalBrowserViews provides browsers,
+            LocalToaster2 provides toaster,
+            LocalNavigator provides navigator,
+        ) {
+            Box(Modifier.fillMaxSize()) {
+                Shell(navigator, onAdd = { addOpen = true }) { wide ->
+                    AppNavHost(navigator, wide) { placeholderEntry(it, navigator) }
+                }
+                // Above the bottom bar on a phone.
+                ToastHost2(toaster, Modifier.align(Alignment.BottomCenter).padding(start = 16.dp, end = 16.dp, bottom = 88.dp))
+            }
+            if (addOpen) {
+                AddMenu(
+                    cameraScan = container.platform.cameraScanSupported,
+                    onChoice = { choice ->
+                        addOpen = false
+                        toaster.show("${choice.title}: появится в части 4")
+                    },
+                    onDismiss = { addOpen = false },
+                )
+            }
+        }
+    }
+}

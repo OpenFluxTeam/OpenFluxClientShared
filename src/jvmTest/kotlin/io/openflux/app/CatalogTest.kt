@@ -31,7 +31,11 @@ import io.openflux.app.components.TextButton2
 import io.openflux.app.components.Toggle
 import io.openflux.app.components.Tone
 import io.openflux.app.components.ValueRow
+import io.openflux.app.shell.AddMenu
+import io.openflux.app.shell.OpenFluxApp2
 import io.openflux.app.theme.AppTheme2
+import io.openflux.desktop.ui.NoScrollbars
+import io.openflux.desktop.ui.Shortcuts
 import kotlin.test.Test
 
 /** Every component in one screen, for review by eye (SHOTS=<dir>). */
@@ -88,4 +92,8 @@ class CatalogTest {
     @Test fun catalogWide() = Shots.render("components", Shots.WIDE) { ComponentsCatalog() }
     @Test fun sheetPhone() = Shots.render("sheet") { Sheet(onDismiss = {}, title = "Подключение") { RowItem("Амстердам", selected = true); RowItem("Франкфурт") } }
     @Test fun confirmDialog() = Shots.render("confirm") { ConfirmDialog("Удалить ноду?", "Нода of-abc будет удалена с сервера.", "Удалить", {}, {}, danger = true) }
+    @Test fun shellPhone() = Shots.render("shell") { OpenFluxApp2(testContainer(), NoScrollbars, Shortcuts()) }
+    @Test fun shellSmall() = Shots.render("shell", Shots.SMALL) { OpenFluxApp2(testContainer(), NoScrollbars, Shortcuts()) }
+    @Test fun shellWide() = Shots.render("shell", Shots.WIDE) { OpenFluxApp2(testContainer(), NoScrollbars, Shortcuts()) }
+    @Test fun addMenu() = Shots.render("add-menu") { AddMenu(cameraScan = true, onChoice = {}, onDismiss = {}) }
 }
