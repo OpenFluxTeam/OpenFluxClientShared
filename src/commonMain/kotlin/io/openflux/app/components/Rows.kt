@@ -77,11 +77,12 @@ fun RowItem(
     onLongClick: (() -> Unit)? = null,
     selected: Boolean = false,
     enabled: Boolean = true,
+    onDoubleClick: (() -> Unit)? = null,
 ) {
     val c = AppTheme2.colors
     val sp = AppTheme2.spacing
-    val clickable = if (onClick != null || onLongClick != null) {
-        Modifier.combinedClickable(enabled = enabled, onClick = onClick ?: {}, onLongClick = onLongClick)
+    val clickable = if (onClick != null || onLongClick != null || onDoubleClick != null) {
+        Modifier.combinedClickable(enabled = enabled, onClick = onClick ?: {}, onLongClick = onLongClick, onDoubleClick = onDoubleClick)
     } else Modifier
     val stripe = if (selected) Modifier.drawBehind { drawRect(c.accent, size = Size(3.dp.toPx(), size.height)) } else Modifier
     Row(

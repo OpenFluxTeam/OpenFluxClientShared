@@ -79,6 +79,7 @@ internal fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, short
             LocalToaster2 provides toaster,
             LocalNavigator provides navigator,
             LocalServerLink provides serverLink,
+            LocalOpenAdd provides { addOpen = true },
         ) {
             Box(Modifier.fillMaxSize()) {
                 Shell(navigator, onAdd = { addOpen = true }) { wide ->

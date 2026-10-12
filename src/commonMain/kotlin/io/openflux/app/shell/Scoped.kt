@@ -8,6 +8,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.openflux.app.servers.ServerLink
 import kotlinx.coroutines.CoroutineScope
 
+/** Opens the ＋ menu (spec 7.1) from any screen. */
+val LocalOpenAdd = staticCompositionLocalOf<() -> Unit> { {} }
+
 /** The app's one SSH link to the person's servers. */
 val LocalServerLink = staticCompositionLocalOf<ServerLink> { error("ServerLink is not provided") }
 

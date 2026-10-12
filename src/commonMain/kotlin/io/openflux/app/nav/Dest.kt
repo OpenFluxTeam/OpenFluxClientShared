@@ -61,6 +61,31 @@ sealed interface Dest {
         override val profileId get() = id
     }
 
+    /** A profile's fields; [id] null for a new one (spec 6.3). */
+    @Serializable @SerialName("profile-edit")
+    data class ProfileEdit(val id: String? = null) : Dest {
+        override val owner get() = Section.Home
+        override val profileId get() = id
+    }
+
+    /** A key, a link or a file to add (spec 7.1). */
+    @Serializable @SerialName("add-key")
+    data class AddKey(val text: String = "") : Dest {
+        override val owner get() = Section.Home
+    }
+
+    /** Signing in to the OpenFlux account (spec 8.1). */
+    @Serializable @SerialName("auth")
+    data object Auth : Dest {
+        override val owner get() = Section.Settings
+    }
+
+    /** The subscription (spec 8.2). */
+    @Serializable @SerialName("account")
+    data object Account : Dest {
+        override val owner get() = Section.Settings
+    }
+
     /** One of the person's servers (spec 5.2). */
     @Serializable @SerialName("server")
     data class Server(val id: String) : Dest {
