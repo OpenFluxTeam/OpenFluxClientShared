@@ -4,7 +4,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -31,6 +34,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.openflux.app.theme.AppTheme2
 
 @Composable
@@ -134,7 +138,16 @@ fun <T> Segmented(
                     inactiveContainerColor = c.surface, inactiveContentColor = c.text, inactiveBorderColor = c.border,
                     disabledInactiveContentColor = c.textMuted, disabledInactiveBorderColor = c.border,
                 ),
-            ) { Text(label(option), style = AppTheme2.type.body, maxLines = 1) }
+            ) {
+                // A narrow screen shrinks a long label rather than cutting it.
+                BasicText(
+                    label(option),
+                    style = AppTheme2.type.body.copy(color = LocalContentColor.current),
+                    maxLines = 1,
+                    softWrap = false,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = AppTheme2.type.body.fontSize, stepSize = 0.5.sp),
+                )
+            }
         }
     }
 }

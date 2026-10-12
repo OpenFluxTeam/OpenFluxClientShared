@@ -96,6 +96,7 @@ internal fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, short
                         when (choice) {
                             AddChoice.Server -> navigator.open(Dest.AddServer)
                             AddChoice.Hosting -> navigator.open(Dest.NewHosting)
+                            AddChoice.Manual -> navigator.open(Dest.ProfileEdit())
                             else -> toaster.show("${choice.title}: появится в части 4")
                         }
                     },

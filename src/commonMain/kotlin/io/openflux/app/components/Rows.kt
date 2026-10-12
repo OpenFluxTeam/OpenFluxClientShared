@@ -46,6 +46,9 @@ import androidx.compose.ui.unit.dp
 import io.openflux.app.theme.AppTheme2
 import io.openflux.app.theme.rowMinHeight
 
+/** The copy icon, the same everywhere. */
+val CopyIcon = Icons.Rounded.ContentCopy
+
 /** What a thing is doing, as a dot: off, busy, on, needs a look, broken. */
 enum class Status { Off, Busy, On, Warning, Error }
 

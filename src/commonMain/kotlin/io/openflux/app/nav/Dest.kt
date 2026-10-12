@@ -132,6 +132,12 @@ sealed interface Dest {
         override val owner get() = Section.Servers
     }
 
+    /** The catalogue of JS transports (spec 8.5). */
+    @Serializable @SerialName("scripts")
+    data object Scripts : Dest {
+        override val owner get() = Section.Settings
+    }
+
     /** The journal (spec 8.4). */
     @Serializable @SerialName("logs")
     data object Logs : Dest {

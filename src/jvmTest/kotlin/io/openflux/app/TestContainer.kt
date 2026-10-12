@@ -92,12 +92,15 @@ class TestPlatform : PlatformServices {
     override fun readTextFile(path: String, maxBytes: Int): String? = null
     override fun qrMatrix(text: String): List<BooleanArray> = emptyList()
     override fun openUrl(url: String) = Unit
-    override fun newSecret() = "00".repeat(32)
     /** The clock; tests move it. */
     var clock = 1_000_000L
     var clipboard: String? = null
     override fun now() = clock
     override suspend fun latestRelease(): String? = null
+    var rooms = "packed-rooms"
+    override suspend fun newCupsRooms(): String = rooms
+    var secrets = 0
+    override fun newSecret() = "%064x".format(++secrets)
 }
 
 /** No server in these tests: any call is a test defect. */
