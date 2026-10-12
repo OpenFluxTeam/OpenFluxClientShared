@@ -251,7 +251,7 @@ fun ProfileEditScreen(dest: Dest.ProfileEdit) {
                 Collapsible("Дополнительно") {
                     Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
                         if (!d.session && !d.stream) {
-                            Text("Кодек", style = AppTheme2.type.caption, color = AppTheme2.colors.textMuted)
+                            Text("Кодек", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary)
                             Segmented(Codec.entries, d.codec, { c -> m.edit { it.copy(codec = c) } }, label = { it.label })
                         }
                         if (d.session) {
@@ -356,7 +356,7 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
                     )
                 }
                 val networks = NetworkKind.entries.filter { !android || it != NetworkKind.Ethernet }
-                Text("Сеть", style = AppTheme2.type.caption, color = AppTheme2.colors.textMuted)
+                Text("Сеть", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
                     for (n in networks) io.openflux.app.components.Chip(n.label, c.network == n, { m.editTransport(index) { it.copy(network = n) } })
                 }

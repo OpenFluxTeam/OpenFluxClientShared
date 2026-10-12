@@ -40,7 +40,7 @@ class ShellTest {
     fun sectionsAndAddMenu() = runComposeUiTest {
         setContent { OpenFluxApp2(testContainer(), NoScrollbars, Shortcuts()) }
         onNodeWithText("Поделиться").performClick()
-        onNodeWithText("Экран появится в следующей части").assertIsDisplayed()
+        onNodeWithText("Пока нечем делиться", substring = true).assertIsDisplayed()
         onNodeWithContentDescription("Добавить").performClick()
         onNodeWithText("Свой сервер").assertIsDisplayed()
         onNodeWithText("Ключ, ссылка или файл").assertIsDisplayed()

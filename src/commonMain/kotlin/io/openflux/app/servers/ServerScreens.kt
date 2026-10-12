@@ -153,7 +153,7 @@ fun LoginFields(form: LoginForm, showAddress: Boolean = true) {
         Collapsible("Дополнительно") {
             Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
                 SecretField(form.sudo, { form.sudo = it }, "Пароль sudo, если логин не root")
-                Text("Ядро на сервере", style = AppTheme2.type.caption, color = AppTheme2.colors.textMuted)
+                Text("Ядро на сервере", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary)
                 Segmented(NodeCoreSource.entries, form.core, { form.core = it }, label = { it.label })
             }
         }

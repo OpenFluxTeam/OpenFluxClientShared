@@ -93,11 +93,17 @@ internal fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, short
         ) {
             Box(Modifier.fillMaxSize()) {
                 Shell(navigator, onAdd = { addOpen = true }) { wide ->
-                    AppNavHost(navigator, wide, nothingChosen = { NothingChosen(it) }) { appEntry(it, navigator) }
+                    androidx.compose.foundation.layout.Column {
+                        UpdateLine()
+                        AppNavHost(navigator, wide, androidx.compose.ui.Modifier.weight(1f), nothingChosen = { NothingChosen(it) }) { appEntry(it, navigator) }
+                    }
                 }
                 // Above the bottom bar on a phone.
                 ToastHost2(toaster, Modifier.align(Alignment.BottomCenter).padding(start = 16.dp, end = 16.dp, bottom = 88.dp))
             }
+            CaptchaOverlay()
+            SignInOverlay()
+            ScriptSettingsOverlay()
             if (addOpen) {
                 AddMenu(
                     cameraScan = container.platform.cameraScanSupported,

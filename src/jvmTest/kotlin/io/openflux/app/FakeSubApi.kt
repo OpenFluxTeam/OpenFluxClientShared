@@ -26,7 +26,8 @@ class FakeSubApi : SubscriptionApi {
         return AuthResult("token-$tokens", "dev-$tokens", "RECOVERY-KEY", account(login))
     }
 
-    override suspend fun plans(ep: ServiceEndpoint) = PlansResult()
+    var plans = PlansResult()
+    override suspend fun plans(ep: ServiceEndpoint) = plans
     override suspend fun register(ep: ServiceEndpoint, login: String, password: String, deviceName: String): AuthResult {
         calls += "register:$login|$deviceName"
         return auth(login)

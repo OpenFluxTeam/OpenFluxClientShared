@@ -187,6 +187,14 @@ private class Seams {
     var ys: List<Float> = emptyList()
 }
 
+/** A group with a heading whose content is not rows: a switcher, a field, a line of text, padded like rows. */
+@Composable
+fun Group(title: String?, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Section(title, modifier) {
+        Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s), content = content)
+    }
+}
+
 /** A heading row that opens and closes what is under it: the rare settings ("Дополнительно"). */
 @Composable
 fun Collapsible(title: String, modifier: Modifier = Modifier, initiallyOpen: Boolean = false, content: @Composable ColumnScope.() -> Unit) {

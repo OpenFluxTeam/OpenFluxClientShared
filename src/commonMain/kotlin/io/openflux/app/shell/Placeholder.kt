@@ -41,6 +41,7 @@ fun NothingChosen(section: io.openflux.app.nav.Section) {
         Text(
             when (section) {
                 io.openflux.app.nav.Section.Servers -> "Выберите сервер слева"
+                io.openflux.app.nav.Section.Settings -> "Выберите раздел слева"
                 else -> "Выберите слева"
             },
             style = AppTheme2.type.body,
