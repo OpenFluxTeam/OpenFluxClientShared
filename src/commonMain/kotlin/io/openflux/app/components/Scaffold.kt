@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -21,13 +22,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.openflux.app.theme.AppTheme2
 import io.openflux.desktop.ui.LocalScrollbars
 
 /**
  * The frame of a screen: the back arrow, the title and the actions, then the page (scrolling when [scroll]),
- * and [bottomBar] pinned under it (the "Изменено · Применить" bar of an editor).
+ * and [bottomBar] pinned under it (the "Изменено · Применить" bar of an editor). Lines longer than [maxWidth]
+ * are hard to read, so a wide window leaves the rest empty.
  */
 @Composable
 fun ScreenScaffold(
@@ -37,6 +40,7 @@ fun ScreenScaffold(
     actions: @Composable RowScope.() -> Unit = {},
     bottomBar: (@Composable () -> Unit)? = null,
     scroll: Boolean = true,
+    maxWidth: Dp = 720.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val sp = AppTheme2.spacing
@@ -64,14 +68,12 @@ fun ScreenScaffold(
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (scroll) {
                 val state = rememberScrollState()
-                Column(
-                    Modifier.fillMaxSize().verticalScroll(state).padding(horizontal = sp.page, vertical = sp.s),
-                    verticalArrangement = Arrangement.spacedBy(sp.l),
-                    content = content,
-                )
+                Column(Modifier.fillMaxSize().verticalScroll(state).padding(horizontal = sp.page, vertical = sp.s)) {
+                    Column(Modifier.widthIn(max = maxWidth), verticalArrangement = Arrangement.spacedBy(sp.l), content = content)
+                }
                 LocalScrollbars.current.Vertical(state, Modifier.align(Alignment.CenterEnd))
             } else {
-                Column(Modifier.fillMaxSize().padding(horizontal = sp.page), content = content)
+                Column(Modifier.fillMaxSize().widthIn(max = maxWidth).padding(horizontal = sp.page), content = content)
             }
         }
         if (bottomBar != null) bottomBar()

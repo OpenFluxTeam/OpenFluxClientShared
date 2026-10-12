@@ -6,6 +6,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -114,7 +116,8 @@ fun RowItem(
     }
 }
 
-/** "Name · value", the value copyable: how facts are shown instead of cards. */
+/** "Name · value", the value copyable: how facts are shown instead of cards. A value too long for the line goes under the name whole. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ValueRow(title: String, value: String, modifier: Modifier = Modifier, mono: Boolean = false, onCopy: (() -> Unit)? = null) {
     val c = AppTheme2.colors
@@ -122,18 +125,15 @@ fun ValueRow(title: String, value: String, modifier: Modifier = Modifier, mono: 
     Row(
         modifier.fillMaxWidth().heightIn(min = rowMinHeight()).padding(start = sp.l, end = if (onCopy != null) sp.xs else sp.l),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(sp.m),
     ) {
-        Text(title, style = AppTheme2.type.body, color = c.textSecondary, maxLines = 1)
-        Text(
-            value,
-            modifier = Modifier.weight(1f),
-            style = if (mono) AppTheme2.type.mono else AppTheme2.type.body,
-            color = c.text,
-            textAlign = TextAlign.End,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        FlowRow(
+            Modifier.weight(1f).padding(vertical = sp.s),
+            horizontalArrangement = Arrangement.spacedBy(sp.m, Alignment.End),
+            itemVerticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, Modifier.weight(1f), style = AppTheme2.type.body, color = c.textSecondary, maxLines = 1)
+            Text(value, style = if (mono) AppTheme2.type.mono else AppTheme2.type.body, color = c.text)
+        }
         if (onCopy != null) IconButton2(Icons.Rounded.ContentCopy, "Копировать", onCopy)
     }
 }
