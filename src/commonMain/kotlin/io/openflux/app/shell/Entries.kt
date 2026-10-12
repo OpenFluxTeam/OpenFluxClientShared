@@ -7,10 +7,13 @@ import io.openflux.app.nav.ListDetail
 import io.openflux.app.nav.Section
 import io.openflux.app.nav.destEntry
 import io.openflux.app.servers.AddServerScreen
+import io.openflux.app.servers.HostingScreen
+import io.openflux.app.servers.NewHostingScreen
 import io.openflux.app.servers.NewNodeScreen
 import io.openflux.app.servers.NodeScreen
 import io.openflux.app.servers.ServerScreen
 import io.openflux.app.servers.ServersRoot
+import io.openflux.app.servers.ThisDeviceScreen
 
 /** The one place that says which screen shows which destination, and which are lists and details. */
 fun appEntry(dest: Dest, navigator: AppNavigator): NavEntry<Dest> = when (dest) {
@@ -19,5 +22,8 @@ fun appEntry(dest: Dest, navigator: AppNavigator): NavEntry<Dest> = when (dest) 
     is Dest.Server -> destEntry(dest, ListDetail.detail(Section.Servers)) { ServerScreen(dest) }
     is Dest.Node -> destEntry(dest, ListDetail.detail(Section.Servers)) { NodeScreen(dest) }
     is Dest.NewNode -> destEntry(dest) { NewNodeScreen(dest) }
+    Dest.NewHosting -> destEntry(dest) { NewHostingScreen() }
+    is Dest.Hosting -> destEntry(dest, ListDetail.detail(Section.Servers)) { HostingScreen(dest) }
+    Dest.ThisDevice -> destEntry(dest, ListDetail.detail(Section.Servers)) { ThisDeviceScreen() }
     else -> placeholderEntry(dest, navigator)
 }

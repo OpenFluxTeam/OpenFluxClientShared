@@ -21,6 +21,7 @@ import io.openflux.desktop.service.AppContainer
 import io.openflux.desktop.model.CaptchaPrompt
 import io.openflux.desktop.service.ConnectionService
 import io.openflux.desktop.service.NodeWizardService
+import io.openflux.desktop.service.PhpHostingService
 import io.openflux.desktop.service.PlatformServices
 import io.openflux.desktop.service.ProfileRepository
 import io.openflux.desktop.service.SettingsRepository
@@ -36,9 +37,11 @@ fun testContainer(
     node: NodeWizardService = NoServer(),
     platform: TestPlatform = TestPlatform(),
     connection: ConnectionService = TestConnection(),
+    hosting: PhpHostingService = PhpHostingService(),
 ): AppContainer = AppContainer(
     TestProfiles(), TestSettings(), connection, platform, FakeShareLinkCodec(), node,
     testAccounts(CoroutineScope(Dispatchers.Unconfined)),
+    phpHosting = hosting,
 )
 
 class TestSettings : SettingsRepository {

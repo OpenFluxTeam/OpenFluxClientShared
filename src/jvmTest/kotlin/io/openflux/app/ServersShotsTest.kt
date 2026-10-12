@@ -60,4 +60,30 @@ class ServersShotsTest {
     @Test fun nodeSmall() = shot("node", world(), Dest.Node(id, "of-k2m9"), frame = Shots.SMALL)
     @Test fun nodeFailed() = shot("node-failed", world(), Dest.Node(id, "of-p7q1"))
     @Test fun newNode() = shot("node-new", world(), Dest.NewNode(id))
+
+    private fun plain(name: String, c: AppContainer, vararg stack: Dest) {
+        c.settings.update { it.copy(navState = AppNavigator().apply { stack.forEach { open(it) } }.snapshot().encode()) }
+        Shots.render(name) { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+    }
+
+    @Test fun newHosting() = plain("hosting-new", testContainer(), Dest.NewHosting)
+
+    @Test fun hostingNode() {
+        val h = FakeHosting().apply { running = true }
+        val c = testContainer(hosting = h)
+        c.profiles.upsert(
+            io.openflux.desktop.model.Profile(
+                id = "h1", name = "Хостинг · me.example", transport = io.openflux.desktop.model.TransportType.CUPSONLINE,
+                value = "https://cups.online/r1", stream = true, source = io.openflux.desktop.model.ProfileSource.Node,
+                phpNode = io.openflux.desktop.model.PhpNodeRef("https://me.example", "tok12345abcd"),
+            ),
+        )
+        plain("hosting-node", c, Dest.Hosting("h1"))
+    }
+
+    @Test fun thisDevice() {
+        val c = testContainer()
+        c.profiles.upsert(io.openflux.desktop.model.Profile(id = "a", name = "Нода 203.0.113.7", secret = "s".repeat(64)))
+        plain("this-device", c, Dest.ThisDevice)
+    }
 }

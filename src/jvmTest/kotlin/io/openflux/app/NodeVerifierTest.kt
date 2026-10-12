@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 
 /** A connection the test steers: what connect() leads to, where traffic leaves, which carrier is live. */
 class ScriptedConnection : ConnectionService {
-    var onConnect: (Profile) -> ConnectionState = { ConnectionState.Connected(it, ConnectionMode.Client, 0) }
+    var onConnect: (Profile, ConnectionMode?) -> ConnectionState = { p, mode -> ConnectionState.Connected(p, mode ?: ConnectionMode.Client, 0) }
     var address: () -> ExitAddress = { ExitAddress.Known("203.0.113.7") }
     var refreshes = 0
     override val state = MutableStateFlow<ConnectionState>(ConnectionState.Idle)
@@ -37,7 +37,7 @@ class ScriptedConnection : ConnectionService {
     override val socksAddress: StateFlow<String?> = MutableStateFlow(null)
     override val captchaPage: StateFlow<BrowserPage?> = MutableStateFlow(null)
     override fun connect(profile: Profile, mode: ConnectionMode?) {
-        state.value = onConnect(profile)
+        state.value = onConnect(profile, mode)
         if (state.value is ConnectionState.Connected) exitAddress.value = address()
     }
     override fun disconnect() { state.value = ConnectionState.Idle }
@@ -88,7 +88,7 @@ class NodeVerifierTest {
 
     @Test
     fun aFailedConnectionSaysWhy() = runTest {
-        conn.onConnect = { ConnectionState.Failed(it, "нода не ответила") }
+        conn.onConnect = { p, _ -> ConnectionState.Failed(p, "нода не ответила") }
         val e = assertFailsWith<NodeWizardException> { verifier().verify(profile, setOf("203.0.113.7"), null) }
         assertEquals("нода не ответила", e.message)
     }
