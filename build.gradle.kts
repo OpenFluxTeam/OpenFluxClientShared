@@ -34,6 +34,9 @@ kotlin {
             implementation(libs.compose.components.resources)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.navigation3.ui)
+            implementation(libs.lifecycle.viewmodel.compose)
+            implementation(libs.lifecycle.viewmodel.navigation3)
             api(libs.voyager.navigator)
             api(libs.voyager.tabNavigator)
             api(libs.voyager.screenmodel)
@@ -51,6 +54,8 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlin.testJunit)
             implementation(libs.kotlinx.coroutines.test)
+            implementation(compose.desktop.currentOs)
+            implementation(libs.compose.uiTest)
         }
     }
 }
