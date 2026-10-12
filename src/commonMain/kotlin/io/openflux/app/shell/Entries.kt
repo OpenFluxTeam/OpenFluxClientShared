@@ -1,6 +1,9 @@
 package io.openflux.app.shell
 
 import androidx.navigation3.runtime.NavEntry
+import io.openflux.app.add.AddKeyScreen
+import io.openflux.app.add.GiveScreen
+import io.openflux.app.add.ShareRoot
 import io.openflux.app.home.HomeRoot
 import io.openflux.app.nav.AppNavigator
 import io.openflux.app.profiles.ProfileEditScreen
@@ -23,6 +26,10 @@ fun appEntry(dest: Dest, navigator: AppNavigator): NavEntry<Dest> = when (dest) 
     Dest.Home -> destEntry(dest) { HomeRoot() }
     is Dest.Profile -> destEntry(dest) { ProfileScreen(dest) }
     is Dest.ProfileEdit -> destEntry(dest) { ProfileEditScreen(dest) }
+    Dest.AddKey -> destEntry(dest) { AddKeyScreen() }
+    Dest.Scan -> destEntry(dest) { AddKeyScreen(scan = true) }
+    Dest.Share -> destEntry(dest) { ShareRoot() }
+    is Dest.Give -> destEntry(dest) { GiveScreen(dest) }
     Dest.Servers -> destEntry(dest, ListDetail.list(Section.Servers)) { ServersRoot(selected = navigator.stack(Section.Servers).last()) }
     Dest.AddServer -> destEntry(dest) { AddServerScreen() }
     is Dest.Server -> destEntry(dest, ListDetail.detail(Section.Servers)) { ServerScreen(dest) }

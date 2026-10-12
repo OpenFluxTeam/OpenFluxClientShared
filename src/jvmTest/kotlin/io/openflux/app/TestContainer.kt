@@ -22,6 +22,7 @@ import io.openflux.desktop.model.CaptchaPrompt
 import io.openflux.desktop.service.ConnectionService
 import io.openflux.desktop.service.NodeWizardService
 import io.openflux.desktop.service.PhpHostingService
+import io.openflux.desktop.service.SubscriptionApi
 import io.openflux.desktop.service.PlatformServices
 import io.openflux.desktop.service.ProfileRepository
 import io.openflux.desktop.service.SettingsRepository
@@ -38,10 +39,12 @@ fun testContainer(
     platform: TestPlatform = TestPlatform(),
     connection: ConnectionService = TestConnection(),
     hosting: PhpHostingService = PhpHostingService(),
+    subscriptions: SubscriptionApi = io.openflux.desktop.service.NoSubscriptionApi,
 ): AppContainer = AppContainer(
     TestProfiles(), TestSettings(), connection, platform, FakeShareLinkCodec(), node,
     testAccounts(CoroutineScope(Dispatchers.Unconfined)),
     phpHosting = hosting,
+    subscriptionApi = subscriptions,
 )
 
 class TestSettings : SettingsRepository {

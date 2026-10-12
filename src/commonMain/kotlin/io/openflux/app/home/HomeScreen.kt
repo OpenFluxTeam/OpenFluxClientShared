@@ -171,7 +171,7 @@ private fun StartPanel(hasSubscription: Boolean) {
     Text("Все способы — под кнопкой ＋", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
     Section(null) {
         RowItem("Аккаунт OpenFlux", subtitle = "Войти или создать: локации появятся сами", onClick = { navigator.open(Dest.Auth) })
-        RowItem("Ключ или ссылка", subtitle = "От друга или из сервиса", onClick = { navigator.open(Dest.AddKey()) })
+        RowItem("Ключ или ссылка", subtitle = "От друга или из сервиса", onClick = { navigator.open(Dest.AddKey) })
         RowItem("Свой сервер", subtitle = "VDS по SSH: нода поставится сама", onClick = { navigator.open(Dest.AddServer) })
     }
 }

@@ -68,9 +68,18 @@ sealed interface Dest {
         override val profileId get() = id
     }
 
-    /** A key, a link or a file to add (spec 7.1). */
+    /**
+     * A key, a link or a file to add (spec 7.1). No text here: the stacks are saved to the settings file, and a key
+     * or a link carries a secret. Text from outside comes through AppContainer.pendingKey, in memory.
+     */
     @Serializable @SerialName("add-key")
-    data class AddKey(val text: String = "") : Dest {
+    data object AddKey : Dest {
+        override val owner get() = Section.Home
+    }
+
+    /** The same as [AddKey], starting with the camera (spec 7.1, "Сканировать QR"). */
+    @Serializable @SerialName("scan")
+    data object Scan : Dest {
         override val owner get() = Section.Home
     }
 

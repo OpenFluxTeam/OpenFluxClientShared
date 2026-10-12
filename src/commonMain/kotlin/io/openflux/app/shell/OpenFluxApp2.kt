@@ -69,6 +69,16 @@ internal fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, short
     val serverLink = remember(container) { link ?: ServerLink(container) }
     DisposableEffect(serverLink) { onDispose { serverLink.close() } }
     var addOpen by rememberSaveable { mutableStateOf(false) }
+    // A key or a profile link opened from outside (a scanned code, a chat) goes to "Ключ, ссылка или файл".
+    LaunchedEffect(container) {
+        container.incomingLink.collect { link ->
+            if (link != null) {
+                container.incomingLink.value = null
+                container.pendingKey.value = link
+                navigator.open(Dest.AddKey)
+            }
+        }
+    }
     AppTheme2(dark, touch) {
         CompositionLocalProvider(
             LocalTouchUi provides touch,
@@ -97,7 +107,9 @@ internal fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, short
                             AddChoice.Server -> navigator.open(Dest.AddServer)
                             AddChoice.Hosting -> navigator.open(Dest.NewHosting)
                             AddChoice.Manual -> navigator.open(Dest.ProfileEdit())
-                            else -> toaster.show("${choice.title}: появится в части 4")
+                            AddChoice.Key -> navigator.open(Dest.AddKey)
+                            AddChoice.Scan -> navigator.open(Dest.Scan)
+                            AddChoice.Account -> navigator.open(Dest.Auth)
                         }
                     },
                     onDismiss = { addOpen = false },
