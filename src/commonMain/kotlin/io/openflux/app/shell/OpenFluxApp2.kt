@@ -23,6 +23,7 @@ import io.openflux.app.components.ToastHost2
 import io.openflux.app.components.Toaster2
 import io.openflux.app.nav.AppNavHost
 import io.openflux.app.nav.AppNavigator
+import io.openflux.app.nav.Dest
 import io.openflux.app.nav.rememberAppNavigator
 import io.openflux.app.servers.ServerLink
 import io.openflux.app.theme.AppTheme2
@@ -47,7 +48,12 @@ val LocalNavigator = staticCompositionLocalOf<AppNavigator> { error("AppNavigato
  * OpenFluxApp so an app switches with one line.
  */
 @Composable
-fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shortcuts, browsers: BrowserViews = NoBrowserViews) {
+fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shortcuts, browsers: BrowserViews = NoBrowserViews) =
+    OpenFluxApp2(container, scrollbars, shortcuts, browsers, link = null)
+
+/** [link]: a link already connected to servers (tests and the screen catalogue); null makes the app's own. */
+@Composable
+internal fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shortcuts, browsers: BrowserViews, link: ServerLink?) {
     val settings by container.settings.settings.collectAsState()
     // The app's own updates; the script transports' updates only with the experimental features on.
     LaunchedEffect(Unit) { container.updates.start() }
@@ -60,7 +66,7 @@ fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, shortcuts: Sho
     val touch = container.platform.kind == PlatformKind.Android
     val toaster = remember { Toaster2() }
     val navigator = rememberAppNavigator(container)
-    val serverLink = remember(container) { ServerLink(container) }
+    val serverLink = remember(container) { link ?: ServerLink(container) }
     DisposableEffect(serverLink) { onDispose { serverLink.close() } }
     var addOpen by rememberSaveable { mutableStateOf(false) }
     AppTheme2(dark, touch) {
@@ -76,7 +82,7 @@ fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, shortcuts: Sho
         ) {
             Box(Modifier.fillMaxSize()) {
                 Shell(navigator, onAdd = { addOpen = true }) { wide ->
-                    AppNavHost(navigator, wide) { placeholderEntry(it, navigator) }
+                    AppNavHost(navigator, wide, nothingChosen = { NothingChosen(it) }) { appEntry(it, navigator) }
                 }
                 // Above the bottom bar on a phone.
                 ToastHost2(toaster, Modifier.align(Alignment.BottomCenter).padding(start = 16.dp, end = 16.dp, bottom = 88.dp))
@@ -86,7 +92,11 @@ fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, shortcuts: Sho
                     cameraScan = container.platform.cameraScanSupported,
                     onChoice = { choice ->
                         addOpen = false
-                        toaster.show("${choice.title}: появится в части 4")
+                        when (choice) {
+                            AddChoice.Server -> navigator.open(Dest.AddServer)
+                            AddChoice.Hosting -> navigator.open(Dest.NewHosting)
+                            else -> toaster.show("${choice.title}: появится в части 4")
+                        }
                     },
                     onDismiss = { addOpen = false },
                 )

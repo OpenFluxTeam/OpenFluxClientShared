@@ -83,6 +83,8 @@ class NodeEditorModel(
     private var job: Job? = null
 
     private val host: String get() = hostOf(serverId)
+    /** The server's address, for the node's "address:port". */
+    val serverHost: String get() = host
 
     val changes: Int get() = original?.let { draft.changes(it) } ?: 0
     /** Why "Применить" cannot run now; null when it can. */

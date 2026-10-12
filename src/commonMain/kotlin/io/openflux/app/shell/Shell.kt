@@ -181,26 +181,27 @@ private fun connectionStatus(): Status? {
 private fun BottomBar(navigator: AppNavigator, onAdd: () -> Unit) {
     val c = AppTheme2.colors
     val status = connectionStatus()
-    Row(
-        Modifier.fillMaxWidth().background(c.surface).padding(vertical = AppTheme2.spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val (left, right) = Section.entries.chunked(2).let { it[0] to it[1] }
-        for (s in left) BarItem(s, navigator, if (s == Section.Home) status else null, Modifier.weight(1f))
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { AddButton(onAdd) }
-        for (s in right) BarItem(s, navigator, null, Modifier.weight(1f))
+    BoxWithConstraints(Modifier.fillMaxWidth().background(c.surface)) {
+        // Too narrow for every label at this text size: only the chosen place keeps its label.
+        val allLabels = maxWidth / 5 >= 76.dp * LocalDensity.current.fontScale
+        Row(Modifier.fillMaxWidth().padding(vertical = AppTheme2.spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+            val (left, right) = Section.entries.chunked(2).let { it[0] to it[1] }
+            for (s in left) BarItem(s, navigator, if (s == Section.Home) status else null, allLabels, Modifier.weight(1f))
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { AddButton(onAdd) }
+            for (s in right) BarItem(s, navigator, null, allLabels, Modifier.weight(1f))
+        }
     }
 }
 
 @Composable
-private fun BarItem(section: Section, navigator: AppNavigator, status: Status?, modifier: Modifier) {
+private fun BarItem(section: Section, navigator: AppNavigator, status: Status?, label: Boolean, modifier: Modifier) {
     val c = AppTheme2.colors
     val selected = navigator.section == section
     val color = if (selected) c.accent else c.textSecondary
     Column(
         modifier.heightIn(min = 56.dp).clip(RoundedCornerShape(AppTheme2.shapes.medium))
             .clickable(role = Role.Tab) { navigator.select(section) }
-            .semantics { this.selected = selected }
+            .semantics { this.selected = selected; contentDescription = section.title }
             .padding(horizontal = 2.dp, vertical = AppTheme2.spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -209,16 +210,18 @@ private fun BarItem(section: Section, navigator: AppNavigator, status: Status?, 
             Icon(section.icon, contentDescription = null, tint = color)
             if (status != null) StatusDot(status, Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-1).dp))
         }
-        Spacer(Modifier.height(2.dp))
-        // A narrow phone with large text shrinks the label rather than cutting it.
-        BasicText(
-            section.title,
-            style = AppTheme2.type.caption.copy(color = color),
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Clip,
-            autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = AppTheme2.type.caption.fontSize, stepSize = 0.5.sp),
-        )
+        if (label || selected) {
+            Spacer(Modifier.height(2.dp))
+            // The chosen place's label alone may still be long on a tiny screen: it shrinks rather than gets cut.
+            BasicText(
+                section.title,
+                style = AppTheme2.type.caption.copy(color = color),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = AppTheme2.type.caption.fontSize, stepSize = 0.5.sp),
+            )
+        }
     }
 }
 

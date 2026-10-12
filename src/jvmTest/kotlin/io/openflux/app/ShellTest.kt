@@ -9,6 +9,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -38,7 +39,7 @@ class ShellTest {
     @Test
     fun sectionsAndAddMenu() = runComposeUiTest {
         setContent { OpenFluxApp2(testContainer(), NoScrollbars, Shortcuts()) }
-        onNodeWithText("Серверы").performClick()
+        onNodeWithText("Поделиться").performClick()
         onNodeWithText("Экран появится в следующей части").assertIsDisplayed()
         onNodeWithContentDescription("Добавить").performClick()
         onNodeWithText("Свой сервер").assertIsDisplayed()
@@ -54,6 +55,8 @@ class ShellTest {
             }
         }
         val tab = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)
-        for (label in listOf("Главная", "Серверы", "Поделиться", "Настройки")) onNode(hasText(label) and tab).assertIsDisplayed()
+        // Every place is there and named for a screen reader, even where only the chosen one shows its label.
+        for (label in listOf("Главная", "Серверы", "Поделиться", "Настройки")) onNode(hasContentDescription(label) and tab).assertIsDisplayed()
+        onNode(hasText("Главная") and tab).assertIsDisplayed()
     }
 }

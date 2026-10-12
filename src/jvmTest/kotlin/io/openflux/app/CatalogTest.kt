@@ -96,4 +96,12 @@ class CatalogTest {
     @Test fun shellSmall() = Shots.render("shell", Shots.SMALL) { OpenFluxApp2(testContainer(), NoScrollbars, Shortcuts()) }
     @Test fun shellWide() = Shots.render("shell", Shots.WIDE) { OpenFluxApp2(testContainer(), NoScrollbars, Shortcuts()) }
     @Test fun addMenu() = Shots.render("add-menu") { AddMenu(cameraScan = true, onChoice = {}, onDismiss = {}) }
+    @Test fun changesBar() = Shots.render("changes-bar", Shots.SMALL) {
+        androidx.compose.foundation.layout.Column {
+            io.openflux.app.components.ChangesBar(2, null, null, null, {}, {})
+            io.openflux.app.components.ChangesBar(1, null, "Нода должна сохранить хотя бы один транспорт кроме прямого", null, {}, {})
+            io.openflux.app.components.ChangesBar(1, null, null, "sudo не принял пароль", {}, {})
+            io.openflux.app.components.ChangesBar(1, "Применяю на сервере…", null, null, {}, {})
+        }
+    }
 }

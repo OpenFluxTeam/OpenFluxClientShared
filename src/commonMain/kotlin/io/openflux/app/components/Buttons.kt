@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,10 +29,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.openflux.app.theme.AppTheme2
 import io.openflux.app.theme.MinTouch
 
-private val ButtonPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+private val ButtonPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
 
 @Composable
 private fun ButtonLabel(text: String, leading: ImageVector?) {
@@ -37,7 +41,14 @@ private fun ButtonLabel(text: String, leading: ImageVector?) {
         Icon(leading, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(AppTheme2.spacing.s))
     }
-    Text(text, style = AppTheme2.type.title, maxLines = 1)
+    // A narrow button (two side by side on a small phone) shrinks its label rather than cutting it.
+    BasicText(
+        text,
+        style = AppTheme2.type.title.copy(color = LocalContentColor.current),
+        maxLines = 1,
+        softWrap = false,
+        autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = AppTheme2.type.title.fontSize, stepSize = 0.5.sp),
+    )
 }
 
 /** The one main action of a screen. */

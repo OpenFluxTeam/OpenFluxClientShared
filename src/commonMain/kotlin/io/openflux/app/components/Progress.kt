@@ -57,10 +57,10 @@ fun ChangesBar(
         val line = error ?: problem
         if (line != null) Text(line, style = AppTheme2.type.bodySmall, color = if (error != null) c.danger else c.warning)
         if (changes > 0) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(sp.s)) {
-                Text("Изменено: $changes", Modifier.weight(1f), style = AppTheme2.type.body, color = c.text)
-                SecondaryButton("Отменить", onDiscard)
-                PrimaryButton(applyLabel, onApply, enabled = problem == null)
+            Text("Изменено: $changes", style = AppTheme2.type.body, color = c.text, maxLines = 1)
+            Row(horizontalArrangement = Arrangement.spacedBy(sp.s)) {
+                SecondaryButton("Отменить", onDiscard, Modifier.weight(1f))
+                PrimaryButton(applyLabel, onApply, Modifier.weight(1f), enabled = problem == null)
             }
         }
     }
