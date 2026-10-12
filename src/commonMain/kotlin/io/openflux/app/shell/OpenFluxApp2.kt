@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -23,6 +24,7 @@ import io.openflux.app.components.Toaster2
 import io.openflux.app.nav.AppNavHost
 import io.openflux.app.nav.AppNavigator
 import io.openflux.app.nav.rememberAppNavigator
+import io.openflux.app.servers.ServerLink
 import io.openflux.app.theme.AppTheme2
 import io.openflux.desktop.model.ThemeMode
 import io.openflux.desktop.service.AppContainer
@@ -58,6 +60,8 @@ fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, shortcuts: Sho
     val touch = container.platform.kind == PlatformKind.Android
     val toaster = remember { Toaster2() }
     val navigator = rememberAppNavigator(container)
+    val serverLink = remember(container) { ServerLink(container) }
+    DisposableEffect(serverLink) { onDispose { serverLink.close() } }
     var addOpen by rememberSaveable { mutableStateOf(false) }
     AppTheme2(dark, touch) {
         CompositionLocalProvider(
@@ -68,6 +72,7 @@ fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, shortcuts: Sho
             LocalBrowserViews provides browsers,
             LocalToaster2 provides toaster,
             LocalNavigator provides navigator,
+            LocalServerLink provides serverLink,
         ) {
             Box(Modifier.fillMaxSize()) {
                 Shell(navigator, onAdd = { addOpen = true }) { wide ->

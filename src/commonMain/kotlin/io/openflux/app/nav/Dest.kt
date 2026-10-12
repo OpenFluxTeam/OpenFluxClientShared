@@ -75,6 +75,44 @@ sealed interface Dest {
         override val serverId get() = server
     }
 
+    /** Connecting to a server not yet in the list (spec 5.1). No serverId: it has none until it connects. */
+    @Serializable @SerialName("add-server")
+    data object AddServer : Dest {
+        override val owner get() = Section.Servers
+    }
+
+    /** A new node on a connected server; [quick] installs a direct-only node at once (spec 5.1). */
+    @Serializable @SerialName("new-node")
+    data class NewNode(val server: String, val quick: Boolean = false) : Dest {
+        override val owner get() = Section.Servers
+        override val serverId get() = server
+    }
+
+    /** A node on an ordinary web hosting, made without a server (spec 5.4). */
+    @Serializable @SerialName("new-hosting")
+    data object NewHosting : Dest {
+        override val owner get() = Section.Servers
+    }
+
+    /** A hosting node, by its profile (spec 5.4). */
+    @Serializable @SerialName("hosting")
+    data class Hosting(val profile: String) : Dest {
+        override val owner get() = Section.Servers
+        override val profileId get() = profile
+    }
+
+    /** This device as an exit node for others (spec 5.5). */
+    @Serializable @SerialName("this-device")
+    data object ThisDevice : Dest {
+        override val owner get() = Section.Servers
+    }
+
+    /** The journal (spec 8.4). */
+    @Serializable @SerialName("logs")
+    data object Logs : Dest {
+        override val owner get() = Section.Settings
+    }
+
     /** Giving one profile away: QR and link (spec 7.2). */
     @Serializable @SerialName("give")
     data class Give(val profile: String) : Dest {
