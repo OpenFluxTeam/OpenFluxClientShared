@@ -39,6 +39,10 @@ enum class TransportType(
     CUPSONLINE("cupsonline", "Cups.online", "Cups", ValueKind.DocumentUrl,
         "Код комнат от ноды", "ic_code"),
 
+    @SerialName("avito")
+    AVITO("avito", "Avito Code", "Avito", ValueKind.DocumentUrl,
+        "Код комнат от ноды", "ic_code"),
+
     @SerialName("telemost")
     TELEMOST("telemost", "Яндекс Телемост", "Телемост", ValueKind.DocumentUrl,
         "https://telemost.yandex.ru/j/…", "ic_yandex"),

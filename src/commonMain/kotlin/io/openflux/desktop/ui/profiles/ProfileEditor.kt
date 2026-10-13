@@ -293,7 +293,7 @@ private fun CarrierFields(carrier: ExtraTransport, session: Boolean, showPriorit
                     carrier.type == TransportType.SCRIPT -> scriptParam?.label?.ifBlank { null } ?: "Параметр"
                     carrier.type.kind == ValueKind.DocumentUrl -> when {
                         stream && carrier.type == TransportType.CUPSONLINE -> "Адрес комнаты cups.online"
-                        carrier.type == TransportType.CUPSONLINE -> "Код комнат"
+                        carrier.type in listOf(TransportType.CUPSONLINE, TransportType.AVITO) -> "Код комнат"
                         else -> "Ссылка на документ"
                     }
                     carrier.type.kind == ValueKind.Address -> "Адрес ноды"
