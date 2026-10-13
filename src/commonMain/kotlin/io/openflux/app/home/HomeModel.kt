@@ -133,3 +133,11 @@ fun statusLine(state: ConnectionState): String = when (state) {
     is ConnectionState.Disconnecting -> "Отключаюсь…"
     is ConnectionState.Failed -> "Не подключено"
 }
+
+/** A profile's dot: green only while connected through it, busy while it connects, else off. */
+fun profileDot(state: ConnectionState, profileId: String): io.openflux.app.components.Status = when {
+    state.profile?.id != profileId -> io.openflux.app.components.Status.Off
+    state is ConnectionState.Connected -> io.openflux.app.components.Status.On
+    state.isActive -> io.openflux.app.components.Status.Busy
+    else -> io.openflux.app.components.Status.Off
+}

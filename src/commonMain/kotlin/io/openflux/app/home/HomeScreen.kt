@@ -204,7 +204,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
             RowItem(
                 chosen.name,
                 subtitle = profileLine(chosen),
-                leading = { StatusDot(if (state.isActive && state.profile?.id == chosen.id) Status.On else Status.Off) },
+                leading = { StatusDot(profileDot(state, chosen.id)) },
                 trailing = if (pickable) ({ Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = AppTheme.colors.textSecondary) }) else null,
                 onClick = if (pickable) onPick else null,
             )
@@ -321,8 +321,7 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
                 }
             }
             for (p in list) {
-                val running = state.isActive && state.profile?.id == p.id
-                ProfileRow(p, selected = p.id == chosen?.id, running = running, touch = touch, onChoose = { m.choose(p); onChosen() }, onChosen = onChosen)
+                ProfileRow(p, selected = p.id == chosen?.id, dot = profileDot(state, p.id), touch = touch, onChoose = { m.choose(p); onChosen() }, onChosen = onChosen)
             }
         }
     }
@@ -330,7 +329,7 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
 }
 
 @Composable
-private fun ProfileRow(p: Profile, selected: Boolean, running: Boolean, touch: Boolean, onChoose: () -> Unit, onChosen: () -> Unit) {
+private fun ProfileRow(p: Profile, selected: Boolean, dot: Status, touch: Boolean, onChoose: () -> Unit, onChosen: () -> Unit) {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
     val toaster = LocalToaster.current
@@ -341,7 +340,7 @@ private fun ProfileRow(p: Profile, selected: Boolean, running: Boolean, touch: B
     RowItem(
         p.name,
         subtitle = profileLine(p),
-        leading = { StatusDot(if (running) Status.On else Status.Off) },
+        leading = { StatusDot(dot) },
         selected = selected,
         onClick = onChoose,
         onDoubleClick = if (touch) null else ({ actions.connect(p); onChosen() }),

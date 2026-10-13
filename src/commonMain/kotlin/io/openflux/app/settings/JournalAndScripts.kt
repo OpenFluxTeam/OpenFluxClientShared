@@ -196,7 +196,7 @@ fun ScriptsScreen() {
         if (own.isNotEmpty()) {
             Section(null) {
                 Collapsible("Транспорты OpenFlux (${own.size})") {
-                    Toggle("Обновлять их сами", settings.autoUpdateScripts, { v -> container.settings.update { it.copy(autoUpdateScripts = v) } }, subtitle = "Подписанные ключом OpenFlux, без смены формата обмена")
+                    Toggle("Обновлять автоматически", settings.autoUpdateScripts, { v -> container.settings.update { it.copy(autoUpdateScripts = v) } }, subtitle = "Подписанные ключом OpenFlux, без смены формата обмена")
                 }
             }
             own.forEach { row(it) }

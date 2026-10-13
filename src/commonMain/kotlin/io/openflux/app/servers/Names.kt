@@ -7,7 +7,7 @@ import io.openflux.desktop.model.TransportType
 val TransportType.title: String
     get() = when (this) {
         TransportType.VYANDEX -> "Яндекс Документ"
-        TransportType.YANDEX -> "Yandex Docs, старый способ"
+        TransportType.YANDEX -> "Яндекс Документ, старый способ"
         TransportType.MAILRU -> "Документ Mail.ru"
         TransportType.BOARDS -> "Яндекс Доска"
         TransportType.CUPSONLINE -> "Cups.online"

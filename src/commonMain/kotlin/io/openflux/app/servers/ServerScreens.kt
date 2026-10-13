@@ -282,7 +282,7 @@ fun ServerScreen(dest: Dest.Server) {
                             )
                         }
                     }
-                    SecondaryButton("Новая нода", { navigator.open(Dest.NewNode(dest.id)) }, leading = Icons.Rounded.Add)
+                    SecondaryButton("Поставить ноду", { navigator.open(Dest.NewNode(dest.id)) }, leading = Icons.Rounded.Add)
                 }
             }
         } else {

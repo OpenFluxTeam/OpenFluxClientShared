@@ -424,7 +424,7 @@ private fun AboutPage() {
         }
     }, Modifier.fillMaxWidth())
     Section(null) {
-        Toggle("Проверять обновления сами", settings.autoUpdate, { v -> container.settings.update { it.copy(autoUpdate = v) } }, subtitle = "Раз в несколько часов. Ставятся только с вашего согласия")
+        Toggle("Проверять обновления автоматически", settings.autoUpdate, { v -> container.settings.update { it.copy(autoUpdate = v) } }, subtitle = "Раз в несколько часов. Ставятся только с вашего согласия")
         if (settings.developerMode) {
             Toggle("Режим разработчика", true, { on -> container.settings.update { it.copy(developerMode = on) } })
         }

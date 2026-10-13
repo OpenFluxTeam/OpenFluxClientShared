@@ -74,6 +74,15 @@ class HomeModelTest {
     }
 
     @Test
+    fun theDotIsGreenOnlyWhenConnected() {
+        val dot = { st: ConnectionState, id: String -> io.openflux.app.home.profileDot(st, id) }
+        assertEquals(io.openflux.app.components.Status.Busy, dot(ConnectionState.Connecting(a, ConnectionMode.Client, 0), "a"))
+        assertEquals(io.openflux.app.components.Status.On, dot(ConnectionState.Connected(a, ConnectionMode.Client, 0), "a"))
+        assertEquals(io.openflux.app.components.Status.Off, dot(ConnectionState.Connected(a, ConnectionMode.Client, 0), "b"))
+        assertEquals(io.openflux.app.components.Status.Off, dot(ConnectionState.Idle, "a"))
+    }
+
+    @Test
     fun choosingDoesNotTouchARunningExitNode() {
         listOf(a, b).forEach(c.profiles::upsert)
         c.settings.update { it.copy(mode = ConnectionMode.Exit, selectedProfileId = "b") }

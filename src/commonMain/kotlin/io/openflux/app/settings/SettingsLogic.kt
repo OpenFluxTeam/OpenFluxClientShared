@@ -46,7 +46,7 @@ fun serviceStatus(status: AuthStatus, now: Long): String = when (status) {
 fun serviceUsage(kind: AccountKind, profiles: List<Profile>): String {
     val n = profiles.count { p -> p.carriers.any { AccountKind.of(it.type) == kind } }
     val what = when (kind) {
-        AccountKind.Yandex -> "Яндекс Документ, Yandex Docs, Доска"
+        AccountKind.Yandex -> "Документ и Доска Яндекса"
         AccountKind.Mailru -> "Документ Mail.ru"
         AccountKind.Max -> "MAX"
     }

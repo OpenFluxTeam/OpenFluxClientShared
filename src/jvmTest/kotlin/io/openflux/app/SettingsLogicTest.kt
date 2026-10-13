@@ -31,7 +31,7 @@ class SettingsLogicTest {
     fun servicesInWords() {
         assertEquals("вход выполнен: ivan · проверено 5 мин назад", serviceStatus(AuthStatus.SignedIn("ivan", 0), 5 * 60_000))
         val p = Profile(id = "a", name = "a", transport = TransportType.VYANDEX)
-        assertEquals("в 1 профиле · Яндекс Документ, Yandex Docs, Доска", serviceUsage(AccountKind.Yandex, listOf(p)))
+        assertEquals("в 1 профиле · Документ и Доска Яндекса", serviceUsage(AccountKind.Yandex, listOf(p)))
         assertEquals("Документ Mail.ru", serviceUsage(AccountKind.Mailru, listOf(p)))
     }
 }

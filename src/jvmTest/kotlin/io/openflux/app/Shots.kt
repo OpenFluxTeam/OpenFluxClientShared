@@ -32,8 +32,14 @@ object Shots {
             ) {
                 mainClock.autoAdvance = false
                 setContent {
-                    AppTheme(dark, touch) {
-                        Box(Modifier.fillMaxSize().background(AppTheme.colors.background)) { content() }
+                    // The app follows the system's theme ("Как в системе"): the shot sets it too, or every screen came out dark.
+                    @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        androidx.compose.ui.LocalSystemTheme provides if (dark) androidx.compose.ui.SystemTheme.Dark else androidx.compose.ui.SystemTheme.Light,
+                    ) {
+                        AppTheme(dark, touch) {
+                            Box(Modifier.fillMaxSize().background(AppTheme.colors.background)) { content() }
+                        }
                     }
                 }
                 mainClock.advanceTimeBy(400)
