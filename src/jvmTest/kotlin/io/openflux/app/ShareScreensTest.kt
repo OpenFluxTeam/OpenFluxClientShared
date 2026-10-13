@@ -8,7 +8,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import io.openflux.app.nav.AppNavigator
 import io.openflux.app.nav.Dest
-import io.openflux.app.shell.OpenFluxApp2
+import io.openflux.app.shell.OpenFluxApp
 import io.openflux.desktop.FakeShareLinkCodec
 import io.openflux.desktop.model.ShareConfig
 import io.openflux.desktop.model.ShareTransport
@@ -23,7 +23,7 @@ class ShareScreensTest {
     @Test
     fun aLinkFromOutsideOpensItsScreenAndIsAdded() = runComposeUiTest {
         val c = testContainer()
-        setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         val link = runBlocking { FakeShareLinkCodec().encode(ShareConfig(name = "От друга", secret = "s".repeat(64), transports = listOf(ShareTransport(type = "direct", dial = "203.0.113.7:8445", priority = 50)))) }
         runOnIdle { c.incomingLink.value = link }
         waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Добавить профиль")).fetchSemanticsNodes().isNotEmpty() && onAllNodes(hasText("От друга")).fetchSemanticsNodes().isNotEmpty() }
@@ -36,7 +36,7 @@ class ShareScreensTest {
     fun theShareSectionGivesAProfilesQr() = runComposeUiTest {
         val c = homeWorld()
         c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.Share) }.snapshot().encode()) }
-        setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         onNodeWithText("Франкфурт").performClick()
         waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Копировать ссылку")).fetchSemanticsNodes().isNotEmpty() }
         onNodeWithText("Копировать ссылку").performClick()
@@ -48,7 +48,7 @@ class ShareScreensTest {
         val c = homeWorld()
         for ((name, dest) in listOf("share" to Dest.Share, "give" to Dest.Give("b"), "add-key" to Dest.AddKey)) {
             c.settings.update { it.copy(navState = AppNavigator().apply { open(dest) }.snapshot().encode()) }
-            Shots.render(name) { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+            Shots.render(name) { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         }
     }
 }

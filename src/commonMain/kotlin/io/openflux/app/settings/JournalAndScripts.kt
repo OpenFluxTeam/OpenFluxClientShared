@@ -30,8 +30,8 @@ import io.openflux.app.components.Banner
 import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ConfirmDialog
 import io.openflux.app.components.Field
-import io.openflux.app.components.IconButton2
-import io.openflux.app.components.LocalToaster2
+import io.openflux.app.components.IconAction
+import io.openflux.app.components.LocalToaster
 import io.openflux.app.components.PrimaryButton
 import io.openflux.app.components.ProgressLine
 import io.openflux.app.components.RowItem
@@ -40,13 +40,13 @@ import io.openflux.app.components.SecondaryButton
 import io.openflux.app.components.Section
 import io.openflux.app.components.Segmented
 import io.openflux.app.components.Sheet
-import io.openflux.app.components.TextButton2
+import io.openflux.app.components.TextAction
 import io.openflux.app.components.Toggle
 import io.openflux.app.components.Tone
 import io.openflux.app.components.ValueRow
 import io.openflux.app.shell.LocalNavigator
-import io.openflux.app.text.Redact2
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.text.Redact
+import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.InstalledScript
 import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.ScriptSource
@@ -67,7 +67,7 @@ import kotlinx.serialization.json.jsonPrimitive
 fun JournalScreen() {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val settings by container.settings.settings.collectAsState()
     val all by remember(container) {
         combine(container.connection.logs, container.nodeWizard.logs, container.phpHosting.logs, ::mergeJournal)
@@ -84,7 +84,7 @@ fun JournalScreen() {
         scroll = false,
         actions = {
             Box {
-                IconButton2(Icons.Rounded.MoreVert, "Ещё", { menu = true })
+                IconAction(Icons.Rounded.MoreVert, "Ещё", { menu = true })
                 DropdownMenu(menu, { menu = false }) {
                     DropdownMenuItem({ Text("Копировать показанное") }, {
                         menu = false
@@ -105,11 +105,11 @@ fun JournalScreen() {
             }
         },
     ) {
-        Column(Modifier.fillMaxSize().padding(vertical = AppTheme2.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+        Column(Modifier.fillMaxSize().padding(vertical = AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             Field(query, { query = it }, "Поиск в журнале")
             Segmented(JournalFilter.entries, filter, { filter = it }, label = { it.label })
             if (shown.isEmpty()) {
-                Text(if (all.isEmpty()) "Журнал пуст" else "Нет строк под фильтр", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+                Text(if (all.isEmpty()) "Журнал пуст" else "Нет строк под фильтр", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
             } else {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     SelectionContainer {
@@ -117,14 +117,14 @@ fun JournalScreen() {
                             // No keys: the core and the wizards count their lines separately, so ids repeat.
                             items(shown) { line ->
                                 Text(
-                                    if (settings.maskSensitive) Redact2.apply(line.text) else line.text,
-                                    style = AppTheme2.type.mono,
+                                    if (settings.maskSensitive) Redact.apply(line.text) else line.text,
+                                    style = AppTheme.type.mono,
                                     color = when (line.level) {
-                                        LogLevel.Error -> AppTheme2.colors.danger
-                                        LogLevel.Warning -> AppTheme2.colors.warning
-                                        LogLevel.Success -> AppTheme2.colors.success
-                                        LogLevel.Debug -> AppTheme2.colors.textMuted
-                                        LogLevel.Info -> AppTheme2.colors.text
+                                        LogLevel.Error -> AppTheme.colors.danger
+                                        LogLevel.Warning -> AppTheme.colors.warning
+                                        LogLevel.Success -> AppTheme.colors.success
+                                        LogLevel.Debug -> AppTheme.colors.textMuted
+                                        LogLevel.Info -> AppTheme.colors.text
                                     },
                                 )
                             }
@@ -142,7 +142,7 @@ fun JournalScreen() {
 fun ScriptsScreen() {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     val scripts by container.scripts.scripts.collectAsState()
     val reports by container.scriptUpdater.reports.collectAsState()
@@ -154,7 +154,7 @@ fun ScriptsScreen() {
     var rev by remember { mutableStateOf(0) }
     LaunchedEffect(settings.experimental) { if (!settings.experimental) navigator.back() }
     ScreenScaffold("Транспорты на JS", onBack = { navigator.back() }) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             PrimaryButton("Импортировать", { addOpen = true })
             SecondaryButton("Проверить обновления", {
                 scope.launch {
@@ -174,7 +174,7 @@ fun ScriptsScreen() {
                     subtitle = if (s.hasSettings) "Настраивается в профиле, где используется" else null,
                 )
                 if (report != null && report.available) {
-                    RowItem("Доступна ${report.latest}", trailing = { TextButton2("Обновить", { updateFor = s }, enabled = !working) })
+                    RowItem("Доступна ${report.latest}", trailing = { TextAction("Обновить", { updateFor = s }, enabled = !working) })
                 } else if (report != null && (report.blocked || report.failed)) {
                     RowItem(ScriptUpdateMessages.failure(report.code))
                 }
@@ -191,7 +191,7 @@ fun ScriptsScreen() {
                 RowItem("Удалить", onClick = { deleteFor = s })
             }
         }
-        if (added.isEmpty()) Text("Своих транспортов пока нет. Импортируйте из GitHub или файла.", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+        if (added.isEmpty()) Text("Своих транспортов пока нет. Импортируйте из GitHub или файла.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
         else added.forEach { row(it) }
         if (own.isNotEmpty()) {
             Section(null) {
@@ -201,7 +201,7 @@ fun ScriptsScreen() {
             }
             own.forEach { row(it) }
         }
-        Text("JS-транспорт работает без песочницы: полный доступ к сети. Ставьте только от авторов, которым доверяете.", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.warning)
+        Text("JS-транспорт работает без песочницы: полный доступ к сети. Ставьте только от авторов, которым доверяете.", style = AppTheme.type.bodySmall, color = AppTheme.colors.warning)
     }
     if (addOpen) AddScriptSheet { addOpen = false }
     updateFor?.let { s ->
@@ -275,12 +275,12 @@ private fun AddScriptSheet(onClose: () -> Unit) {
         )
     }
     Sheet(onDismiss = onClose, title = if (preview == null) "Импорт транспорта" else "Проверьте транспорт") {
-        Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
+        Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
             val p = preview
             if (p == null) {
                 Field(url, { url = it; error = null }, "Ссылка на .js или .flux", placeholder = "https://raw.githubusercontent.com/…", mono = true)
                 Field(key, { key = it }, "Ключ автора (hex); пусто — ключ OpenFlux", mono = true)
-                TextButton2("Из файла…", {
+                TextAction("Из файла…", {
                     scope.launch {
                         val path = platform.pickFile("Файл транспорта", listOf("flux", "js")) ?: return@launch
                         val bytes = platform.readBytes(path)

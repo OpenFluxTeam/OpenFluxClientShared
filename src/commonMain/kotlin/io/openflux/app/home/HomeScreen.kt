@@ -43,8 +43,8 @@ import io.openflux.app.components.ConfirmDialog
 import io.openflux.app.components.ConnectButton
 import io.openflux.app.components.ConnectLook
 import io.openflux.app.components.Field
-import io.openflux.app.components.IconButton2
-import io.openflux.app.components.LocalToaster2
+import io.openflux.app.components.IconAction
+import io.openflux.app.components.LocalToaster
 import io.openflux.app.components.RowItem
 import io.openflux.app.components.ScreenScaffold
 import io.openflux.app.components.SecondaryButton
@@ -52,7 +52,7 @@ import io.openflux.app.components.Section
 import io.openflux.app.components.Sheet
 import io.openflux.app.components.Status
 import io.openflux.app.components.StatusDot
-import io.openflux.app.components.TextButton2
+import io.openflux.app.components.TextAction
 import io.openflux.app.components.Tone
 import io.openflux.app.components.ValueRow
 import io.openflux.app.nav.Dest
@@ -63,7 +63,7 @@ import io.openflux.app.servers.title
 import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.shell.LocalOpenAdd
 import io.openflux.app.text.Fmt
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.ExitAddress
@@ -123,7 +123,7 @@ fun HomeRoot() {
     val chosen = m.selected(profiles)
     ScreenScaffold(null, scroll = false) {
         if (profiles.isEmpty()) {
-            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = AppTheme2.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.l)) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.l)) {
                 StartPanel(hasSubscription = subscription != null)
             }
             return@ScreenScaffold
@@ -132,17 +132,17 @@ fun HomeRoot() {
             val wide = maxWidth >= 840.dp
             Row(Modifier.fillMaxSize()) {
                 Column(
-                    Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(vertical = AppTheme2.spacing.s),
+                    Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(vertical = AppTheme.spacing.s),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.l),
+                    verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.l),
                 ) {
                     Main(m, chosen, state, onPick = { drawer = true }, pickable = !wide)
                 }
                 if (wide) {
                     Box(Modifier.width(1.dp).fillMaxHeight())
                     Column(
-                        Modifier.width(360.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(start = AppTheme2.spacing.l, top = AppTheme2.spacing.s),
-                        verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m),
+                        Modifier.width(360.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(start = AppTheme.spacing.l, top = AppTheme.spacing.s),
+                        verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m),
                     ) {
                         ConnectionList(m, profiles, chosen, onChosen = {})
                     }
@@ -152,7 +152,7 @@ fun HomeRoot() {
     }
     if (drawer) {
         Sheet(onDismiss = { drawer = false }, title = "Подключение") {
-            Column(Modifier.padding(horizontal = AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
+            Column(Modifier.padding(horizontal = AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
                 ConnectionList(m, profiles, chosen, onChosen = { drawer = false })
             }
         }
@@ -167,8 +167,8 @@ private fun StartPanel(hasSubscription: Boolean) {
         Banner("В подписке пока нет локаций", Tone.Info, action = "Открыть подписку", onAction = { navigator.open(Dest.Account) })
         return
     }
-    Text("Приступим", style = AppTheme2.type.screenTitle, color = AppTheme2.colors.text)
-    Text("Все способы — под кнопкой ＋", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+    Text("Приступим", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
+    Text("Все способы — под кнопкой ＋", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
     Section(null) {
         RowItem("Аккаунт OpenFlux", subtitle = "Войти или создать: локации появятся сами", onClick = { navigator.open(Dest.Auth) })
         RowItem("Ключ или ссылка", subtitle = "От друга или из сервиса", onClick = { navigator.open(Dest.AddKey) })
@@ -180,7 +180,7 @@ private fun StartPanel(hasSubscription: Boolean) {
 private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick: () -> Unit, pickable: Boolean) {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     val settings by container.settings.settings.collectAsState()
     val traffic by container.connection.traffic.collectAsState()
@@ -197,12 +197,12 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         shortcut = "Ctrl+Enter",
     )
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(state.title(), style = AppTheme2.type.title, color = AppTheme2.colors.text, textAlign = TextAlign.Center)
+        Text(state.title(), style = AppTheme.type.title, color = AppTheme.colors.text, textAlign = TextAlign.Center)
         val connected = state as? ConnectionState.Connected
         if (connected != null) {
             Text(
                 Fmt.duration(now - connected.since) + "   ↓ " + Fmt.speed(traffic.downBytesPerSec) + "   ↑ " + Fmt.speed(traffic.upBytesPerSec),
-                style = AppTheme2.type.mono, color = AppTheme2.colors.textSecondary,
+                style = AppTheme.type.mono, color = AppTheme.colors.textSecondary,
             )
         }
     }
@@ -212,13 +212,13 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
                 chosen.name,
                 subtitle = profileLine(chosen),
                 leading = { StatusDot(if (state.isActive && state.profile?.id == chosen.id) Status.On else Status.Off) },
-                trailing = if (pickable) ({ Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = AppTheme2.colors.textSecondary) }) else null,
+                trailing = if (pickable) ({ Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = AppTheme.colors.textSecondary) }) else null,
                 onClick = if (pickable) onPick else null,
             )
         }
     }
     if (!exitMode && (platform.fullTunnelSupported || (platform.systemProxySupported && !settings.fullTunnel))) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s, Alignment.CenterHorizontally), modifier = Modifier.fillMaxWidth()) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s, Alignment.CenterHorizontally), modifier = Modifier.fillMaxWidth()) {
             if (platform.fullTunnelSupported) {
                 Chip(if (platform.kind == PlatformKind.Android) "VPN: весь трафик" else "Весь трафик", settings.fullTunnel, { m.setFullTunnel(!settings.fullTunnel) })
             }
@@ -249,7 +249,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
 @Composable
 private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
     val container = LocalAppContainer.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     val settings by container.settings.settings.collectAsState()
     val traffic by container.connection.traffic.collectAsState()
@@ -284,7 +284,7 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ValueRow("Внешний IP", ip, Modifier.weight(1f))
-                IconButton2(Icons.Rounded.Refresh, "Проверить ещё раз", container.connection::refreshExitAddress, enabled = on)
+                IconAction(Icons.Rounded.Refresh, "Проверить ещё раз", container.connection::refreshExitAddress, enabled = on)
             }
             if (on) ValueRow("За сессию", Fmt.bytes(traffic.totalDown + traffic.totalUp))
             if (on && !traffic.live) ValueRow("Статистика", "ядро не сообщает")
@@ -315,15 +315,15 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
         p.name.contains(query.trim(), ignoreCase = true) || p.carriers.any { it.value.contains(query.trim(), ignoreCase = true) }
     }
     if (profiles.size > 4) Field(query, { query = it }, "Поиск по названию или адресу")
-    if (shown.isEmpty()) Text("Ничего не найдено", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+    if (shown.isEmpty()) Text("Ничего не найдено", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
     for ((title, list) in m.groups(shown)) {
         Section(title) {
             if (title == "Подписка") {
                 subscription?.let { sub ->
-                    val look = sub.look2(container.platform.now(), container.platform.utcOffsetSeconds)
+                    val look = sub.look(container.platform.now(), container.platform.utcOffsetSeconds)
                     RowItem(
                         sub.title.ifBlank { "Подписка" }, subtitle = look.line,
-                        trailing = { TextButton2(if (look.attention) "Продлить" else "Открыть", { navigator.open(Dest.Account) }) },
+                        trailing = { TextAction(if (look.attention) "Продлить" else "Открыть", { navigator.open(Dest.Account) }) },
                     )
                 }
             }
@@ -340,7 +340,7 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
 private fun ProfileRow(p: Profile, selected: Boolean, running: Boolean, touch: Boolean, onChoose: () -> Unit, onChosen: () -> Unit) {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val actions = remember(container) { ProfileActions(container) }
     val settings by container.settings.settings.collectAsState()
     var menu by remember { mutableStateOf(false) }
@@ -355,7 +355,7 @@ private fun ProfileRow(p: Profile, selected: Boolean, running: Boolean, touch: B
         onLongClick = if (touch) ({ menu = true }) else null,
         trailing = {
             Box {
-                IconButton2(Icons.Rounded.MoreVert, "Действия", { menu = true })
+                IconAction(Icons.Rounded.MoreVert, "Действия", { menu = true })
                 DropdownMenu(menu, { menu = false }) {
                     fun go(d: Dest) { menu = false; onChosen(); navigator.open(d) }
                     DropdownMenuItem({ Text("Сведения") }, { go(Dest.Profile(p.id)) })
@@ -367,7 +367,7 @@ private fun ProfileRow(p: Profile, selected: Boolean, running: Boolean, touch: B
                         menu = false; actions.markOwn(p); toaster.show("«${p.name}» теперь в «Мои серверы»")
                     })
                     if (!p.managed) DropdownMenuItem({ Text("Дублировать") }, { menu = false; actions.duplicate(p)?.let { toaster.show("Копия: ${it.name}") } })
-                    if (!p.managed) DropdownMenuItem({ Text("Удалить", color = AppTheme2.colors.danger) }, { menu = false; deleteAsk = true })
+                    if (!p.managed) DropdownMenuItem({ Text("Удалить", color = AppTheme.colors.danger) }, { menu = false; deleteAsk = true })
                 }
             }
         },

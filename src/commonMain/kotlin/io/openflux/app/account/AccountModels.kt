@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 const val MIN_PASSWORD = 10
 
 /** The screens of signing in (spec 8.1). */
-enum class AuthStep2 { Login, Register, Recover, Devices }
+enum class AuthStep { Login, Register, Recover, Devices }
 
 private fun loginProblem(login: String): String? = when {
     login.trim().length < 3 -> "Логин: не короче 3 символов (почта или имя)"
@@ -43,7 +43,7 @@ fun newPasswordProblem(login: String, p: String, again: String): String? = when 
 @Stable
 class AuthModel(private val container: AppContainer, private val scope: CoroutineScope) {
     private val manager = container.subscription
-    var step by mutableStateOf(AuthStep2.Login)
+    var step by mutableStateOf(AuthStep.Login)
     var login by mutableStateOf("")
     var password by mutableStateOf("")
     var password2 by mutableStateOf("")
@@ -59,12 +59,12 @@ class AuthModel(private val container: AppContainer, private val scope: Coroutin
     var done by mutableStateOf(false)
         private set
 
-    fun go(next: AuthStep2) {
+    fun go(next: AuthStep) {
         step = next
         error = null
         password = ""
         password2 = ""
-        if (next != AuthStep2.Recover) recoveryInput = ""
+        if (next != AuthStep.Recover) recoveryInput = ""
     }
 
     fun register() {
@@ -119,7 +119,7 @@ class AuthModel(private val container: AppContainer, private val scope: Coroutin
             } catch (e: SubscriptionException) {
                 if (e.code == "device_limit") {
                     devices = e.devices
-                    step = AuthStep2.Devices
+                    step = AuthStep.Devices
                 } else {
                     error = e.message
                 }

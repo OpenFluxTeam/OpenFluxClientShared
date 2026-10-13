@@ -1,7 +1,7 @@
 package io.openflux.app
 
 import io.openflux.app.text.Fmt
-import io.openflux.app.text.Redact2
+import io.openflux.app.text.Redact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -61,6 +61,6 @@ class FmtMoreTest {
 
     @org.junit.Test
     fun redactHidesSecrets() {
-        kotlin.test.assertEquals("[адрес скрыт] и [ключ скрыт]", Redact2.apply("https://docs.yandex.ru/edit/d/abc и " + "a".repeat(64)))
+        kotlin.test.assertEquals("[адрес скрыт] и [ключ скрыт]", Redact.apply("https://docs.yandex.ru/edit/d/abc и " + "a".repeat(64)))
     }
 }

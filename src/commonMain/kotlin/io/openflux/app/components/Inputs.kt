@@ -35,10 +35,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 
 @Composable
-private fun fieldColors() = AppTheme2.colors.let { c ->
+private fun fieldColors() = AppTheme.colors.let { c ->
     OutlinedTextFieldDefaults.colors(
         focusedTextColor = c.text, unfocusedTextColor = c.text, disabledTextColor = c.textMuted,
         focusedContainerColor = c.surface, unfocusedContainerColor = c.surface, disabledContainerColor = c.surface,
@@ -87,11 +87,11 @@ private fun TextInput(
         isError = error != null,
         supportingText = error?.let { { Text(it, maxLines = 2) } },
         singleLine = singleLine,
-        textStyle = if (mono) AppTheme2.type.mono else AppTheme2.type.body,
+        textStyle = if (mono) AppTheme.type.mono else AppTheme.type.body,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         trailingIcon = trailing,
         visualTransformation = transformation,
-        shape = RoundedCornerShape(AppTheme2.shapes.small),
+        shape = RoundedCornerShape(AppTheme.shapes.small),
         colors = fieldColors(),
     )
 }
@@ -103,7 +103,7 @@ fun SecretField(value: String, onValueChange: (String) -> Unit, label: String, m
     TextInput(
         value, onValueChange, label, modifier, null, error, singleLine = true, mono = false, KeyboardType.Password,
         trailing = {
-            IconButton2(
+            IconAction(
                 if (shown) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
                 if (shown) "Скрыть" else "Показать",
                 onClick = { shown = !shown },
@@ -124,7 +124,7 @@ fun <T> Segmented(
     modifier: Modifier = Modifier,
     enabled: (T) -> Boolean = { true },
 ) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth()) {
         options.forEachIndexed { i, option ->
             SegmentedButton(
@@ -142,10 +142,10 @@ fun <T> Segmented(
                 // A narrow screen shrinks a long label rather than cutting it.
                 BasicText(
                     label(option),
-                    style = AppTheme2.type.body.copy(color = LocalContentColor.current),
+                    style = AppTheme.type.body.copy(color = LocalContentColor.current),
                     maxLines = 1,
                     softWrap = false,
-                    autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = AppTheme2.type.body.fontSize, stepSize = 0.5.sp),
+                    autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = AppTheme.type.body.fontSize, stepSize = 0.5.sp),
                 )
             }
         }
@@ -155,7 +155,7 @@ fun <T> Segmented(
 /** A switch on a row: the whole row toggles it. */
 @Composable
 fun Toggle(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: Modifier = Modifier, subtitle: String? = null, enabled: Boolean = true) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     RowItem(
         title,
         modifier = modifier,
@@ -178,14 +178,14 @@ fun Toggle(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, 
 
 @Composable
 fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, leading: ImageVector? = null) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     FilterChip(
         selected = selected,
         onClick = onClick,
         modifier = modifier,
-        label = { Text(text, style = AppTheme2.type.bodySmall, maxLines = 1) },
+        label = { Text(text, style = AppTheme.type.bodySmall, maxLines = 1) },
         leadingIcon = leading?.let { { Icon(it, contentDescription = null, modifier = Modifier.size(18.dp)) } },
-        shape = RoundedCornerShape(AppTheme2.shapes.large),
+        shape = RoundedCornerShape(AppTheme.shapes.large),
         colors = FilterChipDefaults.filterChipColors(
             containerColor = c.surface, labelColor = c.text, iconColor = c.textSecondary,
             selectedContainerColor = c.accent, selectedLabelColor = c.onAccent, selectedLeadingIconColor = c.onAccent,

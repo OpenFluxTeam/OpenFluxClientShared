@@ -7,7 +7,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
-import io.openflux.app.shell.OpenFluxApp2
+import io.openflux.app.shell.OpenFluxApp
 import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.ExitAddress
@@ -35,7 +35,7 @@ class HomeScreenTest {
     fun theButtonConnectsTheChosenProfile() = runComposeUiTest {
         val conn = ScriptedConnection()
         val c = homeWorld(conn)
-        setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         onNodeWithContentDescription("Подключить").performClick()
         assertEquals("a", (conn.state.value as ConnectionState.Connected).profile.id)
         onNodeWithText("Подключено").assertIsDisplayed()
@@ -47,7 +47,7 @@ class HomeScreenTest {
     fun aFailureSaysWhyAndOffersARetry() = runComposeUiTest {
         val conn = ScriptedConnection().apply { onConnect = { p, _ -> ConnectionState.Failed(p, "нода не ответила") } }
         val c = homeWorld(conn)
-        setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         onNodeWithContentDescription("Подключить").performClick()
         onNodeWithText("нода не ответила").assertIsDisplayed()
         onNodeWithText("Повторить").assertIsDisplayed()
@@ -57,7 +57,7 @@ class HomeScreenTest {
     fun theDetailsOpenOnRequest() = runComposeUiTest {
         val conn = ScriptedConnection()
         val c = homeWorld(conn)
-        setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         onNodeWithText("Сведения").performClick()
         onNodeWithText("Шифрование").assertIsDisplayed()
         onNodeWithText("AES-256-GCM").assertIsDisplayed()

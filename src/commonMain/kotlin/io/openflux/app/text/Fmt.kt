@@ -75,7 +75,7 @@ object Fmt {
 }
 
 /** Hides document addresses, links and keys, as the Android log does. */
-object Redact2 {
+object Redact {
     private val url = Regex("""https?://(docs|disk|cloud)\.[^\s"')]+""")
     private val hex = Regex("""\b[0-9a-f]{32,}\b""")
     private val link = Regex("""openflux://v1/[A-Za-z0-9_-]+""")

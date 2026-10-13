@@ -27,7 +27,7 @@ import io.openflux.app.nav.LocalInPane
 import io.openflux.app.components.RowItem
 import io.openflux.app.components.SecretField
 import io.openflux.app.components.Segmented
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -35,7 +35,7 @@ import kotlin.test.assertEquals
 class ComponentsTest {
     @Test
     fun collapsibleHidesUntilOpened() = runComposeUiTest {
-        setContent { AppTheme2(dark = true, touch = false) { Collapsible("Дополнительно") { Text("порт") } } }
+        setContent { AppTheme(dark = true, touch = false) { Collapsible("Дополнительно") { Text("порт") } } }
         onNodeWithText("порт").assertDoesNotExist()
         onNodeWithText("Дополнительно").performClick()
         onNodeWithText("порт").assertIsDisplayed()
@@ -45,7 +45,7 @@ class ComponentsTest {
     fun segmentedReportsChoice() = runComposeUiTest {
         var picked = "L4"
         setContent {
-            AppTheme2(dark = true, touch = false) {
+            AppTheme(dark = true, touch = false) {
                 var s by remember { mutableStateOf("L4") }
                 Segmented(listOf("L4", "L3"), s, { s = it; picked = it }, label = { it })
             }
@@ -56,7 +56,7 @@ class ComponentsTest {
 
     @Test
     fun secretFieldRevealsOnDemand() = runComposeUiTest {
-        setContent { AppTheme2(dark = true, touch = false) { SecretField("hunter2", {}, "Пароль") } }
+        setContent { AppTheme(dark = true, touch = false) { SecretField("hunter2", {}, "Пароль") } }
         // What is drawn, not the field's value (which semantics always carry as InputText).
         fun shown(text: String) = SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString(text))
         onNode(shown("hunter2")).assertDoesNotExist()
@@ -68,7 +68,7 @@ class ComponentsTest {
     @Test
     fun rowItemClicks() = runComposeUiTest {
         var clicks = 0
-        setContent { AppTheme2(dark = true, touch = false) { RowItem("Сервер", onClick = { clicks++ }) } }
+        setContent { AppTheme(dark = true, touch = false) { RowItem("Сервер", onClick = { clicks++ }) } }
         onNodeWithText("Сервер").performClick()
         assertEquals(1, clicks)
     }
@@ -76,7 +76,7 @@ class ComponentsTest {
     @Test
     fun scaffoldHasNoBackArrowBesideItsList() = runComposeUiTest {
         setContent {
-            AppTheme2(dark = true, touch = false) {
+            AppTheme(dark = true, touch = false) {
                 Column {
                     ScreenScaffold("Один", Modifier.height(100.dp), onBack = {}) {}
                     CompositionLocalProvider(LocalInPane provides true) { ScreenScaffold("Два", Modifier.height(100.dp), onBack = {}) {} }

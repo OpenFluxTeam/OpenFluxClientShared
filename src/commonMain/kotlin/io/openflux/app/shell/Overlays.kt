@@ -33,10 +33,10 @@ import androidx.compose.ui.window.DialogProperties
 import io.openflux.app.components.Banner
 import io.openflux.app.components.PrimaryButton
 import io.openflux.app.components.SecondaryButton
-import io.openflux.app.components.TextButton2
+import io.openflux.app.components.TextAction
 import io.openflux.app.components.Tone
 import io.openflux.app.nav.Dest
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.AuthStatus
 import io.openflux.desktop.model.UpdateState
@@ -61,30 +61,30 @@ private fun BrowserOverlay(
     actions: @Composable () -> Unit = {},
 ) {
     val touch = LocalTouchUi.current
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             val frame = if (touch) Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
-            else Modifier.widthIn(max = 960.dp).fillMaxWidth(0.9f).height((maxHeight * 0.88f).coerceAtMost(860.dp)).clip(RoundedCornerShape(AppTheme2.shapes.large))
+            else Modifier.widthIn(max = 960.dp).fillMaxWidth(0.9f).height((maxHeight * 0.88f).coerceAtMost(860.dp)).clip(RoundedCornerShape(AppTheme.shapes.large))
             Surface(frame, color = c.surface, contentColor = c.text) {
                 Column(Modifier.fillMaxSize()) {
-                    Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+                    Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(title, Modifier.weight(1f), style = AppTheme2.type.title, color = c.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            TextButton2(closeLabel, onClose, color = c.textSecondary)
+                            Text(title, Modifier.weight(1f), style = AppTheme.type.title, color = c.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            TextAction(closeLabel, onClose, color = c.textSecondary)
                         }
-                        note?.let { Text(it, style = AppTheme2.type.bodySmall, color = c.textSecondary) }
+                        note?.let { Text(it, style = AppTheme.type.bodySmall, color = c.textSecondary) }
                         error?.let { Banner(it, Tone.Danger) }
                         actions()
                     }
                     Box(
-                        Modifier.weight(1f).fillMaxWidth().padding(horizontal = if (touch) 0.dp else AppTheme2.spacing.l)
-                            .padding(bottom = if (touch) 0.dp else AppTheme2.spacing.l)
+                        Modifier.weight(1f).fillMaxWidth().padding(horizontal = if (touch) 0.dp else AppTheme.spacing.l)
+                            .padding(bottom = if (touch) 0.dp else AppTheme.spacing.l)
                             .border(1.dp, c.border),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (page != null) LocalBrowserViews.current.Page(page, Modifier.fillMaxSize())
-                        else Text(waiting, style = AppTheme2.type.body, color = c.textSecondary)
+                        else Text(waiting, style = AppTheme.type.body, color = c.textSecondary)
                     }
                 }
             }
@@ -120,12 +120,12 @@ fun CaptchaOverlay() {
         closeLabel = "Позже",
         error = current.error.ifBlank { null },
     ) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             if (!setup) PrimaryButton(if (current.busy) "Передаю…" else "Готово", connection::submitCaptcha, enabled = !current.busy && page != null)
             SecondaryButton("Открыть заново", connection::openCaptcha, enabled = !current.busy)
         }
         if (!setup && sessions[AccountKind.Yandex]?.let { !it.expired && it.cookies.isNotEmpty() } != true) {
-            TextButton2("Не проходить каждый раз: войти в Яндекс", {
+            TextAction("Не проходить каждый раз: войти в Яндекс", {
                 connection.dismissCaptcha()
                 navigator.open(Dest.SettingsPage("services"))
             })
@@ -175,7 +175,7 @@ fun UpdateLine(modifier: Modifier = Modifier) {
     val container = LocalAppContainer.current
     val updates = container.updates
     val state by updates.state.collectAsState()
-    val pad = modifier.padding(horizontal = AppTheme2.spacing.page, vertical = AppTheme2.spacing.xs)
+    val pad = modifier.padding(horizontal = AppTheme.spacing.page, vertical = AppTheme.spacing.xs)
     when (val s = state) {
         is UpdateState.Available -> Banner(
             "Вышла версия ${s.release.version}", Tone.Info, pad,
@@ -185,10 +185,10 @@ fun UpdateLine(modifier: Modifier = Modifier) {
         is UpdateState.Downloading -> Column(pad) {
             Text(
                 "Скачиваю ${s.release.version}: ${mb(s.done)}" + if (s.total > 0) " из ${mb(s.total)}" else "",
-                style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary,
+                style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
             )
-            if (s.total > 0) LinearProgressIndicator(progress = { (s.done.toFloat() / s.total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(), color = AppTheme2.colors.accent)
-            else LinearProgressIndicator(Modifier.fillMaxWidth(), color = AppTheme2.colors.accent)
+            if (s.total > 0) LinearProgressIndicator(progress = { (s.done.toFloat() / s.total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(), color = AppTheme.colors.accent)
+            else LinearProgressIndicator(Modifier.fillMaxWidth(), color = AppTheme.colors.accent)
         }
         is UpdateState.Installing -> Banner(s.note ?: "Устанавливаю ${s.release.version}…", Tone.Success, pad, action = "Закрыть", onAction = updates::dismiss)
         is UpdateState.Failed -> if (s.release != null) Banner(s.message, Tone.Danger, pad, action = "Повторить", onAction = updates::install, secondAction = "Закрыть", onSecondAction = updates::dismiss)

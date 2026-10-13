@@ -11,7 +11,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.v2.runComposeUiTest
 import io.openflux.app.nav.AppNavigator
 import io.openflux.app.nav.Dest
-import io.openflux.app.shell.OpenFluxApp2
+import io.openflux.app.shell.OpenFluxApp
 import io.openflux.desktop.model.LogLevel
 import io.openflux.app.platform.NoScrollbars
 import io.openflux.app.platform.Shortcuts
@@ -25,7 +25,7 @@ class SettingsScreensTest {
     fun signingUpShowsTheRecoveryKeyThenTheSubscription() = runComposeUiTest {
         val c = testContainer(subscriptions = FakeSubApi())
         c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.Auth) }.snapshot().encode()) }
-        setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         onNodeWithText("Регистрация").performClick()
         onNode(hasSetTextAction() and hasText("Логин")).performTextInput("ivan")
         onNode(hasSetTextAction() and hasText("Пароль")).performTextInput("longenough1")
@@ -46,7 +46,7 @@ class SettingsScreensTest {
             io.openflux.desktop.model.LogLine(2, 2, "ошибка входа по SSH", LogLevel.Error),
         )
         c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.Logs) }.snapshot().encode()) }
-        setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         onNodeWithText("соединение установлено").assertIsDisplayed()
         onNodeWithText("Ошибки").performClick()
         assertEquals(0, onAllNodes(hasText("соединение установлено")).fetchSemanticsNodes().size)
@@ -60,7 +60,7 @@ class SettingsScreensTest {
     fun tenTapsOnTheVersion() = runComposeUiTest {
         val c = testContainer()
         c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.SettingsPage("about")) }.snapshot().encode()) }
-        setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         repeat(10) { onNodeWithText("Версия приложения").performClick() }
         waitForIdle()
         assertEquals(true, c.settings.settings.value.developerMode)
@@ -74,7 +74,7 @@ class SettingsScreensTest {
         }
         val c = testContainer(platform = p)
         kotlinx.coroutines.runBlocking { c.updates.check(manual = false) }
-        setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         onNodeWithText("Вышла версия 2.1.0").assertIsDisplayed()
         onNodeWithContentDescription("Ещё").performClick()
         onNodeWithText("Пропустить эту версию").performClick()
@@ -94,9 +94,9 @@ class SettingsScreensTest {
         )
         for ((name, dest) in pages) {
             c.settings.update { it.copy(navState = AppNavigator().apply { open(dest) }.snapshot().encode()) }
-            Shots.render(name) { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+            Shots.render(name) { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         }
         c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.SettingsPage("services")) }.snapshot().encode()) }
-        Shots.render("settings", Shots.WIDE) { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        Shots.render("settings", Shots.WIDE) { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
     }
 }

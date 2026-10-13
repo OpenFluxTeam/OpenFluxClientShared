@@ -66,7 +66,7 @@ import io.openflux.app.components.Status
 import io.openflux.app.components.StatusDot
 import io.openflux.app.nav.AppNavigator
 import io.openflux.app.nav.Section
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.isActive
 import io.openflux.desktop.service.LocalAppContainer
@@ -108,7 +108,7 @@ private val Section.shortcut: String
 fun Shell(navigator: AppNavigator, onAdd: () -> Unit, content: @Composable (wide: Boolean) -> Unit) {
     val touch = LocalTouchUi.current
     ShellShortcuts(navigator, onAdd, enabled = !touch)
-    BoxWithConstraints(Modifier.fillMaxSize().background(AppTheme2.colors.background).windowInsetsPadding(WindowInsets.safeDrawing)) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(AppTheme.colors.background).windowInsetsPadding(WindowInsets.safeDrawing)) {
         val window = maxWidth
         val widthClass = widthClassOf(window)
         if (widthClass == WidthClass.Phone) {
@@ -121,7 +121,7 @@ fun Shell(navigator: AppNavigator, onAdd: () -> Unit, content: @Composable (wide
             val rail = if (widthClass == WidthClass.Compact) RailCompact else RailFull
             Row(Modifier.fillMaxSize()) {
                 SideRail(navigator, onAdd, labels = widthClass != WidthClass.Compact, modifier = Modifier.width(rail).fillMaxHeight())
-                Box(Modifier.width(1.dp).fillMaxHeight().background(AppTheme2.colors.border))
+                Box(Modifier.width(1.dp).fillMaxHeight().background(AppTheme.colors.border))
                 Box(Modifier.weight(1f).fillMaxHeight()) { content(window - rail >= WideContent) }
             }
         }
@@ -191,12 +191,12 @@ private fun connectionStatus(): Status? {
 
 @Composable
 private fun BottomBar(navigator: AppNavigator, onAdd: () -> Unit) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     val status = connectionStatus()
     BoxWithConstraints(Modifier.fillMaxWidth().background(c.surface)) {
         // Too narrow for every label at this text size: only the chosen place keeps its label.
         val allLabels = maxWidth / 5 >= 76.dp * LocalDensity.current.fontScale
-        Row(Modifier.fillMaxWidth().padding(vertical = AppTheme2.spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(vertical = AppTheme.spacing.xs), verticalAlignment = Alignment.CenterVertically) {
             val (left, right) = Section.entries.chunked(2).let { it[0] to it[1] }
             for (s in left) BarItem(s, navigator, if (s == Section.Home) status else null, allLabels, Modifier.weight(1f))
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { AddButton(onAdd) }
@@ -207,14 +207,14 @@ private fun BottomBar(navigator: AppNavigator, onAdd: () -> Unit) {
 
 @Composable
 private fun BarItem(section: Section, navigator: AppNavigator, status: Status?, label: Boolean, modifier: Modifier) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     val selected = navigator.section == section
     val color = if (selected) c.accent else c.textSecondary
     Column(
-        modifier.heightIn(min = 56.dp).clip(RoundedCornerShape(AppTheme2.shapes.medium))
+        modifier.heightIn(min = 56.dp).clip(RoundedCornerShape(AppTheme.shapes.medium))
             .clickable(role = Role.Tab) { navigator.select(section) }
             .semantics { this.selected = selected; contentDescription = section.title }
-            .padding(horizontal = 2.dp, vertical = AppTheme2.spacing.xs),
+            .padding(horizontal = 2.dp, vertical = AppTheme.spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -227,11 +227,11 @@ private fun BarItem(section: Section, navigator: AppNavigator, status: Status?, 
             // The chosen place's label alone may still be long on a tiny screen: it shrinks rather than gets cut.
             BasicText(
                 section.title,
-                style = AppTheme2.type.caption.copy(color = color),
+                style = AppTheme.type.caption.copy(color = color),
                 maxLines = 1,
                 softWrap = false,
                 overflow = TextOverflow.Clip,
-                autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = AppTheme2.type.caption.fontSize, stepSize = 0.5.sp),
+                autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = AppTheme.type.caption.fontSize, stepSize = 0.5.sp),
             )
         }
     }
@@ -239,7 +239,7 @@ private fun BarItem(section: Section, navigator: AppNavigator, status: Status?, 
 
 @Composable
 private fun AddButton(onAdd: () -> Unit, modifier: Modifier = Modifier) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     Box(
         modifier.size(48.dp).clip(CircleShape).background(c.accent)
             .clickable(role = Role.Button, onClick = onAdd)
@@ -250,8 +250,8 @@ private fun AddButton(onAdd: () -> Unit, modifier: Modifier = Modifier) {
 
 @Composable
 private fun SideRail(navigator: AppNavigator, onAdd: () -> Unit, labels: Boolean, modifier: Modifier) {
-    val c = AppTheme2.colors
-    val sp = AppTheme2.spacing
+    val c = AppTheme.colors
+    val sp = AppTheme.spacing
     val status = connectionStatus()
     Column(
         modifier.background(c.surface).padding(vertical = sp.l, horizontal = sp.s),
@@ -261,13 +261,13 @@ private fun SideRail(navigator: AppNavigator, onAdd: () -> Unit, labels: Boolean
         Hint("Добавить · Ctrl+N", enabled = !labels) {
             if (labels) {
                 Row(
-                    Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(AppTheme2.shapes.medium)).background(c.accent)
+                    Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(AppTheme.shapes.medium)).background(c.accent)
                         .clickable(role = Role.Button, onClick = onAdd).semantics { contentDescription = "Добавить" }.padding(horizontal = sp.m),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(Icons.Rounded.Add, contentDescription = null, tint = c.onAccent)
                     Spacer(Modifier.width(sp.m))
-                    Text("Добавить", style = AppTheme2.type.title, color = c.onAccent, maxLines = 1)
+                    Text("Добавить", style = AppTheme.type.title, color = c.onAccent, maxLines = 1)
                 }
             } else {
                 AddButton(onAdd)
@@ -280,7 +280,7 @@ private fun SideRail(navigator: AppNavigator, onAdd: () -> Unit, labels: Boolean
             Hint("${s.title} · ${s.shortcut}", enabled = true) {
                 Row(
                     Modifier.then(if (labels) Modifier.fillMaxWidth() else Modifier.size(48.dp))
-                        .heightIn(min = 44.dp).clip(RoundedCornerShape(AppTheme2.shapes.medium))
+                        .heightIn(min = 44.dp).clip(RoundedCornerShape(AppTheme.shapes.medium))
                         .background(if (selected) c.surfaceHigh else c.surface)
                         .clickable(role = Role.Tab) { navigator.select(s) }
                         .semantics { this.selected = selected; if (!labels) contentDescription = s.title }
@@ -294,7 +294,7 @@ private fun SideRail(navigator: AppNavigator, onAdd: () -> Unit, labels: Boolean
                     }
                     if (labels) {
                         Spacer(Modifier.width(sp.m))
-                        Text(s.title, style = AppTheme2.type.body, color = if (selected) c.text else c.textSecondary, maxLines = 1)
+                        Text(s.title, style = AppTheme.type.body, color = if (selected) c.text else c.textSecondary, maxLines = 1)
                     }
                 }
             }

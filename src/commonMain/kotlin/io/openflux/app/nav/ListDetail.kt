@@ -16,7 +16,7 @@ import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 
 /** Marks a screen as the list (left pane) or a detail (right pane) of its section, for wide windows. */
 object ListDetail {
@@ -71,7 +71,7 @@ private class ListDetailScene(
             val listWidth = (maxWidth * 0.32f).coerceIn(300.dp, 420.dp)
             Row(Modifier.fillMaxSize()) {
                 Box(Modifier.width(listWidth).fillMaxHeight()) { list.Content() }
-                Box(Modifier.width(1.dp).fillMaxHeight().background(AppTheme2.colors.border))
+                Box(Modifier.width(1.dp).fillMaxHeight().background(AppTheme.colors.border))
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     if (detail != null) CompositionLocalProvider(LocalInPane provides true) { detail.Content() }
                     else nothingChosen(section)

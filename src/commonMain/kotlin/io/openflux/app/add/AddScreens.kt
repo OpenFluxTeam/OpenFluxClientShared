@@ -25,7 +25,7 @@ import io.openflux.app.components.SecondaryButton
 import io.openflux.app.components.Section
 import io.openflux.app.components.Tone
 import io.openflux.app.components.ValueRow
-import io.openflux.app.components.LocalToaster2
+import io.openflux.app.components.LocalToaster
 import io.openflux.app.home.profileLine
 import io.openflux.app.nav.Dest
 import io.openflux.app.profiles.ProfileActions
@@ -34,7 +34,7 @@ import io.openflux.app.servers.title
 import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.shell.rememberScreenModel
 import io.openflux.app.text.Fmt
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.SubStatus
 import io.openflux.desktop.model.TransportType
@@ -61,7 +61,7 @@ fun AddKeyScreen(scan: Boolean = false) {
             val r = m.result
             val ok = (r is KeyResult.Profile) || (r is KeyResult.Subscription && r.canAdd)
             if (ok) {
-                androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().padding(AppTheme2.spacing.page)) {
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().padding(AppTheme.spacing.page)) {
                     PrimaryButton(
                         if (r is KeyResult.Subscription) "Подключить подписку" else "Добавить профиль",
                         { m.add()?.let(navigator::replaceTop) },
@@ -73,7 +73,7 @@ fun AddKeyScreen(scan: Boolean = false) {
         },
     ) {
         Field(m.text, { m.onText(it) }, "Ключ подписки или ссылка openflux://", singleLine = false, mono = true)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             SecondaryButton("Вставить", m::paste, leading = Icons.Rounded.ContentPaste)
             SecondaryButton("Файл", m::fromFile, leading = Icons.Rounded.Description)
             SecondaryButton(if (platform.cameraScanSupported) "Сканировать QR" else "QR из картинки", m::fromQr, leading = Icons.Rounded.QrCodeScanner)
@@ -123,7 +123,7 @@ fun ShareRoot() {
         if (shareable.isEmpty()) {
             Text(
                 "Пока нечем делиться. Поставьте свою ноду в «Серверах» или добавьте подключение через ＋. Локациями подписки делиться нельзя.",
-                style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary,
+                style = AppTheme.type.body, color = AppTheme.colors.textSecondary,
             )
             return@ScreenScaffold
         }
@@ -137,7 +137,7 @@ fun ShareRoot() {
                 for (p in list) RowItem(p.name, subtitle = profileLine(p), onClick = { navigator.open(Dest.Give(p.id)) })
             }
         }
-        Text("Ноду, которой ещё нет на этом устройстве, можно отдать с её экрана в «Серверах».", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textMuted)
+        Text("Ноду, которой ещё нет на этом устройстве, можно отдать с её экрана в «Серверах».", style = AppTheme.type.bodySmall, color = AppTheme.colors.textMuted)
     }
 }
 
@@ -146,7 +146,7 @@ fun ShareRoot() {
 fun GiveScreen(dest: Dest.Give) {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val actions = remember(container) { ProfileActions(container) }
     val profiles by container.profiles.profiles.collectAsState()
     val p: Profile = profiles.firstOrNull { it.id == dest.profile } ?: return
@@ -161,7 +161,7 @@ fun GiveScreen(dest: Dest.Give) {
                     Text(
                         if (p.stream) "По этой ссылке подключится любой, у кого она есть."
                         else "По этой ссылке подключится любой. Одновременно работает одно устройство — второе вытеснит первое.",
-                        style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary,
+                        style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
                     )
                 },
                 onFailure = { Banner(it.message ?: "Этим профилем нельзя поделиться", Tone.Danger) },

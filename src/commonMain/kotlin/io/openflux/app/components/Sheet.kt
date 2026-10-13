@@ -19,7 +19,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 
 /**
  * A choice or a short form over the screen: a sheet from the bottom on a phone, a dialog in a wider window.
@@ -28,16 +28,16 @@ import io.openflux.app.theme.AppTheme2
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Sheet(onDismiss: () -> Unit, title: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     val widthDp = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
     val body = @Composable {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = AppTheme2.spacing.l)) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = AppTheme.spacing.l)) {
             if (title != null) {
                 Text(
                     title,
-                    style = AppTheme2.type.title,
+                    style = AppTheme.type.title,
                     color = c.text,
-                    modifier = Modifier.padding(horizontal = AppTheme2.spacing.l, vertical = AppTheme2.spacing.m),
+                    modifier = Modifier.padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.m),
                 )
             }
             content()
@@ -54,10 +54,10 @@ fun Sheet(onDismiss: () -> Unit, title: String? = null, content: @Composable Col
         Dialog(onDismissRequest = onDismiss) {
             Surface(
                 modifier = Modifier.widthIn(max = 480.dp),
-                shape = RoundedCornerShape(AppTheme2.shapes.large),
+                shape = RoundedCornerShape(AppTheme.shapes.large),
                 color = c.surface,
                 contentColor = c.text,
-            ) { Column(Modifier.padding(top = AppTheme2.spacing.s)) { body() } }
+            ) { Column(Modifier.padding(top = AppTheme.spacing.s)) { body() } }
         }
     }
 }

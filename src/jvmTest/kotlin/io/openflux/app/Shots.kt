@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import androidx.compose.ui.unit.Density
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import java.io.File
 import javax.imageio.ImageIO
 
@@ -32,8 +32,8 @@ object Shots {
             ) {
                 mainClock.autoAdvance = false
                 setContent {
-                    AppTheme2(dark, touch) {
-                        Box(Modifier.fillMaxSize().background(AppTheme2.colors.background)) { content() }
+                    AppTheme(dark, touch) {
+                        Box(Modifier.fillMaxSize().background(AppTheme.colors.background)) { content() }
                     }
                 }
                 mainClock.advanceTimeBy(400)

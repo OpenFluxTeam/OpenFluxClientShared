@@ -18,15 +18,15 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.openflux.app.components.LocalToaster2
-import io.openflux.app.components.ToastHost2
-import io.openflux.app.components.Toaster2
+import io.openflux.app.components.LocalToaster
+import io.openflux.app.components.ToastHost
+import io.openflux.app.components.Toaster
 import io.openflux.app.nav.AppNavHost
 import io.openflux.app.nav.AppNavigator
 import io.openflux.app.nav.Dest
 import io.openflux.app.nav.rememberAppNavigator
 import io.openflux.app.servers.ServerLink
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.ThemeMode
 import io.openflux.desktop.service.AppContainer
 import io.openflux.desktop.service.LocalAppContainer
@@ -48,12 +48,12 @@ val LocalNavigator = staticCompositionLocalOf<AppNavigator> { error("AppNavigato
  * OpenFluxApp so an app switches with one line.
  */
 @Composable
-fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shortcuts, browsers: BrowserViews = NoBrowserViews) =
-    OpenFluxApp2(container, scrollbars, shortcuts, browsers, link = null)
+fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shortcuts, browsers: BrowserViews = NoBrowserViews) =
+    OpenFluxApp(container, scrollbars, shortcuts, browsers, link = null)
 
 /** [link]: a link already connected to servers (tests and the screen catalogue); null makes the app's own. */
 @Composable
-internal fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shortcuts, browsers: BrowserViews, link: ServerLink?) {
+internal fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shortcuts, browsers: BrowserViews, link: ServerLink?) {
     val settings by container.settings.settings.collectAsState()
     // The app's own updates; the script transports' updates only with the experimental features on.
     LaunchedEffect(Unit) { container.updates.start() }
@@ -64,7 +64,7 @@ internal fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, short
         ThemeMode.Dark -> true
     }
     val touch = container.platform.kind == PlatformKind.Android
-    val toaster = remember { Toaster2() }
+    val toaster = remember { Toaster() }
     val navigator = rememberAppNavigator(container)
     val serverLink = remember(container) { link ?: ServerLink(container) }
     DisposableEffect(serverLink) { onDispose { serverLink.close() } }
@@ -79,14 +79,14 @@ internal fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, short
             }
         }
     }
-    AppTheme2(dark, touch) {
+    AppTheme(dark, touch) {
         CompositionLocalProvider(
             LocalTouchUi provides touch,
             LocalAppContainer provides container,
             LocalScrollbars provides scrollbars,
             LocalShortcuts provides shortcuts,
             LocalBrowserViews provides browsers,
-            LocalToaster2 provides toaster,
+            LocalToaster provides toaster,
             LocalNavigator provides navigator,
             LocalServerLink provides serverLink,
             LocalOpenAdd provides { addOpen = true },
@@ -99,7 +99,7 @@ internal fun OpenFluxApp2(container: AppContainer, scrollbars: Scrollbars, short
                     }
                 }
                 // Above the bottom bar on a phone.
-                ToastHost2(toaster, Modifier.align(Alignment.BottomCenter).padding(start = 16.dp, end = 16.dp, bottom = 88.dp))
+                ToastHost(toaster, Modifier.align(Alignment.BottomCenter).padding(start = 16.dp, end = 16.dp, bottom = 88.dp))
             }
             CaptchaOverlay()
             SignInOverlay()

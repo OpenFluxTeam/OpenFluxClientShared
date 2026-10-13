@@ -102,7 +102,7 @@ private val LocalSpacing = staticCompositionLocalOf { Spacing() }
 private val LocalShapes = staticCompositionLocalOf { Shapes() }
 private val LocalTouch = staticCompositionLocalOf { false }
 
-object AppTheme2 {
+object AppTheme {
     val colors: Colors @Composable get() = LocalColors.current
     val type: Type @Composable get() = LocalType.current
     val spacing: Spacing @Composable get() = LocalSpacing.current
@@ -112,10 +112,10 @@ object AppTheme2 {
 
 /** A row's minimum height: a finger needs more than a pointer. */
 @Composable
-fun rowMinHeight(): Dp = if (AppTheme2.touch) 56.dp else 44.dp
+fun rowMinHeight(): Dp = if (AppTheme.touch) 56.dp else 44.dp
 
 @Composable
-fun AppTheme2(dark: Boolean, touch: Boolean, content: @Composable () -> Unit) {
+fun AppTheme(dark: Boolean, touch: Boolean, content: @Composable () -> Unit) {
     val c = if (dark) DarkColors else LightColors
     val scheme = (if (dark) darkColorScheme() else lightColorScheme()).copy(
         primary = c.accent, onPrimary = c.onAccent,

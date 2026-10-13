@@ -40,8 +40,8 @@ import io.openflux.app.components.Banner
 import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ConfirmDialog
 import io.openflux.app.components.Field
-import io.openflux.app.components.IconButton2
-import io.openflux.app.components.LocalToaster2
+import io.openflux.app.components.IconAction
+import io.openflux.app.components.LocalToaster
 import io.openflux.app.components.ProgressLine
 import io.openflux.app.components.RowItem
 import io.openflux.app.components.ScreenScaffold
@@ -50,7 +50,7 @@ import io.openflux.app.components.SecretField
 import io.openflux.app.components.Section
 import io.openflux.app.components.Segmented
 import io.openflux.app.components.Sheet
-import io.openflux.app.components.TextButton2
+import io.openflux.app.components.TextAction
 import io.openflux.app.components.Toggle
 import io.openflux.app.components.Tone
 import io.openflux.app.components.ValueRow
@@ -60,7 +60,7 @@ import io.openflux.app.servers.isOwnNode
 import io.openflux.app.servers.title
 import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.shell.rememberScreenModel
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.Codec
 import io.openflux.desktop.model.DocumentKind
 import io.openflux.desktop.model.ExtraTransport
@@ -105,7 +105,7 @@ fun TransportType.blurb(): String = when (this) {
 fun ProfileScreen(dest: Dest.Profile) {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val actions = remember(container) { ProfileActions(container) }
     val profiles by container.profiles.profiles.collectAsState()
     val state by container.connection.state.collectAsState()
@@ -120,16 +120,16 @@ fun ProfileScreen(dest: Dest.Profile) {
         onBack = { navigator.back() },
         actions = {
             if (!p.managed) Box {
-                IconButton2(Icons.Rounded.MoreVert, "Ещё", { menu = true })
+                IconAction(Icons.Rounded.MoreVert, "Ещё", { menu = true })
                 DropdownMenu(menu, { menu = false }) {
                     DropdownMenuItem({ Text("Дублировать") }, { menu = false; actions.duplicate(p)?.let { navigator.open(Dest.Profile(it.id)) } })
                     if (!p.isOwnNode && p.editableNode) DropdownMenuItem({ Text("Это моя нода") }, { menu = false; actions.markOwn(p); toaster.show("Теперь в «Мои серверы»") })
-                    DropdownMenuItem({ Text("Удалить", color = AppTheme2.colors.danger) }, { menu = false; deleteAsk = true })
+                    DropdownMenuItem({ Text("Удалить", color = AppTheme.colors.danger) }, { menu = false; deleteAsk = true })
                 }
             }
         },
     ) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             if (running) SecondaryButton("Отключить", { container.connection.disconnect() }, leading = Icons.Rounded.Stop)
             else SecondaryButton("Подключить", { actions.connect(p) }, leading = Icons.Rounded.PlayArrow)
             if (!p.managed) SecondaryButton("Изменить", { navigator.open(Dest.ProfileEdit(p.id)) }, leading = Icons.Rounded.Edit)
@@ -147,7 +147,7 @@ fun ProfileScreen(dest: Dest.Profile) {
                     else -> c.value.ifBlank { "—" }
                 }
                 RowItem(name, subtitle = value + if (p.session && p.carriers.size > 1) " · приоритет ${c.priority}" else "", trailing = if (hidden || c.value.isBlank()) null else ({
-                    IconButton2(io.openflux.app.components.CopyIcon, "Копировать", { container.platform.setClipboardText(c.value); toaster.show("Скопировано") })
+                    IconAction(io.openflux.app.components.CopyIcon, "Копировать", { container.platform.setClipboardText(c.value); toaster.show("Скопировано") })
                 }))
             }
         }
@@ -180,7 +180,7 @@ fun ProfileScreen(dest: Dest.Profile) {
 fun ProfileEditScreen(dest: Dest.ProfileEdit) {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val shortcuts = LocalShortcuts.current
     val touch = LocalTouchUi.current
     val m = rememberScreenModel { ProfileEditorModel(container, dest.id, it) }
@@ -207,7 +207,7 @@ fun ProfileEditScreen(dest: Dest.ProfileEdit) {
     ScreenScaffold(
         if (m.isNew) "Новый профиль" else "Изменить профиль",
         onBack = leave,
-        actions = { if (!m.readOnly) TextButton2("Сохранить", save) },
+        actions = { if (!m.readOnly) TextAction("Сохранить", save) },
     ) {
         if (m.readOnly) {
             Banner("Приходит с подпиской, менять её нельзя", Tone.Info)
@@ -216,7 +216,7 @@ fun ProfileEditScreen(dest: Dest.ProfileEdit) {
         if (m.showProblems) m.problems.firstOrNull()?.let { Banner(it, Tone.Danger) }
         Field(d.name, { v -> m.edit { it.copy(name = v) } }, "Название", placeholder = "Например, Нода в Нидерландах")
         Section("Режим") {
-            Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+            Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                 Segmented(EditMode.entries, d.editMode, m::setMode, label = { it.label })
                 Text(
                     when (d.editMode) {
@@ -224,7 +224,7 @@ fun ProfileEditScreen(dest: Dest.ProfileEdit) {
                         EditMode.Session -> "Несколько транспортов, переключение по приоритету. Нода должна работать в режиме Session."
                         EditMode.Stream -> "Нода на PHP-хостинге, без ключа. Проще создать через ＋ → «Без сервера»."
                     },
-                    style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary,
+                    style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
                 )
             }
             if (d.session) {
@@ -240,7 +240,7 @@ fun ProfileEditScreen(dest: Dest.ProfileEdit) {
         if (d.session) SecondaryButton("Добавить транспорт", m::addTransport, leading = Icons.Rounded.Add)
         if (!d.stream) {
             SecretField(d.secret, { v -> m.edit { it.copy(secret = v.trim()) } }, "Ключ шифрования")
-            TextButton2("Сгенерировать ключ", m::newKey)
+            TextAction("Сгенерировать ключ", m::newKey)
             when {
                 d.secret.isBlank() && !d.session -> Banner("Без ключа трафик виден владельцу площадки (Яндекс, Mail.ru). Задайте ключ, как на ноде.", Tone.Warning)
                 d.secret.isNotBlank() && d.secret.length < 24 -> Banner("Короткий ключ можно подобрать. Надёжнее сгенерированный.", Tone.Info)
@@ -249,9 +249,9 @@ fun ProfileEditScreen(dest: Dest.ProfileEdit) {
         if ((!d.session && !d.stream) || d.session) {
             Section(null) {
                 Collapsible("Дополнительно") {
-                    Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
+                    Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
                         if (!d.session && !d.stream) {
-                            Text("Кодек", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary)
+                            Text("Кодек", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
                             Segmented(Codec.entries, d.codec, { c -> m.edit { it.copy(codec = c) } }, label = { it.label })
                         }
                         if (d.session) {
@@ -294,15 +294,15 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
             subtitle = if (c.type == TransportType.SCRIPT && script == null) "JS-транспорт выключен" else c.type.blurb(),
             trailing = {
                 Row {
-                    if (index > 0) IconButton2(Icons.Rounded.Close, "Убрать транспорт", { m.removeTransport(index) })
-                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = AppTheme2.colors.textMuted)
+                    if (index > 0) IconAction(Icons.Rounded.Close, "Убрать транспорт", { m.removeTransport(index) })
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = AppTheme.colors.textMuted)
                 }
             },
             onClick = { pick = true },
         )
-        Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+        Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             if (c.type == TransportType.SCRIPT && !settings.experimental) {
-                Text("Экспериментальные функции выключены: с этим транспортом профиль не подключится.", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.warning)
+                Text("Экспериментальные функции выключены: с этим транспортом профиль не подключится.", style = AppTheme.type.bodySmall, color = AppTheme.colors.warning)
             }
             val param = script?.primaryParam
             val noField = c.type == TransportType.SCRIPT && script != null && param == null
@@ -329,7 +329,7 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
                 }
             }
             if (script != null && script.hasSettings) {
-                TextButton2("Настройки транспорта", {
+                TextAction("Настройки транспорта", {
                     val current = c.settings + (param?.key?.let { mapOf(it to c.value) } ?: emptyMap())
                     container.scriptSettings.open(script.id, current) { saved ->
                         val v = param?.key?.let { saved[it] } ?: c.value
@@ -342,13 +342,13 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
             if (m.busyIndex == index) ProgressLine("Создаю…")
             else {
                 DocumentKind.of(c.type)?.let { kind ->
-                    TextButton2("Создать ${kind.label} в ${kind.account.where}", { m.makeDocument(index) })
+                    TextAction("Создать ${kind.label} в ${kind.account.where}", { m.makeDocument(index) })
                 }
-                if (c.type == TransportType.CUPSONLINE && !d.stream) TextButton2("Сгенерировать комнаты", { m.makeRooms(index) })
+                if (c.type == TransportType.CUPSONLINE && !d.stream) TextAction("Сгенерировать комнаты", { m.makeRooms(index) })
             }
-            if (m.error != null && m.busyIndex == null) Text(m.error!!, style = AppTheme2.type.bodySmall, color = AppTheme2.colors.danger)
+            if (m.error != null && m.busyIndex == null) Text(m.error!!, style = AppTheme.type.bodySmall, color = AppTheme.colors.danger)
             if (d.session) {
-                Row(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
                     Field(
                         c.priority.toString(),
                         { v -> v.filter(Char::isDigit).take(3).toIntOrNull()?.let { p -> m.editTransport(index) { it.copy(priority = p) } } },
@@ -356,8 +356,8 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
                     )
                 }
                 val networks = NetworkKind.entries.filter { !android || it != NetworkKind.Ethernet }
-                Text("Сеть", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+                Text("Сеть", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                     for (n in networks) io.openflux.app.components.Chip(n.label, c.network == n, { m.editTransport(index) { it.copy(network = n) } })
                 }
             }
@@ -383,7 +383,7 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
                         pick = false
                     })
                 }
-                TextButton2("Управлять транспортами", { pick = false; navigator.open(Dest.Scripts) })
+                TextAction("Управлять транспортами", { pick = false; navigator.open(Dest.Scripts) })
             }
         }
     }

@@ -18,7 +18,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import io.openflux.app.shell.OpenFluxApp2
+import io.openflux.app.shell.OpenFluxApp
 import io.openflux.app.shell.WidthClass
 import io.openflux.app.shell.widthClassOf
 import io.openflux.app.platform.NoScrollbars
@@ -38,7 +38,7 @@ class ShellTest {
 
     @Test
     fun sectionsAndAddMenu() = runComposeUiTest {
-        setContent { OpenFluxApp2(testContainer(), NoScrollbars, Shortcuts()) }
+        setContent { OpenFluxApp(testContainer(), NoScrollbars, Shortcuts()) }
         onNodeWithText("Поделиться").performClick()
         onNodeWithText("Пока нечем делиться", substring = true).assertIsDisplayed()
         onNodeWithContentDescription("Добавить").performClick()
@@ -51,7 +51,7 @@ class ShellTest {
         setContent {
             val base = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(base.density, 1.3f)) {
-                Box(Modifier.requiredSize(320.dp, 640.dp)) { OpenFluxApp2(testContainer(), NoScrollbars, Shortcuts()) }
+                Box(Modifier.requiredSize(320.dp, 640.dp)) { OpenFluxApp(testContainer(), NoScrollbars, Shortcuts()) }
             }
         }
         val tab = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab)

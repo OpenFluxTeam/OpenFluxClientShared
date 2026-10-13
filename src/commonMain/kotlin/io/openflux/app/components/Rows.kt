@@ -43,7 +43,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.app.theme.rowMinHeight
 
 /** The copy icon, the same everywhere. */
@@ -54,7 +54,7 @@ enum class Status { Off, Busy, On, Warning, Error }
 
 @Composable
 fun StatusDot(status: Status, modifier: Modifier = Modifier) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     val color = when (status) {
         Status.Off -> c.textMuted
         Status.Busy, Status.Warning -> c.warning
@@ -82,8 +82,8 @@ fun RowItem(
     enabled: Boolean = true,
     onDoubleClick: (() -> Unit)? = null,
 ) {
-    val c = AppTheme2.colors
-    val sp = AppTheme2.spacing
+    val c = AppTheme.colors
+    val sp = AppTheme.spacing
     val clickable = if (onClick != null || onLongClick != null || onDoubleClick != null) {
         Modifier.combinedClickable(enabled = enabled, onClick = onClick ?: {}, onLongClick = onLongClick, onDoubleClick = onDoubleClick)
     } else Modifier
@@ -100,7 +100,7 @@ fun RowItem(
         Column(Modifier.weight(1f)) {
             Text(
                 title,
-                style = AppTheme2.type.body,
+                style = AppTheme.type.body,
                 color = when {
                     !enabled -> c.textMuted
                     selected -> c.accent
@@ -110,7 +110,7 @@ fun RowItem(
                 overflow = TextOverflow.Ellipsis,
             )
             if (subtitle != null) {
-                Text(subtitle, style = AppTheme2.type.bodySmall, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = AppTheme.type.bodySmall, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         if (trailing != null) {
@@ -124,8 +124,8 @@ fun RowItem(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ValueRow(title: String, value: String, modifier: Modifier = Modifier, mono: Boolean = false, onCopy: (() -> Unit)? = null) {
-    val c = AppTheme2.colors
-    val sp = AppTheme2.spacing
+    val c = AppTheme.colors
+    val sp = AppTheme.spacing
     Row(
         modifier.fillMaxWidth().heightIn(min = rowMinHeight()).padding(start = sp.l, end = if (onCopy != null) sp.xs else sp.l),
         verticalAlignment = Alignment.CenterVertically,
@@ -135,10 +135,10 @@ fun ValueRow(title: String, value: String, modifier: Modifier = Modifier, mono: 
             horizontalArrangement = Arrangement.spacedBy(sp.m, Alignment.End),
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, Modifier.weight(1f), style = AppTheme2.type.body, color = c.textSecondary, maxLines = 1)
-            Text(value, style = if (mono) AppTheme2.type.mono else AppTheme2.type.body, color = c.text)
+            Text(title, Modifier.weight(1f), style = AppTheme.type.body, color = c.textSecondary, maxLines = 1)
+            Text(value, style = if (mono) AppTheme.type.mono else AppTheme.type.body, color = c.text)
         }
-        if (onCopy != null) IconButton2(Icons.Rounded.ContentCopy, "Копировать", onCopy)
+        if (onCopy != null) IconAction(Icons.Rounded.ContentCopy, "Копировать", onCopy)
     }
 }
 
@@ -148,13 +148,13 @@ fun ValueRow(title: String, value: String, modifier: Modifier = Modifier, mono: 
  */
 @Composable
 fun Section(title: String?, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val c = AppTheme2.colors
-    val sp = AppTheme2.spacing
+    val c = AppTheme.colors
+    val sp = AppTheme.spacing
     Column(modifier.fillMaxWidth()) {
         if (title != null) {
             Text(
                 title.uppercase(),
-                style = AppTheme2.type.caption,
+                style = AppTheme.type.caption,
                 color = c.textMuted,
                 modifier = Modifier.padding(start = sp.l, bottom = sp.xs),
             )
@@ -164,7 +164,7 @@ fun Section(title: String?, modifier: Modifier = Modifier, content: @Composable 
         val inset = sp.l
         Layout(
             content = content,
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(AppTheme2.shapes.medium)).background(c.surface)
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(AppTheme.shapes.medium)).background(c.surface)
                 .drawWithContent {
                     drawContent()
                     val x = inset.toPx()
@@ -191,7 +191,7 @@ private class Seams {
 @Composable
 fun Group(title: String?, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Section(title, modifier) {
-        Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s), content = content)
+        Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), content = content)
     }
 }
 
@@ -203,7 +203,7 @@ fun Collapsible(title: String, modifier: Modifier = Modifier, initiallyOpen: Boo
     Column(modifier.fillMaxWidth()) {
         RowItem(
             title,
-            trailing = { Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = AppTheme2.colors.textSecondary, modifier = Modifier.rotate(turn)) },
+            trailing = { Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = AppTheme.colors.textSecondary, modifier = Modifier.rotate(turn)) },
             onClick = { open = !open },
         )
         AnimatedVisibility(open) { Column(content = content) }

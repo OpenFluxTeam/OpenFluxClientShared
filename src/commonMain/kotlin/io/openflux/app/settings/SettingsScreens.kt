@@ -32,7 +32,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.KeyboardType
 import io.openflux.app.components.Banner
 import io.openflux.app.components.Field
-import io.openflux.app.components.LocalToaster2
+import io.openflux.app.components.LocalToaster
 import io.openflux.app.components.PrimaryButton
 import io.openflux.app.components.ProgressLine
 import io.openflux.app.components.RowItem
@@ -40,7 +40,7 @@ import io.openflux.app.components.ScreenScaffold
 import io.openflux.app.components.SecondaryButton
 import io.openflux.app.components.Section
 import io.openflux.app.components.Segmented
-import io.openflux.app.components.TextButton2
+import io.openflux.app.components.TextAction
 import io.openflux.app.components.Toggle
 import io.openflux.app.components.Tone
 import io.openflux.app.components.ValueRow
@@ -48,7 +48,7 @@ import io.openflux.app.nav.Dest
 import io.openflux.app.nav.LocalInPane
 import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.text.Fmt
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.AuthStatus
 import io.openflux.desktop.model.CoreRepos
@@ -97,8 +97,8 @@ fun SettingsRoot(selected: Dest? = null) {
             for (p in SettingsPage.entries) {
                 RowItem(
                     if (p == SettingsPage.Vpn && android) "VPN" else p.title,
-                    leading = { Icon(p.icon, contentDescription = null, tint = AppTheme2.colors.textSecondary) },
-                    trailing = { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = AppTheme2.colors.textMuted) },
+                    leading = { Icon(p.icon, contentDescription = null, tint = AppTheme.colors.textSecondary) },
+                    trailing = { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = AppTheme.colors.textMuted) },
                     selected = selected == p.dest(),
                     onClick = { navigator.open(p.dest()) },
                 )
@@ -131,7 +131,7 @@ fun SettingsPageScreen(dest: Dest.SettingsPage) {
 @Composable
 private fun NextConnectionNote() {
     val state by LocalAppContainer.current.connection.state.collectAsState()
-    if (state.isActive) Text("Применится при переподключении", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.warning)
+    if (state.isActive) Text("Применится при переподключении", style = AppTheme.type.bodySmall, color = AppTheme.colors.warning)
 }
 
 @Composable
@@ -154,7 +154,7 @@ private fun ConnectionPage() {
         Text(
             if (android) "Прокси 127.0.0.1:$parsed работает, когда VPN выключен"
             else "SOCKS5 127.0.0.1:$parsed, HTTP-прокси 127.0.0.1:${parsed!! + 1}",
-            style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary,
+            style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
         )
     }
     NextConnectionNote()
@@ -181,7 +181,7 @@ private fun VpnPage() {
         Text(
             if (settings.fullTunnel) "Чтобы при обрыве ничего не шло мимо, включите в настройках Android «Постоянный VPN» и «Блокировать подключения без VPN»."
             else "Без VPN работает только прокси SOCKS5 127.0.0.1:${settings.socksPort}: через ноду идут лишь приложения, где он указан.",
-            style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary,
+            style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
         )
         return
     }
@@ -198,7 +198,7 @@ private fun VpnPage() {
     if (!platform.systemProxySupported) {
         Text(
             "Системный прокси есть только в Windows. Укажите SOCKS5 127.0.0.1:${settings.socksPort} в нужных программах" + if (platform.fullTunnelSupported) " или включите TUN." else ".",
-            style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary,
+            style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
         )
         return
     }
@@ -207,7 +207,7 @@ private fun VpnPage() {
         ValueRow("Адрес", "127.0.0.1:${settings.socksPort + 1}", mono = true)
         ValueRow("Исключения", "localhost, 127.*, 10.*, 192.168.*")
     }
-    Text("Прежние настройки прокси Windows возвращаются при отключении и выходе.", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary)
+    Text("Прежние настройки прокси Windows возвращаются при отключении и выходе.", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
 }
 
 /** Yandex and Mail.ru sign-ins (spec 8.3, "Сервисы"). */
@@ -215,7 +215,7 @@ private fun VpnPage() {
 private fun ServicesPage() {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     val status by container.accounts.status.collectAsState()
     val profiles by container.profiles.profiles.collectAsState()
@@ -235,36 +235,36 @@ private fun ServicesPage() {
             }
         }
     }
-    Text("Войдите один раз: Яндекс реже просит проверку, а ваши ноды получают сессию сами. Пароль OpenFlux не видит.", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+    Text("Войдите один раз: Яндекс реже просит проверку, а ваши ноды получают сессию сами. Пароль OpenFlux не видит.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
     for (kind in AccountKind.entries.filter { it.signsIn }) {
         val st = status[kind] ?: AuthStatus.SignedOut
         Section(kind.label) {
             RowItem(serviceStatus(st, container.platform.now()).replaceFirstChar { it.uppercase() }, subtitle = serviceUsage(kind, profiles))
-            Column(Modifier.fillMaxWidth().padding(horizontal = AppTheme2.spacing.l, vertical = AppTheme2.spacing.s)) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.xs)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.s)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.xs)) {
                     when (st) {
-                        AuthStatus.SignedOut -> TextButton2("Войти в ${kind.label}", { act { container.accounts.signIn(kind) } })
+                        AuthStatus.SignedOut -> TextAction("Войти в ${kind.label}", { act { container.accounts.signIn(kind) } })
                         is AuthStatus.Checking -> Unit
-                        is AuthStatus.Busy -> TextButton2("Отмена", container.accounts::cancel)
+                        is AuthStatus.Busy -> TextAction("Отмена", container.accounts::cancel)
                         is AuthStatus.SignedIn -> {
-                            if (kind.createsDocuments && settings.developerMode) TextButton2("Создать документ", {
+                            if (kind.createsDocuments && settings.developerMode) TextAction("Создать документ", {
                                 act { created = kind to container.accounts.createDocument(kind, io.openflux.desktop.model.NodeDocuments.fileName("", "", container.platform.now())) }
                             })
-                            TextButton2("Проверить", { act { container.accounts.check(kind) } })
-                            TextButton2("Выйти", { container.accounts.signOut(kind) }, color = AppTheme2.colors.textSecondary)
+                            TextAction("Проверить", { act { container.accounts.check(kind) } })
+                            TextAction("Выйти", { container.accounts.signOut(kind) }, color = AppTheme.colors.textSecondary)
                         }
                         is AuthStatus.Expired -> {
-                            TextButton2("Войти заново", { act { container.accounts.signIn(kind) } })
-                            TextButton2("Выйти", { container.accounts.signOut(kind) }, color = AppTheme2.colors.textSecondary)
+                            TextAction("Войти заново", { act { container.accounts.signIn(kind) } })
+                            TextAction("Выйти", { container.accounts.signOut(kind) }, color = AppTheme.colors.textSecondary)
                         }
                         is AuthStatus.NeedsCheck -> {
-                            TextButton2("Войти заново", { act { container.accounts.signIn(kind) } })
-                            TextButton2("Проверить", { act { container.accounts.check(kind) } })
+                            TextAction("Войти заново", { act { container.accounts.signIn(kind) } })
+                            TextAction("Проверить", { act { container.accounts.check(kind) } })
                         }
                         is AuthStatus.Failed -> {
-                            TextButton2("Проверить снова", { act { container.accounts.check(kind) } })
-                            TextButton2("Войти заново", { act { container.accounts.signIn(kind) } })
-                            if (st.login.isNotEmpty()) TextButton2("Выйти", { container.accounts.signOut(kind) }, color = AppTheme2.colors.textSecondary)
+                            TextAction("Проверить снова", { act { container.accounts.check(kind) } })
+                            TextAction("Войти заново", { act { container.accounts.signIn(kind) } })
+                            if (st.login.isNotEmpty()) TextAction("Выйти", { container.accounts.signOut(kind) }, color = AppTheme.colors.textSecondary)
                         }
                     }
                 }
@@ -287,7 +287,7 @@ private fun ServicesPage() {
     if (status.values.any { it !is AuthStatus.SignedOut }) SecondaryButton("Проверить все", { container.accounts.checkAllInBackground(force = true) })
     Text(
         "Сервис может заблокировать аккаунт, которым пользуются так. Авторы OpenFlux за это не отвечают. Cups.online и прямое подключение входа не требуют.",
-        style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textMuted,
+        style = AppTheme.type.bodySmall, color = AppTheme.colors.textMuted,
     )
 }
 
@@ -333,11 +333,11 @@ private fun CorePage() {
                 }, enabled = platform.coreDownloadSupported)
                 result?.let { Banner(it, Tone.Success) }
                 error?.let { Banner(it, Tone.Danger) }
-                Text("Выпуск из github.com/$repo, сверенный с SHA256SUMS.txt. Мастер своей ноды всегда работает со встроенным ядром.", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary)
+                Text("Выпуск из github.com/$repo, сверенный с SHA256SUMS.txt. Мастер своей ноды всегда работает со встроенным ядром.", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
             }
             else -> {
                 Field(settings.customCorePath, { v -> container.settings.update { it.copy(customCorePath = v) } }, "Путь к файлу ядра", mono = true)
-                TextButton2("Выбрать файл…", {
+                TextAction("Выбрать файл…", {
                     scope.launch { platform.pickFile("Файл ядра OpenFlux", emptyList())?.let { path -> container.settings.update { it.copy(customCorePath = path) } } }
                 })
             }
@@ -352,7 +352,7 @@ private fun CorePage() {
                 2 -> "Сессии, транспорты, ключи шифрования: для диагностики."
                 else -> "Вдобавок дампы пакетов: самый медленный."
             },
-            style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary,
+            style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
         )
     }
     NextConnectionNote()
@@ -386,14 +386,14 @@ private fun ExperimentalPage() {
     }
     Text(
         "Могут работать нестабильно и меняться от версии к версии. JS-транспорт — чужой код без песочницы, с полным доступом к сети: ставьте только от авторов, которым доверяете.",
-        style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary,
+        style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
     )
 }
 
 @Composable
 private fun AboutPage() {
     val container = LocalAppContainer.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     val platform = container.platform
     val settings by container.settings.settings.collectAsState()
@@ -441,6 +441,6 @@ private fun AboutPage() {
     }
     Text(
         "OpenFlux — экспериментальный проект без независимого аудита безопасности. Не публикуйте ключи и ссылки openflux://.",
-        style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textMuted,
+        style = AppTheme.type.bodySmall, color = AppTheme.colors.textMuted,
     )
 }

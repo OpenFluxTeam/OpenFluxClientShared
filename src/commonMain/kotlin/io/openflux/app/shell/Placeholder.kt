@@ -8,7 +8,7 @@ import io.openflux.app.components.ScreenScaffold
 import io.openflux.app.nav.AppNavigator
 import io.openflux.app.nav.Dest
 import io.openflux.app.nav.destEntry
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 
 /** A screen's title until its real screen exists. */
 private fun titleOf(dest: Dest): String = when (dest) {
@@ -24,7 +24,7 @@ private fun titleOf(dest: Dest): String = when (dest) {
 @Composable
 fun Placeholder(dest: Dest, onBack: (() -> Unit)?) {
     ScreenScaffold(titleOf(dest), onBack = onBack) {
-        Text("Экран появится в следующей части", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+        Text("Экран появится в следующей части", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
     }
 }
 
@@ -44,8 +44,8 @@ fun NothingChosen(section: io.openflux.app.nav.Section) {
                 io.openflux.app.nav.Section.Settings -> "Выберите раздел слева"
                 else -> "Выберите слева"
             },
-            style = AppTheme2.type.body,
-            color = AppTheme2.colors.textMuted,
+            style = AppTheme.type.body,
+            color = AppTheme.colors.textMuted,
         )
     }
 }

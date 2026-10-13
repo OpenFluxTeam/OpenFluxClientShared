@@ -12,16 +12,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 
 /** What a long operation is doing, in one line, with a bar; [onDetails] opens the journal ("Подробнее"). */
 @Composable
 fun ProgressLine(text: String, modifier: Modifier = Modifier, onDetails: (() -> Unit)? = null) {
-    val c = AppTheme2.colors
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.xs)) {
+    val c = AppTheme.colors
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.xs)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text, Modifier.weight(1f), style = AppTheme2.type.bodySmall, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (onDetails != null) TextButton2("Подробнее", onDetails, color = c.textSecondary)
+            Text(text, Modifier.weight(1f), style = AppTheme.type.bodySmall, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (onDetails != null) TextAction("Подробнее", onDetails, color = c.textSecondary)
         }
         LinearProgressIndicator(Modifier.fillMaxWidth(), color = c.accent, trackColor = c.surfaceHigh)
     }
@@ -44,8 +44,8 @@ fun ChangesBar(
     applyLabel: String = "Применить",
 ) {
     if (changes == 0 && busy == null && error == null) return
-    val c = AppTheme2.colors
-    val sp = AppTheme2.spacing
+    val c = AppTheme.colors
+    val sp = AppTheme.spacing
     Column(
         modifier.fillMaxWidth().background(c.surface).padding(horizontal = sp.page, vertical = sp.m),
         verticalArrangement = Arrangement.spacedBy(sp.s),
@@ -55,9 +55,9 @@ fun ChangesBar(
             return@Column
         }
         val line = error ?: problem
-        if (line != null) Text(line, style = AppTheme2.type.bodySmall, color = if (error != null) c.danger else c.warning)
+        if (line != null) Text(line, style = AppTheme.type.bodySmall, color = if (error != null) c.danger else c.warning)
         if (changes > 0) {
-            Text("Изменено: $changes", style = AppTheme2.type.body, color = c.text, maxLines = 1)
+            Text("Изменено: $changes", style = AppTheme.type.body, color = c.text, maxLines = 1)
             Row(horizontalArrangement = Arrangement.spacedBy(sp.s)) {
                 SecondaryButton("Отменить", onDiscard, Modifier.weight(1f))
                 PrimaryButton(applyLabel, onApply, Modifier.weight(1f), enabled = problem == null)

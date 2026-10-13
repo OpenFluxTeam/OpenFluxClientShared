@@ -30,7 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.app.theme.MinTouch
 
 private val ButtonPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
@@ -39,27 +39,27 @@ private val ButtonPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
 private fun ButtonLabel(text: String, leading: ImageVector?) {
     if (leading != null) {
         Icon(leading, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(AppTheme2.spacing.s))
+        Spacer(Modifier.width(AppTheme.spacing.s))
     }
     // A narrow button (two side by side on a small phone) shrinks its label rather than cutting it.
     BasicText(
         text,
-        style = AppTheme2.type.title.copy(color = LocalContentColor.current),
+        style = AppTheme.type.title.copy(color = LocalContentColor.current),
         maxLines = 1,
         softWrap = false,
-        autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = AppTheme2.type.title.fontSize, stepSize = 0.5.sp),
+        autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = AppTheme.type.title.fontSize, stepSize = 0.5.sp),
     )
 }
 
 /** The one main action of a screen. */
 @Composable
 fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, leading: ImageVector? = null) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     Button(
         onClick = onClick,
         modifier = modifier.defaultMinSize(minHeight = MinTouch),
         enabled = enabled,
-        shape = RoundedCornerShape(AppTheme2.shapes.medium),
+        shape = RoundedCornerShape(AppTheme.shapes.medium),
         colors = ButtonDefaults.buttonColors(
             containerColor = c.accent, contentColor = c.onAccent,
             disabledContainerColor = c.surfaceHigh, disabledContentColor = c.textMuted,
@@ -70,12 +70,12 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
 
 @Composable
 fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, leading: ImageVector? = null) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.defaultMinSize(minHeight = MinTouch),
         enabled = enabled,
-        shape = RoundedCornerShape(AppTheme2.shapes.medium),
+        shape = RoundedCornerShape(AppTheme.shapes.medium),
         border = BorderStroke(1.dp, c.border),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = c.text, disabledContentColor = c.textMuted),
         contentPadding = ButtonPadding,
@@ -85,12 +85,12 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
 /** Deletes or breaks something: the colour says so before the dialog does. */
 @Composable
 fun DangerButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.defaultMinSize(minHeight = MinTouch),
         enabled = enabled,
-        shape = RoundedCornerShape(AppTheme2.shapes.medium),
+        shape = RoundedCornerShape(AppTheme.shapes.medium),
         border = BorderStroke(1.dp, c.danger),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = c.danger, disabledContentColor = c.textMuted),
         contentPadding = ButtonPadding,
@@ -98,20 +98,20 @@ fun DangerButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifie
 }
 
 @Composable
-fun TextButton2(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, color: Color = AppTheme2.colors.accent) {
+fun TextAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, color: Color = AppTheme.colors.accent) {
     TextButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
-        colors = ButtonDefaults.textButtonColors(contentColor = color, disabledContentColor = AppTheme2.colors.textMuted),
-    ) { Text(text, style = AppTheme2.type.title, maxLines = 1) }
+        colors = ButtonDefaults.textButtonColors(contentColor = color, disabledContentColor = AppTheme.colors.textMuted),
+    ) { Text(text, style = AppTheme.type.title, maxLines = 1) }
 }
 
 /** An icon with a tooltip naming it (and its shortcut, when [description] carries one: "Добавить · Ctrl+N"). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IconButton2(icon: ImageVector, description: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    val c = AppTheme2.colors
+fun IconAction(icon: ImageVector, description: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val c = AppTheme.colors
     val button = @Composable {
         IconButton(
             onClick = onClick,
@@ -120,7 +120,7 @@ fun IconButton2(icon: ImageVector, description: String, onClick: () -> Unit, mod
             colors = IconButtonDefaults.iconButtonColors(contentColor = c.text, disabledContentColor = c.textMuted),
         ) { Icon(icon, contentDescription = description.substringBefore(" · ")) }
     }
-    if (AppTheme2.touch) {
+    if (AppTheme.touch) {
         button()
     } else {
         TooltipBox(

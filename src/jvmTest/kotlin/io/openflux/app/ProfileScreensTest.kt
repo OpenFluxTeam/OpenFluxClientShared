@@ -11,7 +11,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.v2.runComposeUiTest
 import io.openflux.app.nav.AppNavigator
 import io.openflux.app.nav.Dest
-import io.openflux.app.shell.OpenFluxApp2
+import io.openflux.app.shell.OpenFluxApp
 import io.openflux.app.platform.NoScrollbars
 import io.openflux.app.platform.Shortcuts
 import kotlin.test.Test
@@ -22,7 +22,7 @@ class ProfileScreensTest {
     @Test
     fun aProfileMadeByHandIsSavedAndShown() = runComposeUiTest {
         val c = testContainer()
-        setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         onNodeWithContentDescription("Добавить").performClick()
         onNodeWithText("Вручную").performClick()
         onNodeWithText("Сохранить").performClick()
@@ -41,7 +41,7 @@ class ProfileScreensTest {
         val c = homeWorld()
         for ((name, dest) in listOf("profile" to Dest.Profile("a"), "profile-edit" to Dest.ProfileEdit("a"), "profile-new" to Dest.ProfileEdit())) {
             c.settings.update { it.copy(navState = AppNavigator().apply { open(dest) }.snapshot().encode()) }
-            Shots.render(name) { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+            Shots.render(name) { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         }
     }
 }

@@ -3,7 +3,7 @@ package io.openflux.app
 import io.openflux.app.nav.AppNavigator
 import io.openflux.app.nav.Dest
 import io.openflux.app.servers.ServerLink
-import io.openflux.app.shell.OpenFluxApp2
+import io.openflux.app.shell.OpenFluxApp
 import io.openflux.desktop.model.InstalledChannel
 import io.openflux.desktop.model.KnownServer
 import io.openflux.desktop.model.NodeTransport
@@ -37,7 +37,7 @@ class ServersShotsTest {
     private fun shot(name: String, w: World, vararg stack: Dest, frame: Shots.Frame = Shots.PHONE) {
         val n = AppNavigator().apply { stack.forEach { open(it) } }
         w.c.settings.update { it.copy(navState = n.snapshot().encode()) }
-        Shots.render(name, frame) { OpenFluxApp2(w.c, NoScrollbars, Shortcuts(), NoBrowserViews, w.link) }
+        Shots.render(name, frame) { OpenFluxApp(w.c, NoScrollbars, Shortcuts(), NoBrowserViews, w.link) }
     }
 
     private val id = "203.0.113.7:22:root"
@@ -46,7 +46,7 @@ class ServersShotsTest {
         val c = testContainer()
         val n = AppNavigator().apply { open(Dest.Servers) }
         c.settings.update { it.copy(navState = n.snapshot().encode()) }
-        Shots.render("servers-empty") { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        Shots.render("servers-empty") { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
     }
 
     @Test fun serversList() = shot("servers", world(), Dest.Servers)
@@ -63,7 +63,7 @@ class ServersShotsTest {
 
     private fun plain(name: String, c: AppContainer, vararg stack: Dest) {
         c.settings.update { it.copy(navState = AppNavigator().apply { stack.forEach { open(it) } }.snapshot().encode()) }
-        Shots.render(name) { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        Shots.render(name) { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
     }
 
     @Test fun newHosting() = plain("hosting-new", testContainer(), Dest.NewHosting)

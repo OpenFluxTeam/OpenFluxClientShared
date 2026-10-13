@@ -26,7 +26,7 @@ import io.openflux.app.components.Chip
 import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ConfirmDialog
 import io.openflux.app.components.Field
-import io.openflux.app.components.LocalToaster2
+import io.openflux.app.components.LocalToaster
 import io.openflux.app.components.PrimaryButton
 import io.openflux.app.components.ProgressLine
 import io.openflux.app.components.RowItem
@@ -37,14 +37,14 @@ import io.openflux.app.components.Section
 import io.openflux.app.components.Segmented
 import io.openflux.app.components.Status
 import io.openflux.app.components.StatusDot
-import io.openflux.app.components.TextButton2
+import io.openflux.app.components.TextAction
 import io.openflux.app.components.Toggle
 import io.openflux.app.components.Tone
 import io.openflux.app.components.ValueRow
 import io.openflux.app.nav.Dest
 import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.shell.rememberScreenModel
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.PhpHosts
 import io.openflux.desktop.model.PhpMessages
 import io.openflux.desktop.model.TransportType
@@ -65,7 +65,7 @@ fun NewHostingScreen() {
         "Нода без сервера",
         onBack = { navigator.back() },
         bottomBar = {
-            Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.page), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+            Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.page), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                 when {
                     done != null -> {
                         Banner(m.securityNote ?: "Нода работает", Tone.Warning)
@@ -74,47 +74,47 @@ fun NewHostingScreen() {
                     busy != null -> ProgressLine(busy, onDetails = { navigator.open(Dest.Logs) })
                     m.verifyFailed != null -> {
                         Banner(m.verifyFailed!!, Tone.Danger, action = "Повторить", onAction = m::retryVerify)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                             SecondaryButton("Оставить как есть", m::keepAnyway)
-                            if (m.canRemove) TextButton2("Удалить с хостинга", m::removeFailed, color = AppTheme2.colors.danger)
+                            if (m.canRemove) TextAction("Удалить с хостинга", m::removeFailed, color = AppTheme.colors.danger)
                         }
                     }
-                    m.error != null && m.canRemove -> FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+                    m.error != null && m.canRemove -> FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                         PrimaryButton("Повторить", m::install)
-                        TextButton2("Удалить с хостинга", m::removeFailed, color = AppTheme2.colors.danger)
+                        TextAction("Удалить с хостинга", m::removeFailed, color = AppTheme.colors.danger)
                     }
                     else -> PrimaryButton(if (m.existing) "Подключить ноду" else "Установить", m::install, Modifier.fillMaxWidth())
                 }
             }
         },
     ) {
-        Text("Нода на обычном хостинге с PHP, даже на бесплатном.", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+        Text("Нода на обычном хостинге с PHP, даже на бесплатном.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
         Segmented(listOf(false, true), m.existing, { m.existing = it }, label = { if (it) "Уже залита" else "Залить по FTP" })
         if (m.existing) {
             Field(m.site, m::onExistingAddress, "Адрес сайта или страницы ноды", placeholder = "https://ваш-сайт.ru")
             Field(m.token, { m.token = it }, "Ключ доступа", mono = true)
         } else {
             Field(m.ftpHost, { m.ftpHost = it }, "Адрес FTP-сервера", placeholder = "ftpupload.net")
-            m.preset?.let { Text(it.note, style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary) }
+            m.preset?.let { Text(it.note, style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary) }
             Field(m.ftpUser, { m.ftpUser = it }, "Логин FTP")
             SecretField(m.ftpPassword, { m.ftpPassword = it }, "Пароль FTP")
             Field(m.site, { m.site = it }, "Адрес сайта", placeholder = "https://ваш-сайт.ru")
         }
         if (m.folderChoices.isNotEmpty()) {
-            Text("Какая папка на хостинге — сайт?", style = AppTheme2.type.title, color = AppTheme2.colors.text)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+            Text("Какая папка на хостинге — сайт?", style = AppTheme.type.title, color = AppTheme.colors.text)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                 for (dir in m.folderChoices) Chip(dir, selected = false, onClick = { m.chooseFolder(dir) })
             }
         }
         Section("Транспорт") {
-            Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
+            Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
                 Segmented(PhpHosts.carriers, m.carrier, { m.carrier = it }, label = { it.title })
                 if (m.carrier == TransportType.MAILRU) Field(m.mailru, { m.mailru = it }, "Публичная ссылка Mail.ru", mono = true)
             }
         }
         Section(null) {
             Collapsible("Дополнительно") {
-                Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
+                Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
                     Field(m.name, { m.name = it }, "Имя на этом устройстве")
                     if (!m.existing) {
                         Field(m.ftpPort, { m.ftpPort = it }, "Порт FTP", keyboardType = KeyboardType.Number)
@@ -137,7 +137,7 @@ fun NewHostingScreen() {
 fun HostingScreen(dest: Dest.Hosting) {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val m = rememberScreenModel { HostingNodeModel(container, dest.profile, it) }
     val profiles by container.profiles.profiles.collectAsState()
     val connection by container.connection.state.collectAsState()
@@ -147,11 +147,11 @@ fun HostingScreen(dest: Dest.Hosting) {
     LaunchedEffect(m) { m.refresh() }
     ScreenScaffold(p.name, onBack = { navigator.back() }) {
         val st = m.state
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             StatusDot(if (st?.running == true) Status.On else if (st == null) Status.Off else Status.Error)
             Text(
                 st?.let { PhpMessages.nodeStatus(it).replaceFirstChar { c -> c.uppercase() } } ?: "Состояние неизвестно",
-                style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary,
+                style = AppTheme.type.body, color = AppTheme.colors.textSecondary,
             )
         }
         Section(null) {
@@ -160,7 +160,7 @@ fun HostingScreen(dest: Dest.Hosting) {
             ValueRow("Ключ доступа", m.maskedToken, mono = true, onCopy = { m.copyToken(); toaster.show("Ключ скопирован") })
         }
         val through = connection.isActive && connection.profile?.id == p.id
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             if (through) SecondaryButton("Отключить", { container.connection.disconnect() }, leading = Icons.Rounded.Stop)
             else SecondaryButton("Подключить себе", { io.openflux.app.shell.connectAsClient(container, p) }, leading = Icons.Rounded.PlayArrow)
             SecondaryButton("Поделиться", { navigator.open(Dest.Give(p.id)) }, leading = Icons.Rounded.Share)
@@ -173,7 +173,7 @@ fun HostingScreen(dest: Dest.Hosting) {
         }
         m.busy?.let { ProgressLine(it) }
         m.error?.let { Banner(it, Tone.Danger) }
-        TextButton2("Убрать из приложения", { forgetAsk = true }, color = AppTheme2.colors.danger)
+        TextAction("Убрать из приложения", { forgetAsk = true }, color = AppTheme.colors.danger)
     }
     if (forgetAsk) {
         ConfirmDialog(

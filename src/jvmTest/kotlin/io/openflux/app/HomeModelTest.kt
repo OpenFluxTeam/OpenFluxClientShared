@@ -2,8 +2,8 @@ package io.openflux.app
 
 import io.openflux.app.home.HomeBanner
 import io.openflux.app.home.HomeModel
-import io.openflux.app.home.SubLook2
-import io.openflux.app.home.look2
+import io.openflux.app.home.SubLook
+import io.openflux.app.home.look
 import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.AppSettings
 import io.openflux.desktop.model.AuthStatus
@@ -119,10 +119,10 @@ class HomeModelTest {
         val day = 86_400L
         val now = 1_791_763_200L
         fun s(status: String, expires: Long) = SubscriptionState(ServiceEndpoint("https://s"), SubscriptionKind.Account, status = status, expires = expires)
-        assertEquals(SubLook2("Отключена", "Доступ отключён. Обратитесь в поддержку.", true), s(SubStatus.REVOKED, 0).look2(now * 1000, 0))
-        assertEquals(SubLook2("Нет подписки", "Подписка не оформлена.", true), s(SubStatus.EXPIRED, 0).look2(now * 1000, 0))
-        assertEquals(true, s(SubStatus.ACTIVE, now + 2 * day).look2(now * 1000, 0).attention)
-        assertEquals(false, s(SubStatus.ACTIVE, now + 10 * day).look2(now * 1000, 0).attention)
-        assertEquals("До 22 октября 2026: осталось 10 дней.", s(SubStatus.ACTIVE, now + 10 * day).look2(now * 1000, 0).line)
+        assertEquals(SubLook("Отключена", "Доступ отключён. Обратитесь в поддержку.", true), s(SubStatus.REVOKED, 0).look(now * 1000, 0))
+        assertEquals(SubLook("Нет подписки", "Подписка не оформлена.", true), s(SubStatus.EXPIRED, 0).look(now * 1000, 0))
+        assertEquals(true, s(SubStatus.ACTIVE, now + 2 * day).look(now * 1000, 0).attention)
+        assertEquals(false, s(SubStatus.ACTIVE, now + 10 * day).look(now * 1000, 0).attention)
+        assertEquals("До 22 октября 2026: осталось 10 дней.", s(SubStatus.ACTIVE, now + 10 * day).look(now * 1000, 0).line)
     }
 }

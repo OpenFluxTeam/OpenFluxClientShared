@@ -30,7 +30,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 
 /** What the big button shows. */
 enum class ConnectLook { Off, Busy, On, Error }
@@ -42,7 +42,7 @@ enum class ConnectLook { Off, Busy, On, Error }
 @Composable
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun ConnectButton(look: ConnectLook, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 168.dp, shortcut: String? = null) {
-    if (shortcut == null || AppTheme2.touch) return ConnectCircle(look, label, onClick, modifier, size)
+    if (shortcut == null || AppTheme.touch) return ConnectCircle(look, label, onClick, modifier, size)
     androidx.compose.material3.TooltipBox(
         positionProvider = androidx.compose.material3.TooltipDefaults.rememberTooltipPositionProvider(androidx.compose.material3.TooltipAnchorPosition.Below),
         tooltip = { PlainTooltip { androidx.compose.material3.Text("$label · $shortcut") } },
@@ -52,7 +52,7 @@ fun ConnectButton(look: ConnectLook, label: String, onClick: () -> Unit, modifie
 
 @Composable
 private fun ConnectCircle(look: ConnectLook, label: String, onClick: () -> Unit, modifier: Modifier, size: Dp) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     val fill by animateColorAsState(if (look == ConnectLook.On) c.accent else c.surface)
     val iconColor by animateColorAsState(
         when (look) {

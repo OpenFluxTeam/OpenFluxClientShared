@@ -31,7 +31,7 @@ import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ConfirmDialog
 import io.openflux.app.components.DangerButton
 import io.openflux.app.components.Field
-import io.openflux.app.components.IconButton2
+import io.openflux.app.components.IconAction
 import io.openflux.app.components.PrimaryButton
 import io.openflux.app.components.ProgressLine
 import io.openflux.app.components.RowItem
@@ -42,14 +42,14 @@ import io.openflux.app.components.Section
 import io.openflux.app.components.Segmented
 import io.openflux.app.components.Status
 import io.openflux.app.components.StatusDot
-import io.openflux.app.components.TextButton2
+import io.openflux.app.components.TextAction
 import io.openflux.app.components.Tone
 import io.openflux.app.components.ValueRow
 import io.openflux.app.nav.Dest
 import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.shell.LocalServerLink
 import io.openflux.app.shell.rememberScreenModel
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.NodeCoreSource
 import io.openflux.desktop.model.isActive
@@ -57,7 +57,7 @@ import io.openflux.desktop.service.LocalAppContainer
 import kotlinx.coroutines.launch
 
 @Composable
-private fun Chevron() = Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = AppTheme2.colors.textMuted)
+private fun Chevron() = Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = AppTheme.colors.textMuted)
 
 /**
  * The Servers section's first screen (spec 5): the person's servers, their nodes on web hostings, and this
@@ -72,13 +72,13 @@ fun ServersRoot(selected: Dest? = null) {
     val profiles by container.profiles.profiles.collectAsState()
     val state by container.connection.state.collectAsState()
     val hostings = profiles.filter { it.phpNode != null }
-    ScreenScaffold("Серверы", actions = { IconButton2(Icons.Rounded.Add, "Добавить сервер", { navigator.open(Dest.AddServer) }) }) {
+    ScreenScaffold("Серверы", actions = { IconAction(Icons.Rounded.Add, "Добавить сервер", { navigator.open(Dest.AddServer) }) }) {
         if (settings.knownServers.isEmpty() && hostings.isEmpty()) {
             Text(
                 "Своих серверов пока нет. Подключите сервер (VDS) по SSH или поставьте ноду на обычный хостинг.",
-                style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary,
+                style = AppTheme.type.body, color = AppTheme.colors.textSecondary,
             )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                 PrimaryButton("Добавить сервер", { navigator.open(Dest.AddServer) }, leading = Icons.Rounded.Dns)
                 SecondaryButton("Без сервера", { navigator.open(Dest.NewHosting) }, leading = Icons.Rounded.Cloud)
             }
@@ -109,7 +109,7 @@ fun ServersRoot(selected: Dest? = null) {
                         RowItem(
                             p.name,
                             subtitle = p.phpNode?.siteUrl,
-                            leading = { Icon(Icons.Rounded.Cloud, contentDescription = null, tint = AppTheme2.colors.textSecondary) },
+                            leading = { Icon(Icons.Rounded.Cloud, contentDescription = null, tint = AppTheme.colors.textSecondary) },
                             trailing = { Chevron() },
                             selected = selected?.profileId == p.id,
                             onClick = { navigator.open(Dest.Hosting(p.id)) },
@@ -123,7 +123,7 @@ fun ServersRoot(selected: Dest? = null) {
             RowItem(
                 "Это устройство",
                 subtitle = if (exit) "Работает как нода" else "Раздать интернет другим через это устройство",
-                leading = { Icon(Icons.Rounded.Devices, contentDescription = null, tint = AppTheme2.colors.textSecondary) },
+                leading = { Icon(Icons.Rounded.Devices, contentDescription = null, tint = AppTheme.colors.textSecondary) },
                 trailing = { Chevron() },
                 selected = selected == Dest.ThisDevice,
                 onClick = { navigator.open(Dest.ThisDevice) },
@@ -144,16 +144,16 @@ fun LoginFields(form: LoginForm, showAddress: Boolean = true) {
     Segmented(listOf(false, true), form.useKey, { form.useKey = it; form.error = null }, label = { if (it) "Ключ" else "Пароль" })
     if (form.useKey) {
         Field(form.privateKey, { form.privateKey = it; form.error = null }, "Закрытый ключ", singleLine = false, mono = true, placeholder = "-----BEGIN OPENSSH PRIVATE KEY-----")
-        TextButton2("Выбрать файл ключа…", { scope.launch { form.readKeyFile(container.platform) } })
+        TextAction("Выбрать файл ключа…", { scope.launch { form.readKeyFile(container.platform) } })
         SecretField(form.passphrase, { form.passphrase = it }, "Парольная фраза ключа, если есть")
     } else {
         SecretField(form.password, { form.password = it; form.error = null }, "Пароль")
     }
     Section(null) {
         Collapsible("Дополнительно") {
-            Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
+            Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
                 SecretField(form.sudo, { form.sudo = it }, "Пароль sudo, если логин не root")
-                Text("Ядро на сервере", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary)
+                Text("Ядро на сервере", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
                 Segmented(NodeCoreSource.entries, form.core, { form.core = it }, label = { it.label })
             }
         }
@@ -200,7 +200,7 @@ fun AddServerScreen() {
         if (id == null) {
             val recent = settings.knownServers.filterNot { link.hasAccess(serverIdOf(it)) }.take(5)
             if (recent.isNotEmpty()) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                     for (s in recent) Chip(s.host, selected = false, onClick = { form.prefill(s) })
                 }
             }
@@ -210,7 +210,7 @@ fun AddServerScreen() {
             else PrimaryButton("Подключиться", { scope.launch { connected = form.connect() } }, Modifier.fillMaxWidth())
         } else {
             val probe = link.probe(id)
-            Text("Сервер подключён. Как поставить ноду?", style = AppTheme2.type.title, color = AppTheme2.colors.text)
+            Text("Сервер подключён. Как поставить ноду?", style = AppTheme.type.title, color = AppTheme.colors.text)
             Section(null) {
                 RowItem(
                     "Быстро",
@@ -250,7 +250,7 @@ fun ServerScreen(dest: Dest.Server) {
     LaunchedEffect(m) { if (m.hasAccess && m.channels == null && !m.needsSudo) m.load() }
     ScreenScaffold(m.host, onBack = { navigator.back() }) {
         if (!m.hasAccess) {
-            Text("Войдите на сервер, чтобы увидеть и менять его ноды.", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+            Text("Войдите на сервер, чтобы увидеть и менять его ноды.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
             LoginFields(m.login, showAddress = false)
             (m.login.error ?: m.error)?.let { Banner(it, Tone.Danger) }
             val busy = m.busy
@@ -267,7 +267,7 @@ fun ServerScreen(dest: Dest.Server) {
                 }
                 channels == null -> Unit
                 channels.isEmpty() -> {
-                    Text("На сервере пока нет нод.", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+                    Text("На сервере пока нет нод.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
                     PrimaryButton("Поставить ноду", { navigator.open(Dest.NewNode(dest.id)) }, leading = Icons.Rounded.Add)
                 }
                 else -> {

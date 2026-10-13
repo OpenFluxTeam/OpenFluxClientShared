@@ -20,30 +20,30 @@ sealed interface HomeBanner {
     data class Failed(val message: String) : HomeBanner
     data object NeedsAdmin : HomeBanner
     data class Account(val kind: AccountKind, val needsCheck: Boolean) : HomeBanner
-    data class Subscription(val look: SubLook2) : HomeBanner
+    data class Subscription(val look: SubLook) : HomeBanner
     data object ThisDevice : HomeBanner
 }
 
 /** How a subscription reads: a word, a line about its end, whether it wants the person. */
-data class SubLook2(val badge: String, val line: String, val attention: Boolean)
+data class SubLook(val badge: String, val line: String, val attention: Boolean)
 
 /** Days left at which Home starts asking to renew. */
 const val RENEW_SOON_DAYS = 3
 
 /** [nowMillis] is the platform clock; [offsetSeconds] its zone east of UTC; `expires` is unix seconds. */
-fun SubscriptionState.look2(nowMillis: Long, offsetSeconds: Int): SubLook2 {
+fun SubscriptionState.look(nowMillis: Long, offsetSeconds: Int): SubLook {
     val nowSeconds = nowMillis / 1000
     val trial = account?.plan?.id == "trial"
-    fun ended() = SubLook2("Срок вышел", "Закончилась ${Fmt.date(expires, offsetSeconds)}.", true)
+    fun ended() = SubLook("Срок вышел", "Закончилась ${Fmt.date(expires, offsetSeconds)}.", true)
     return when (status) {
-        SubStatus.REVOKED -> SubLook2("Отключена", "Доступ отключён. Обратитесь в поддержку.", true)
-        SubStatus.EXPIRED -> if (expires == 0L) SubLook2("Нет подписки", "Подписка не оформлена.", true) else ended()
+        SubStatus.REVOKED -> SubLook("Отключена", "Доступ отключён. Обратитесь в поддержку.", true)
+        SubStatus.EXPIRED -> if (expires == 0L) SubLook("Нет подписки", "Подписка не оформлена.", true) else ended()
         else -> {
             val left = daysLeft(nowSeconds)
             when {
-                expires == 0L -> SubLook2("Активна", "Без ограничения срока.", false)
+                expires == 0L -> SubLook("Активна", "Без ограничения срока.", false)
                 left == null -> ended()
-                else -> SubLook2(
+                else -> SubLook(
                     if (trial) "Пробный период" else if (left <= RENEW_SOON_DAYS) "Скоро закончится" else "Активна",
                     "До ${Fmt.date(expires, offsetSeconds)}: ${Fmt.daysLeft(left)}.",
                     left <= RENEW_SOON_DAYS,
@@ -111,7 +111,7 @@ class HomeModel(private val container: AppContainer) {
             return HomeBanner.NeedsAdmin
         }
         profile?.let { p -> accountAlert(p, status)?.let { return it } }
-        subscription?.look2(nowMillis, platform.utcOffsetSeconds)?.takeIf { it.attention }?.let { return HomeBanner.Subscription(it) }
+        subscription?.look(nowMillis, platform.utcOffsetSeconds)?.takeIf { it.attention }?.let { return HomeBanner.Subscription(it) }
         if (state.isActive && settings.mode == ConnectionMode.Exit) return HomeBanner.ThisDevice
         return null
     }

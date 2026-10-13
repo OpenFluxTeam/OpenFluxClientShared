@@ -12,7 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import io.openflux.app.components.RowItem
 import io.openflux.app.components.Sheet
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 
 /** Everything new comes in through ＋ (spec 7.1). */
 enum class AddChoice(val title: String, val icon: ImageVector) {
@@ -31,7 +31,7 @@ fun AddMenu(cameraScan: Boolean, onChoice: (AddChoice) -> Unit, onDismiss: () ->
             if (choice == AddChoice.Scan && !cameraScan) continue
             RowItem(
                 choice.title,
-                leading = { Icon(choice.icon, contentDescription = null, tint = AppTheme2.colors.textSecondary) },
+                leading = { Icon(choice.icon, contentDescription = null, tint = AppTheme.colors.textSecondary) },
                 onClick = { onChoice(choice) },
             )
         }

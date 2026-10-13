@@ -8,7 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.v2.runComposeUiTest
-import io.openflux.app.shell.OpenFluxApp2
+import io.openflux.app.shell.OpenFluxApp
 import io.openflux.desktop.model.ExitAddress
 import io.openflux.app.platform.NoScrollbars
 import io.openflux.app.platform.Shortcuts
@@ -22,7 +22,7 @@ class ServersFlowTest {
         val server = FakeServer("a.example")
         val conn = ScriptedConnection().apply { address = { ExitAddress.Known("a.example") } }
         val c = testContainer(node = FakeNodeService(server), connection = conn)
-        setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         onNodeWithText("Серверы").performClick()
         onNodeWithText("Добавить сервер").performClick()
         onNode(hasSetTextAction() and hasText("Адрес сервера")).performTextInput("a.example")

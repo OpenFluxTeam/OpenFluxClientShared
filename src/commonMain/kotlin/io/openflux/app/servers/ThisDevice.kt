@@ -15,7 +15,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import io.openflux.app.components.Banner
 import io.openflux.app.components.Collapsible
 import io.openflux.app.components.Field
-import io.openflux.app.components.LocalToaster2
+import io.openflux.app.components.LocalToaster
 import io.openflux.app.components.PrimaryButton
 import io.openflux.app.components.QrView
 import io.openflux.app.components.RowItem
@@ -27,7 +27,7 @@ import io.openflux.app.components.Status
 import io.openflux.app.components.StatusDot
 import io.openflux.app.components.Tone
 import io.openflux.app.shell.LocalNavigator
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.ExitBackend
@@ -70,7 +70,7 @@ class ThisDeviceModel(private val container: AppContainer) {
 fun ThisDeviceScreen() {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val m = remember(container) { ThisDeviceModel(container) }
     val settings by container.settings.settings.collectAsState()
     val state by container.connection.state.collectAsState()
@@ -83,7 +83,7 @@ fun ThisDeviceScreen() {
     ScreenScaffold("Это устройство", onBack = { navigator.back() }) {
         Text(
             "Устройство может работать нодой: другие подключаются через него к интернету.",
-            style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary,
+            style = AppTheme.type.body, color = AppTheme.colors.textSecondary,
         )
         if (exit) {
             Section(null) {
@@ -97,9 +97,9 @@ fun ThisDeviceScreen() {
             if (text != null) {
                 QrView(text, platform)
                 SecondaryButton("Копировать ссылку", { platform.setClipboardText(text); toaster.show("Ссылка скопирована") }, Modifier.fillMaxWidth())
-                Text("По этой ссылке подключится любой. Одновременно работает одно устройство — второе вытеснит первое.", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary)
+                Text("По этой ссылке подключится любой. Одновременно работает одно устройство — второе вытеснит первое.", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
             } else {
-                Text("Ядро готовит ссылку…", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary)
+                Text("Ядро готовит ссылку…", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
             }
             PrimaryButton("Остановить ноду", m::stop, Modifier.fillMaxWidth())
             return@ScreenScaffold
@@ -118,15 +118,15 @@ fun ThisDeviceScreen() {
         }
         if (platform.kind == PlatformKind.Desktop && platform.exitL3Supported) {
             Section("Режим") {
-                Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+                Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                     Segmented(ExitBackend.entries, settings.exitBackend, { b -> container.settings.update { it.copy(exitBackend = b) } }, label = { it.label })
-                    Text(settings.exitBackend.describe(platform.exitL3Needs), style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary)
+                    Text(settings.exitBackend.describe(platform.exitL3Needs), style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
                 }
             }
         }
         Section(null) {
             Collapsible("Дополнительно") {
-                Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
+                Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
                     Field(
                         settings.exitDirectPort.toString(),
                         { v -> v.toIntOrNull()?.takeIf { it in 1..65535 }?.let { p -> container.settings.update { it.copy(exitDirectPort = p) } } },
@@ -137,7 +137,7 @@ fun ThisDeviceScreen() {
             }
         }
         val busyElsewhere = state.isActive && settings.mode != ConnectionMode.Exit
-        if (busyElsewhere) Text("Сейчас устройство подключено как клиент: запуск ноды это подключение остановит.", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.warning)
+        if (busyElsewhere) Text("Сейчас устройство подключено как клиент: запуск ноды это подключение остановит.", style = AppTheme.type.bodySmall, color = AppTheme.colors.warning)
         PrimaryButton("Запустить ноду", { chosen?.let(m::start) }, Modifier.fillMaxWidth(), enabled = chosen != null)
     }
 }

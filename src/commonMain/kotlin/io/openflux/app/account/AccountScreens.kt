@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import io.openflux.app.components.Banner
 import io.openflux.app.components.ConfirmDialog
 import io.openflux.app.components.Field
-import io.openflux.app.components.LocalToaster2
+import io.openflux.app.components.LocalToaster
 import io.openflux.app.components.PrimaryButton
 import io.openflux.app.components.ProgressLine
 import io.openflux.app.components.RowItem
@@ -27,16 +27,16 @@ import io.openflux.app.components.SecretField
 import io.openflux.app.components.Section
 import io.openflux.app.components.Segmented
 import io.openflux.app.components.Sheet
-import io.openflux.app.components.TextButton2
+import io.openflux.app.components.TextAction
 import io.openflux.app.components.Toggle
 import io.openflux.app.components.Tone
 import io.openflux.app.components.ValueRow
-import io.openflux.app.home.look2
+import io.openflux.app.home.look
 import io.openflux.app.nav.Dest
 import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.shell.rememberScreenModel
 import io.openflux.app.text.Fmt
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.SubscriptionKind
 import io.openflux.desktop.service.LocalAppContainer
 
@@ -45,7 +45,7 @@ import io.openflux.desktop.service.LocalAppContainer
 fun AuthScreen() {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val m = rememberScreenModel { AuthModel(container, it) }
     val sub by container.subscription.state.collectAsState()
     LaunchedEffect(m.done) { if (m.done) navigator.replaceTop(Dest.Account) }
@@ -63,39 +63,39 @@ fun AuthScreen() {
             return@ScreenScaffold
         }
         when (m.step) {
-            AuthStep2.Devices -> {
-                Text("На аккаунте уже все устройства. Замените одно из них этим.", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+            AuthStep.Devices -> {
+                Text("На аккаунте уже все устройства. Замените одно из них этим.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
                 Section(null) {
                     for (d in m.devices) {
                         RowItem(
                             d.name.ifBlank { "Устройство" },
                             subtitle = if (d.lastSeen > 0) "было в сети ${Fmt.ago(container.platform.now() - d.lastSeen * 1000)}" else null,
-                            trailing = { TextButton2("Заменить", { m.signIn(replaceDeviceId = d.id) }, enabled = m.busy == null) },
+                            trailing = { TextAction("Заменить", { m.signIn(replaceDeviceId = d.id) }, enabled = m.busy == null) },
                         )
                     }
                 }
-                TextButton2("Назад ко входу", { m.go(AuthStep2.Login) })
+                TextAction("Назад ко входу", { m.go(AuthStep.Login) })
             }
-            AuthStep2.Recover -> {
-                Text("Восстановление доступа по ключу, выданному при регистрации.", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+            AuthStep.Recover -> {
+                Text("Восстановление доступа по ключу, выданному при регистрации.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
                 Field(m.login, { m.login = it }, "Логин")
                 Field(m.recoveryInput, { m.recoveryInput = it }, "Ключ восстановления", mono = true)
                 SecretField(m.password, { m.password = it }, "Новый пароль")
                 SecretField(m.password2, { m.password2 = it }, "Новый пароль ещё раз")
                 Submit(m.busy, "Задать новый пароль", m::recover)
-                TextButton2("Назад ко входу", { m.go(AuthStep2.Login) })
+                TextAction("Назад ко входу", { m.go(AuthStep.Login) })
             }
             else -> {
-                Segmented(listOf(AuthStep2.Login, AuthStep2.Register), m.step, m::go, label = { if (it == AuthStep2.Login) "Вход" else "Регистрация" })
+                Segmented(listOf(AuthStep.Login, AuthStep.Register), m.step, m::go, label = { if (it == AuthStep.Login) "Вход" else "Регистрация" })
                 Field(m.login, { m.login = it }, "Логин", placeholder = "Почта или имя")
                 SecretField(m.password, { m.password = it }, "Пароль")
-                if (m.step == AuthStep2.Register) {
+                if (m.step == AuthStep.Register) {
                     SecretField(m.password2, { m.password2 = it }, "Пароль ещё раз")
-                    Text("Не короче $MIN_PASSWORD символов", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textMuted)
+                    Text("Не короче $MIN_PASSWORD символов", style = AppTheme.type.bodySmall, color = AppTheme.colors.textMuted)
                     Submit(m.busy, "Создать аккаунт", m::register)
                 } else {
                     Submit(m.busy, "Войти") { m.signIn() }
-                    TextButton2("Забыли пароль?", { m.go(AuthStep2.Recover) })
+                    TextAction("Забыли пароль?", { m.go(AuthStep.Recover) })
                 }
             }
         }
@@ -113,23 +113,23 @@ private fun Submit(busy: String?, label: String, onClick: () -> Unit) {
 fun AccountScreen() {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val m = rememberScreenModel { SubscriptionModel(container, it) }
     val state by container.subscription.state.collectAsState()
     var passwordOpen by remember { mutableStateOf(false) }
     var deleteOpen by remember { mutableStateOf(false) }
     var signOutAsk by remember { mutableStateOf(false) }
     LaunchedEffect(m.notice) { m.notice?.let { toaster.show(it); m.clearNotice() } }
-    ScreenScaffold("Подписка", onBack = { navigator.back() }, actions = { if (state != null) TextButton2("Обновить", m::refresh, enabled = m.busy == null) }) {
+    ScreenScaffold("Подписка", onBack = { navigator.back() }, actions = { if (state != null) TextAction("Обновить", m::refresh, enabled = m.busy == null) }) {
         val s = state
         if (s == null) {
-            Text("На этом устройстве нет подписки.", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+            Text("На этом устройстве нет подписки.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
             PrimaryButton("Войти или создать аккаунт", { navigator.replaceTop(Dest.Auth) }, Modifier.fillMaxWidth())
             SecondaryButton("У меня ключ подписки", { navigator.replaceTop(Dest.AddKey) }, Modifier.fillMaxWidth())
             return@ScreenScaffold
         }
         val platform = container.platform
-        val look = s.look2(platform.now(), platform.utcOffsetSeconds)
+        val look = s.look(platform.now(), platform.utcOffsetSeconds)
         val account = s.account
         Section(null) {
             ValueRow("Подписка", s.title.ifBlank { "OpenFlux" })
@@ -157,7 +157,7 @@ fun AccountScreen() {
                     RowItem(
                         d.name.ifBlank { "Устройство" },
                         subtitle = if (d.current) "это устройство" else if (d.lastSeen > 0) "было в сети ${Fmt.ago(platform.now() - d.lastSeen * 1000)}" else null,
-                        trailing = if (d.current) null else ({ TextButton2("Убрать", { m.removeDevice(d.id) }, enabled = m.busy == null) }),
+                        trailing = if (d.current) null else ({ TextAction("Убрать", { m.removeDevice(d.id) }, enabled = m.busy == null) }),
                     )
                 }
             }
@@ -189,11 +189,11 @@ private fun PasswordSheet(m: SubscriptionModel, onClose: () -> Unit) {
     var new by remember { mutableStateOf("") }
     var again by remember { mutableStateOf("") }
     Sheet(onDismiss = onClose, title = "Смена пароля") {
-        Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
+        Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
             SecretField(old, { old = it }, "Текущий пароль")
             SecretField(new, { new = it }, "Новый пароль")
             SecretField(again, { again = it }, "Новый пароль ещё раз")
-            Text("На других устройствах придётся войти заново.", style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary)
+            Text("На других устройствах придётся войти заново.", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
             m.dialogError?.let { Banner(it, Tone.Danger) }
             Submit(m.busy, "Сменить") { m.changePassword(old, new, again, onDone = onClose) }
         }
@@ -204,8 +204,8 @@ private fun PasswordSheet(m: SubscriptionModel, onClose: () -> Unit) {
 private fun DeleteSheet(m: SubscriptionModel, onClose: () -> Unit) {
     var password by remember { mutableStateOf("") }
     Sheet(onDismiss = onClose, title = "Удалить аккаунт?") {
-        Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
-            Text("Аккаунт, подписка и устройства удалятся навсегда. Вернуть их не получится.", style = AppTheme2.type.body, color = AppTheme2.colors.text)
+        Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
+            Text("Аккаунт, подписка и устройства удалятся навсегда. Вернуть их не получится.", style = AppTheme.type.body, color = AppTheme.colors.text)
             SecretField(password, { password = it }, "Пароль")
             m.dialogError?.let { Banner(it, Tone.Danger) }
             if (m.busy != null) ProgressLine(m.busy!!)
@@ -218,7 +218,7 @@ private fun DeleteSheet(m: SubscriptionModel, onClose: () -> Unit) {
 @Composable
 private fun PlansSheet(m: SubscriptionModel) {
     Sheet(onDismiss = m::closePlans, title = "Продление") {
-        Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
+        Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
             val plans = m.plans
             val order = m.order
             when {
@@ -227,12 +227,12 @@ private fun PlansSheet(m: SubscriptionModel) {
                     PrimaryButton("Готово", m::closePlans, Modifier.fillMaxWidth())
                 }
                 order != null -> {
-                    Text(order.instructions.ifBlank { plans?.payment?.instructions.orEmpty() }.ifBlank { "Оплатите заказ ${order.orderId} по инструкции сервиса." }, style = AppTheme2.type.body, color = AppTheme2.colors.text)
+                    Text(order.instructions.ifBlank { plans?.payment?.instructions.orEmpty() }.ifBlank { "Оплатите заказ ${order.orderId} по инструкции сервиса." }, style = AppTheme.type.body, color = AppTheme.colors.text)
                     ProgressLine("Жду подтверждения оплаты…")
                     SecondaryButton("Проверить оплату", m::checkOrder, Modifier.fillMaxWidth())
                 }
                 plans == null && m.plansError == null -> ProgressLine("Загружаю тарифы…")
-                plans != null && plans.plans.isEmpty() -> Text("Платных тарифов пока нет.", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+                plans != null && plans.plans.isEmpty() -> Text("Платных тарифов пока нет.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
                 plans != null -> {
                     Section(null) {
                         for (p in plans.plans) {

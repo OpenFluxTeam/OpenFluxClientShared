@@ -1,6 +1,6 @@
 package io.openflux.app.settings
 
-import io.openflux.app.text.Redact2
+import io.openflux.app.text.Redact
 import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.LogLine
 
@@ -24,4 +24,4 @@ fun journalLines(lines: List<LogLine>, filter: JournalFilter, query: String): Li
 }
 
 /** What "Копировать показанное" puts on the clipboard: the lines, addresses and keys hidden when [mask]. */
-fun journalText(lines: List<LogLine>, mask: Boolean): String = lines.joinToString("\n") { if (mask) Redact2.apply(it.text) else it.text }
+fun journalText(lines: List<LogLine>, mask: Boolean): String = lines.joinToString("\n") { if (mask) Redact.apply(it.text) else it.text }

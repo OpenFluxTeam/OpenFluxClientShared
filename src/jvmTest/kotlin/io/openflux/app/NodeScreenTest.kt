@@ -9,7 +9,7 @@ import androidx.compose.ui.test.v2.runComposeUiTest
 import io.openflux.app.nav.AppNavigator
 import io.openflux.app.nav.Dest
 import io.openflux.app.servers.ServerLink
-import io.openflux.app.shell.OpenFluxApp2
+import io.openflux.app.shell.OpenFluxApp
 import io.openflux.desktop.model.InstalledChannel
 import io.openflux.desktop.model.NodeTransport
 import io.openflux.desktop.model.SshTarget
@@ -30,7 +30,7 @@ class NodeScreenTest {
         val link = ServerLink(c)
         runBlocking { link.connect(SshTarget("a.example", 22, "root", password = "pw", hostKey = "SHA256:a.example")) }
         c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.Node("a.example:22:root", "of-x")) }.snapshot().encode()) }
-        setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts(), NoBrowserViews, link) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts(), NoBrowserViews, link) }
         waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Cups.online")).fetchSemanticsNodes().isNotEmpty() }
         onNodeWithText("Cups.online").performClick()
         onNodeWithText("Изменено: 1").assertIsDisplayed()

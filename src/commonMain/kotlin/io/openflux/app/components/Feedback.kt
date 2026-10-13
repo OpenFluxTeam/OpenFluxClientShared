@@ -35,7 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import kotlinx.coroutines.delay
 
 enum class Tone { Info, Success, Warning, Danger }
@@ -52,7 +52,7 @@ fun Banner(
     onSecondAction: (() -> Unit)? = null,
     more: List<Pair<String, () -> Unit>> = emptyList(),
 ) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     val (icon, color) = when (tone) {
         Tone.Info -> Icons.Rounded.Info to c.textSecondary
         Tone.Success -> Icons.Rounded.CheckCircle to c.success
@@ -60,24 +60,24 @@ fun Banner(
         Tone.Danger -> Icons.Rounded.Error to c.danger
     }
     Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(AppTheme2.shapes.medium)).background(c.surfaceHigh)
-            .padding(start = AppTheme2.spacing.m, end = AppTheme2.spacing.xs, top = AppTheme2.spacing.xs, bottom = AppTheme2.spacing.xs),
+        modifier.fillMaxWidth().clip(RoundedCornerShape(AppTheme.shapes.medium)).background(c.surfaceHigh)
+            .padding(start = AppTheme.spacing.m, end = AppTheme.spacing.xs, top = AppTheme.spacing.xs, bottom = AppTheme.spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s),
+        horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s),
     ) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
         Text(
             text,
-            modifier = Modifier.weight(1f).padding(vertical = AppTheme2.spacing.s),
-            style = AppTheme2.type.bodySmall,
+            modifier = Modifier.weight(1f).padding(vertical = AppTheme.spacing.s),
+            style = AppTheme.type.bodySmall,
             color = c.text,
             maxLines = 3,
         )
-        if (secondAction != null && onSecondAction != null) TextButton2(secondAction, onSecondAction, color = c.textSecondary)
-        if (action != null && onAction != null) TextButton2(action, onAction)
+        if (secondAction != null && onSecondAction != null) TextAction(secondAction, onSecondAction, color = c.textSecondary)
+        if (action != null && onAction != null) TextAction(action, onAction)
         if (more.isNotEmpty()) Box {
             var open by remember { mutableStateOf(false) }
-            IconButton2(Icons.Rounded.MoreVert, "Ещё", { open = true })
+            IconAction(Icons.Rounded.MoreVert, "Ещё", { open = true })
             DropdownMenu(open, { open = false }) {
                 more.forEach { (label, run) -> DropdownMenuItem({ Text(label) }, { open = false; run() }) }
             }
@@ -87,7 +87,7 @@ fun Banner(
 
 /** A short note at the bottom of the window ("Скопировано"); a new one replaces the old. */
 @Stable
-class Toaster2 {
+class Toaster {
     var current by mutableStateOf<String?>(null)
         private set
     internal var serial by mutableStateOf(0)
@@ -103,10 +103,10 @@ class Toaster2 {
     }
 }
 
-val LocalToaster2 = staticCompositionLocalOf { Toaster2() }
+val LocalToaster = staticCompositionLocalOf { Toaster() }
 
 @Composable
-fun ToastHost2(toaster: Toaster2, modifier: Modifier = Modifier) {
+fun ToastHost(toaster: Toaster, modifier: Modifier = Modifier) {
     val serial = toaster.serial
     LaunchedEffect(serial) {
         delay(2_500)
@@ -116,10 +116,10 @@ fun ToastHost2(toaster: Toaster2, modifier: Modifier = Modifier) {
         AnimatedVisibility(toaster.current != null, enter = fadeIn(), exit = fadeOut()) {
             Text(
                 toaster.current.orEmpty(),
-                modifier = Modifier.widthIn(max = 480.dp).clip(RoundedCornerShape(AppTheme2.shapes.medium))
-                    .background(AppTheme2.colors.text).padding(horizontal = AppTheme2.spacing.l, vertical = AppTheme2.spacing.m),
-                style = AppTheme2.type.body,
-                color = AppTheme2.colors.background,
+                modifier = Modifier.widthIn(max = 480.dp).clip(RoundedCornerShape(AppTheme.shapes.medium))
+                    .background(AppTheme.colors.text).padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.m),
+                style = AppTheme.type.body,
+                color = AppTheme.colors.background,
             )
         }
     }
@@ -136,16 +136,16 @@ fun ConfirmDialog(
     danger: Boolean = false,
     dismiss: String = "Отмена",
 ) {
-    val c = AppTheme2.colors
+    val c = AppTheme.colors
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = c.surface,
         titleContentColor = c.text,
         textContentColor = c.textSecondary,
-        shape = RoundedCornerShape(AppTheme2.shapes.large),
-        title = { Text(title, style = AppTheme2.type.title) },
-        text = text?.let { { Text(it, style = AppTheme2.type.body) } },
-        confirmButton = { TextButton2(confirm, { onConfirm() }, color = if (danger) c.danger else c.accent) },
-        dismissButton = { TextButton2(dismiss, onDismiss, color = c.textSecondary) },
+        shape = RoundedCornerShape(AppTheme.shapes.large),
+        title = { Text(title, style = AppTheme.type.title) },
+        text = text?.let { { Text(it, style = AppTheme.type.body) } },
+        confirmButton = { TextAction(confirm, { onConfirm() }, color = if (danger) c.danger else c.accent) },
+        dismissButton = { TextAction(dismiss, onDismiss, color = c.textSecondary) },
     )
 }

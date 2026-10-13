@@ -29,8 +29,8 @@ import io.openflux.app.components.ChangesBar
 import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ConfirmDialog
 import io.openflux.app.components.Field
-import io.openflux.app.components.IconButton2
-import io.openflux.app.components.LocalToaster2
+import io.openflux.app.components.IconAction
+import io.openflux.app.components.LocalToaster
 import io.openflux.app.components.PrimaryButton
 import io.openflux.app.components.ProgressLine
 import io.openflux.app.components.RowItem
@@ -41,7 +41,7 @@ import io.openflux.app.components.Section
 import io.openflux.app.components.Segmented
 import io.openflux.app.components.Status
 import io.openflux.app.components.StatusDot
-import io.openflux.app.components.TextButton2
+import io.openflux.app.components.TextAction
 import io.openflux.app.components.Toggle
 import io.openflux.app.components.Tone
 import io.openflux.app.components.ValueRow
@@ -49,7 +49,7 @@ import io.openflux.app.nav.Dest
 import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.shell.LocalServerLink
 import io.openflux.app.shell.rememberScreenModel
-import io.openflux.app.theme.AppTheme2
+import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.model.isActive
@@ -85,7 +85,7 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
     val link = LocalServerLink.current
-    val toaster = LocalToaster2.current
+    val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     var leaveAsk by remember { mutableStateOf(false) }
     var removeAsk by remember { mutableStateOf(false) }
@@ -104,31 +104,31 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
         actions = {
             if (info != null) {
                 Box {
-                    IconButton2(Icons.Rounded.MoreVert, "Ещё", { menu = true })
+                    IconAction(Icons.Rounded.MoreVert, "Ещё", { menu = true })
                     DropdownMenu(menu, { menu = false }) {
                         DropdownMenuItem({ Text("Обновить состояние") }, { menu = false; m.load() })
                         if (info.transportTypes.any { it == TransportType.VYANDEX || it == TransportType.YANDEX }) {
                             DropdownMenuItem({ Text("Передать вход Яндекса ноде") }, { menu = false; m.pushYandexSignIn() })
                         }
-                        DropdownMenuItem({ Text("Удалить с сервера", color = AppTheme2.colors.danger) }, { menu = false; removeAsk = true })
+                        DropdownMenuItem({ Text("Удалить с сервера", color = AppTheme.colors.danger) }, { menu = false; removeAsk = true })
                     }
                 }
             }
         },
         bottomBar = {
             if (m.creating) {
-                Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.page), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+                Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.page), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                     when {
                         busy != null -> ProgressLine(busy, onDetails = { navigator.open(Dest.Logs) })
                         m.verifyFailed != null -> {
                             Banner(m.verifyFailed!!, Tone.Danger, action = "Повторить", onAction = m::retryVerify)
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                                 SecondaryButton("Оставить как есть", m::keepAnyway)
-                                TextButton2("Удалить с сервера", m::removeFailed, color = AppTheme2.colors.danger)
+                                TextAction("Удалить с сервера", m::removeFailed, color = AppTheme.colors.danger)
                             }
                         }
                         else -> {
-                            (m.error ?: d.problem())?.let { Text(it, style = AppTheme2.type.bodySmall, color = if (m.error != null) AppTheme2.colors.danger else AppTheme2.colors.warning) }
+                            (m.error ?: d.problem())?.let { Text(it, style = AppTheme.type.bodySmall, color = if (m.error != null) AppTheme.colors.danger else AppTheme.colors.warning) }
                             PrimaryButton("Установить", m::install, Modifier.fillMaxWidth(), enabled = d.problem() == null)
                         }
                     }
@@ -145,9 +145,9 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
         if (info != null) {
             val local = m.localProfile
             val through = local != null && state.isActive && state.profile?.id == local.id
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                 StatusDot(if (info.running) Status.On else Status.Error)
-                Text(nodeStateText(info.state).replaceFirstChar { it.uppercase() } + " · " + info.id, style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+                Text(nodeStateText(info.state).replaceFirstChar { it.uppercase() } + " · " + info.id, style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
             }
             Section(null) {
                 ValueRow("Адрес", "${m.serverHost}:${info.port}", mono = true, onCopy = {
@@ -155,7 +155,7 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
                     toaster.show("Адрес скопирован")
                 })
             }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                 if (through) SecondaryButton("Отключить", { container.connection.disconnect() }, leading = Icons.Rounded.Stop)
                 else SecondaryButton("Подключить себе", m::connectHere, leading = Icons.Rounded.PlayArrow, enabled = busy == null)
                 SecondaryButton("Поделиться", {
@@ -169,7 +169,7 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
             return@ScreenScaffold
         }
 
-        if (m.creating) Text("На сервере ${m.serverHost}", style = AppTheme2.type.body, color = AppTheme2.colors.textSecondary)
+        if (m.creating) Text("На сервере ${m.serverHost}", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
         val editable = busy == null
         Section("Транспорты") {
             Toggle(TransportType.VYANDEX.title, d.volga, { on -> m.edit { it.copy(volga = on) } }, enabled = editable)
@@ -180,21 +180,21 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
                     onValue = { v -> m.edit { it.copy(yandexDoc = v) } },
                     label = "Ссылка на документ Яндекса",
                     actions = {
-                        TextButton2("Создать в Яндексе", m::createYandexDocument, enabled = editable)
-                        if (d.yandexDoc.isNotBlank()) TextButton2("Проверить", m::checkDocument, enabled = editable)
+                        TextAction("Создать в Яндексе", m::createYandexDocument, enabled = editable)
+                        if (d.yandexDoc.isNotBlank()) TextAction("Проверить", m::checkDocument, enabled = editable)
                     },
                 )
             }
             Toggle(TransportType.MAILRU.title, d.mailru, { on -> m.edit { it.copy(mailru = on) } }, enabled = editable)
             if (d.mailru) {
                 LinkRow(d.mailruLink, { v -> m.edit { it.copy(mailruLink = v) } }, "Публичная ссылка Mail.ru") {
-                    TextButton2("Создать в Облаке Mail", m::createMailruDocument, enabled = editable)
+                    TextAction("Создать в Облаке Mail", m::createMailruDocument, enabled = editable)
                 }
             }
             Toggle(TransportType.BOARDS.title, d.board, { on -> m.edit { it.copy(board = on) } }, enabled = editable)
             if (d.board) {
                 LinkRow(d.boardLink, { v -> m.edit { it.copy(boardLink = v) } }, "Ссылка на доску") {
-                    TextButton2("Создать доску", m::createBoard, enabled = editable)
+                    TextAction("Создать доску", m::createBoard, enabled = editable)
                 }
             }
             Toggle(
@@ -206,15 +206,15 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
         m.documentWarning?.let { Banner(it, Tone.Info) }
 
         Section("Режим") {
-            Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+            Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                 Segmented(NodeMode.entries, d.mode, { mode -> m.edit { it.copy(mode = mode) } }, label = { it.label }, enabled = { editable })
-                Text(d.mode.short, style = AppTheme2.type.bodySmall, color = AppTheme2.colors.textSecondary)
+                Text(d.mode.short, style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
             }
         }
 
         Section(null) {
             Collapsible("Дополнительно") {
-                Column(Modifier.fillMaxWidth().padding(AppTheme2.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.m)) {
+                Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
                     Field(d.name, { v -> m.edit { it.copy(name = v) } }, "Имя на этом устройстве")
                     if (m.creating) {
                         Toggle("Автообновление ядра на сервере", d.autoUpdate, { on -> m.edit { it.copy(autoUpdate = on) } })
@@ -252,8 +252,8 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
 /** A transport's link field under its switch, with what can be done about it. */
 @Composable
 private fun LinkRow(value: String, onValue: (String) -> Unit, label: String, actions: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = AppTheme2.spacing.l, vertical = AppTheme2.spacing.s)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.s)) {
         Field(value, onValue, label, mono = true)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.xs)) { actions() }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.xs)) { actions() }
     }
 }

@@ -2,7 +2,7 @@ package io.openflux.app
 
 import io.openflux.app.home.ConnectionList
 import io.openflux.app.home.HomeModel
-import io.openflux.app.shell.OpenFluxApp2
+import io.openflux.app.shell.OpenFluxApp
 import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.TrafficStats
@@ -20,10 +20,10 @@ class HomeShotsTest {
         val conn = ScriptedConnection()
         val c = homeWorld(conn)
         prepare(conn)
-        Shots.render(name, frame) { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        Shots.render(name, frame) { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
     }
 
-    @Test fun empty() = Shots.render("home-empty") { OpenFluxApp2(testContainer(), NoScrollbars, Shortcuts()) }
+    @Test fun empty() = Shots.render("home-empty") { OpenFluxApp(testContainer(), NoScrollbars, Shortcuts()) }
     @Test fun idle() = shot("home")
     @Test fun idleSmall() = shot("home", Shots.SMALL)
     @Test fun wide() = shot("home", Shots.WIDE)

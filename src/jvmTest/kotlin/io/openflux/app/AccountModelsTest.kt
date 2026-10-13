@@ -1,7 +1,7 @@
 package io.openflux.app
 
 import io.openflux.app.account.AuthModel
-import io.openflux.app.account.AuthStep2
+import io.openflux.app.account.AuthStep
 import io.openflux.app.account.SubscriptionModel
 import io.openflux.desktop.model.DeviceInfo
 import io.openflux.desktop.model.PlansResult
@@ -26,7 +26,7 @@ class AccountModelsTest {
     @Test
     fun registeringChecksTheFormFirst() = runTest {
         val m = AuthModel(c, this)
-        m.step = AuthStep2.Register
+        m.step = AuthStep.Register
         m.login = "ab"
         m.register()
         assertEquals("Логин: не короче 3 символов (почта или имя)", m.error)
@@ -44,7 +44,7 @@ class AccountModelsTest {
     @Test
     fun aNewAccountShowsItsRecoveryKeyUntilItIsSaved() = runTest {
         val m = AuthModel(c, this)
-        m.step = AuthStep2.Register
+        m.step = AuthStep.Register
         m.login = "ivan"; m.password = "longenough1"; m.password2 = "longenough1"
         m.register(); advanceUntilIdle()
         assertEquals("RECOVERY-KEY", m.recoveryKey)
@@ -59,10 +59,10 @@ class AccountModelsTest {
     fun aFullAccountOffersToReplaceADevice() = runTest {
         api.loginFailure = SubscriptionException("device_limit", "Слишком много устройств", listOf(DeviceInfo("d1", "Телефон")))
         val m = AuthModel(c, this)
-        m.step = AuthStep2.Login
+        m.step = AuthStep.Login
         m.login = "ivan"; m.password = "longenough1"
         m.signIn(); advanceUntilIdle()
-        assertEquals(AuthStep2.Devices, m.step)
+        assertEquals(AuthStep.Devices, m.step)
         assertEquals(listOf("d1"), m.devices.map { it.id })
         api.loginFailure = null
         m.signIn(replaceDeviceId = "d1"); advanceUntilIdle()
@@ -73,7 +73,7 @@ class AccountModelsTest {
     @Test
     fun theWholeFlowOfBuying() = runTest {
         api.plans = PlansResult(listOf(SubPlan("month", "Месяц", 30, 2, "299 ₽")))
-        val a = AuthModel(c, this).apply { step = AuthStep2.Login; login = "ivan"; password = "longenough1" }
+        val a = AuthModel(c, this).apply { step = AuthStep.Login; login = "ivan"; password = "longenough1" }
         a.signIn(); advanceUntilIdle()
         val s = SubscriptionModel(c, this)
         s.openPlans(); advanceUntilIdle()
@@ -88,7 +88,7 @@ class AccountModelsTest {
 
     @Test
     fun changingThePasswordAsksForTheOldOne() = runTest {
-        AuthModel(c, this).apply { step = AuthStep2.Login; login = "ivan"; password = "longenough1"; signIn() }
+        AuthModel(c, this).apply { step = AuthStep.Login; login = "ivan"; password = "longenough1"; signIn() }
         advanceUntilIdle()
         val s = SubscriptionModel(c, this)
         s.changePassword("", "newpassword1", "newpassword1")
@@ -100,7 +100,7 @@ class AccountModelsTest {
 
     @Test
     fun deletingTheAccountNeedsThePasswordAndSignsOut() = runTest {
-        AuthModel(c, this).apply { step = AuthStep2.Login; login = "ivan"; password = "longenough1"; signIn() }
+        AuthModel(c, this).apply { step = AuthStep.Login; login = "ivan"; password = "longenough1"; signIn() }
         advanceUntilIdle()
         val s = SubscriptionModel(c, this)
         s.deleteAccount(""); advanceUntilIdle()
@@ -112,7 +112,7 @@ class AccountModelsTest {
     @Test
     fun aTrialStarts() = runTest {
         api.document = SubscriptionDocument(status = SubStatus.EXPIRED)
-        AuthModel(c, this).apply { step = AuthStep2.Login; login = "ivan"; password = "longenough1"; signIn() }
+        AuthModel(c, this).apply { step = AuthStep.Login; login = "ivan"; password = "longenough1"; signIn() }
         advanceUntilIdle()
         val s = SubscriptionModel(c, this)
         s.startTrial(); advanceUntilIdle()
