@@ -123,3 +123,13 @@ class HomeModel(private val container: AppContainer) {
             .distinct().filter { container.accounts.validSession(it) != null }
     }
 }
+
+/** The state in a few words: under the button on Home and in the Android notification. */
+fun statusLine(state: ConnectionState): String = when (state) {
+    ConnectionState.Idle -> "Отключено"
+    is ConnectionState.Connecting -> if (state.mode == ConnectionMode.Exit) "Запуск ноды…" else "Подключаюсь…"
+    is ConnectionState.Connected -> if (state.mode == ConnectionMode.Exit) "Нода работает" else "Подключено"
+    is ConnectionState.Reconnecting -> "Связь прервалась, восстанавливаю…"
+    is ConnectionState.Disconnecting -> "Отключаюсь…"
+    is ConnectionState.Failed -> "Не подключено"
+}

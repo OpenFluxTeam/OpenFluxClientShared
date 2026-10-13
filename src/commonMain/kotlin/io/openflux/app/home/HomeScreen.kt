@@ -100,14 +100,7 @@ private fun ConnectionState.look(): ConnectLook = when (this) {
     else -> ConnectLook.Busy
 }
 
-private fun ConnectionState.title(): String = when (this) {
-    ConnectionState.Idle -> "Отключено"
-    is ConnectionState.Connecting -> if (mode == ConnectionMode.Exit) "Запуск ноды…" else "Подключаюсь…"
-    is ConnectionState.Connected -> if (mode == ConnectionMode.Exit) "Нода работает" else "Подключено"
-    is ConnectionState.Reconnecting -> "Связь прервалась, восстанавливаю…"
-    is ConnectionState.Disconnecting -> "Отключаюсь…"
-    is ConnectionState.Failed -> "Не подключено"
-}
+private fun ConnectionState.title(): String = statusLine(this)
 
 /** Home (spec 6): the button, what it connects, a few switches, one banner, and the details on request. */
 @Composable

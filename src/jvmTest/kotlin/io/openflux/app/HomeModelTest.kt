@@ -65,6 +65,14 @@ class HomeModelTest {
         assertEquals(ConnectionMode.Client, c.settings.settings.value.mode)
     }
 
+    /** The words of the state, the same on Home and in the Android notification. */
+    @Test
+    fun theStateInWords() {
+        assertEquals("Отключено", io.openflux.app.home.statusLine(ConnectionState.Idle))
+        assertEquals("Подключено", io.openflux.app.home.statusLine(ConnectionState.Connected(a, ConnectionMode.Client, 0)))
+        assertEquals("Нода работает", io.openflux.app.home.statusLine(ConnectionState.Connected(b, ConnectionMode.Exit, 0)))
+    }
+
     @Test
     fun choosingDoesNotTouchARunningExitNode() {
         listOf(a, b).forEach(c.profiles::upsert)
