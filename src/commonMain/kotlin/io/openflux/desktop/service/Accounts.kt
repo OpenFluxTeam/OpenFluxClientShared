@@ -10,7 +10,7 @@ import io.openflux.desktop.model.MailruCloud
 import io.openflux.desktop.model.NodeDocuments
 import io.openflux.desktop.model.YandexDisk
 import io.openflux.desktop.model.YandexDocument
-import io.openflux.desktop.ui.BrowserPage
+import io.openflux.app.platform.BrowserPage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope

@@ -76,9 +76,9 @@ import io.openflux.desktop.model.managed
 import io.openflux.desktop.model.profile
 import io.openflux.desktop.service.LocalAppContainer
 import io.openflux.desktop.service.PlatformKind
-import io.openflux.desktop.ui.LocalShortcuts
-import io.openflux.desktop.ui.LocalTouchUi
-import io.openflux.desktop.ui.PlatformBackHandler
+import io.openflux.app.platform.LocalShortcuts
+import io.openflux.app.platform.LocalTouchUi
+import io.openflux.app.platform.PlatformBackHandler
 
 /** "в Яндексе", "в Облаке Mail": where a document is made. */
 val io.openflux.desktop.model.AccountKind.where: String

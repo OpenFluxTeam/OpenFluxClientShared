@@ -41,9 +41,9 @@ import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.AuthStatus
 import io.openflux.desktop.model.UpdateState
 import io.openflux.desktop.service.LocalAppContainer
-import io.openflux.desktop.ui.BrowserPage
-import io.openflux.desktop.ui.LocalBrowserViews
-import io.openflux.desktop.ui.LocalTouchUi
+import io.openflux.app.platform.BrowserPage
+import io.openflux.app.platform.LocalBrowserViews
+import io.openflux.app.platform.LocalTouchUi
 
 /**
  * A page of the built-in browser over the app: full screen on a phone (a dialog's body would resize under the

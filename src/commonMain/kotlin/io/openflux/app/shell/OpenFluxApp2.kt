@@ -31,14 +31,14 @@ import io.openflux.desktop.model.ThemeMode
 import io.openflux.desktop.service.AppContainer
 import io.openflux.desktop.service.LocalAppContainer
 import io.openflux.desktop.service.PlatformKind
-import io.openflux.desktop.ui.BrowserViews
-import io.openflux.desktop.ui.LocalBrowserViews
-import io.openflux.desktop.ui.LocalScrollbars
-import io.openflux.desktop.ui.LocalShortcuts
-import io.openflux.desktop.ui.LocalTouchUi
-import io.openflux.desktop.ui.NoBrowserViews
-import io.openflux.desktop.ui.Scrollbars
-import io.openflux.desktop.ui.Shortcuts
+import io.openflux.app.platform.BrowserViews
+import io.openflux.app.platform.LocalBrowserViews
+import io.openflux.app.platform.LocalScrollbars
+import io.openflux.app.platform.LocalShortcuts
+import io.openflux.app.platform.LocalTouchUi
+import io.openflux.app.platform.NoBrowserViews
+import io.openflux.app.platform.Scrollbars
+import io.openflux.app.platform.Shortcuts
 
 /** Where the person is in the new interface; screens open others through it. */
 val LocalNavigator = staticCompositionLocalOf<AppNavigator> { error("AppNavigator is not provided") }

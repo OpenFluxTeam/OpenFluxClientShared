@@ -37,10 +37,6 @@ kotlin {
             implementation(libs.navigation3.ui)
             implementation(libs.lifecycle.viewmodel.compose)
             implementation(libs.lifecycle.viewmodel.navigation3)
-            api(libs.voyager.navigator)
-            api(libs.voyager.tabNavigator)
-            api(libs.voyager.screenmodel)
-            implementation(libs.voyager.transitions)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)

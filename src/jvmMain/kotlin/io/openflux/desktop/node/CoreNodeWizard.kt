@@ -13,7 +13,7 @@ import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.ServerProbe
 import io.openflux.desktop.model.SshTarget
 import io.openflux.desktop.model.YandexDocument
-import io.openflux.desktop.ui.BrowserPage
+import io.openflux.app.platform.BrowserPage
 import io.openflux.desktop.service.AccountException
 import io.openflux.desktop.service.Accounts
 import io.openflux.desktop.service.NodeWizardService

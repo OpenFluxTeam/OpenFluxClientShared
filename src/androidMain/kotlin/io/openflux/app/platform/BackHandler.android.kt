@@ -1,4 +1,4 @@
-package io.openflux.desktop.ui
+package io.openflux.app.platform
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable

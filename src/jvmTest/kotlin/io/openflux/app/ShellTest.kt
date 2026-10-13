@@ -21,8 +21,8 @@ import androidx.compose.ui.unit.dp
 import io.openflux.app.shell.OpenFluxApp2
 import io.openflux.app.shell.WidthClass
 import io.openflux.app.shell.widthClassOf
-import io.openflux.desktop.ui.NoScrollbars
-import io.openflux.desktop.ui.Shortcuts
+import io.openflux.app.platform.NoScrollbars
+import io.openflux.app.platform.Shortcuts
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

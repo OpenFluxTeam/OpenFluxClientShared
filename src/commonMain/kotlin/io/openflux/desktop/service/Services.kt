@@ -26,7 +26,7 @@ import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ShareLinkCodec
 import io.openflux.desktop.model.TrafficStats
 import io.openflux.desktop.model.YandexDocument
-import io.openflux.desktop.ui.BrowserPage
+import io.openflux.app.platform.BrowserPage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

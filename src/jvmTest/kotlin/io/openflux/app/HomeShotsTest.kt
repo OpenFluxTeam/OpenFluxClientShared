@@ -7,8 +7,8 @@ import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.TrafficStats
 import io.openflux.desktop.service.LocalAppContainer
-import io.openflux.desktop.ui.NoScrollbars
-import io.openflux.desktop.ui.Shortcuts
+import io.openflux.app.platform.NoScrollbars
+import io.openflux.app.platform.Shortcuts
 import androidx.compose.runtime.CompositionLocalProvider
 import kotlin.test.Test
 import androidx.compose.foundation.layout.padding

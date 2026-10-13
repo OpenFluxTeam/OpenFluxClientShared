@@ -52,7 +52,7 @@ import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.ScriptSource
 import io.openflux.desktop.model.ScriptUpdateMessages
 import io.openflux.desktop.service.LocalAppContainer
-import io.openflux.desktop.ui.LocalScrollbars
+import io.openflux.app.platform.LocalScrollbars
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json

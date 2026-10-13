@@ -6,7 +6,7 @@ import io.openflux.desktop.data.AppDirs
 import io.openflux.desktop.data.restrictToOwner
 import io.openflux.desktop.model.AppSettings
 import io.openflux.desktop.model.CaptchaPrompt
-import io.openflux.desktop.ui.BrowserPage
+import io.openflux.app.platform.BrowserPage
 import io.openflux.desktop.platform.MacElevation
 import io.openflux.desktop.platform.WindowsCoreElevation
 import io.openflux.desktop.platform.WindowsElevation

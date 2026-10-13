@@ -10,8 +10,8 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.v2.runComposeUiTest
 import io.openflux.app.shell.OpenFluxApp2
 import io.openflux.desktop.model.ExitAddress
-import io.openflux.desktop.ui.NoScrollbars
-import io.openflux.desktop.ui.Shortcuts
+import io.openflux.app.platform.NoScrollbars
+import io.openflux.app.platform.Shortcuts
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

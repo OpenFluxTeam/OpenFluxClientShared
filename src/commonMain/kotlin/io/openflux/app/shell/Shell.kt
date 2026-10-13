@@ -70,8 +70,8 @@ import io.openflux.app.theme.AppTheme2
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.isActive
 import io.openflux.desktop.service.LocalAppContainer
-import io.openflux.desktop.ui.LocalShortcuts
-import io.openflux.desktop.ui.LocalTouchUi
+import io.openflux.app.platform.LocalShortcuts
+import io.openflux.app.platform.LocalTouchUi
 
 /** The window's width class: a phone gets a bottom bar; below [Medium] the side column shows icons only. */
 enum class WidthClass { Phone, Compact, Medium, Expanded }

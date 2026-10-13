@@ -55,7 +55,7 @@ import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.model.isActive
 import io.openflux.desktop.model.profile
 import io.openflux.desktop.service.LocalAppContainer
-import io.openflux.desktop.ui.PlatformBackHandler
+import io.openflux.app.platform.PlatformBackHandler
 import kotlinx.coroutines.launch
 
 /** An installed node (spec 5.3). */

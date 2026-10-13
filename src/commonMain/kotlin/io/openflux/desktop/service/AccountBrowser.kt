@@ -1,7 +1,7 @@
 package io.openflux.desktop.service
 
 import io.openflux.desktop.model.AccountKind
-import io.openflux.desktop.ui.BrowserPage
+import io.openflux.app.platform.BrowserPage
 import kotlinx.coroutines.flow.StateFlow
 
 /** What a request made with a saved session says about it. */

@@ -34,8 +34,8 @@ import io.openflux.app.components.ValueRow
 import io.openflux.app.shell.AddMenu
 import io.openflux.app.shell.OpenFluxApp2
 import io.openflux.app.theme.AppTheme2
-import io.openflux.desktop.ui.NoScrollbars
-import io.openflux.desktop.ui.Shortcuts
+import io.openflux.app.platform.NoScrollbars
+import io.openflux.app.platform.Shortcuts
 import kotlin.test.Test
 
 /** Every component in one screen, for review by eye (SHOTS=<dir>). */

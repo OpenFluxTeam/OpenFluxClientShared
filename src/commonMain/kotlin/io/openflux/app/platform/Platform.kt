@@ -1,4 +1,4 @@
-package io.openflux.desktop.ui
+package io.openflux.app.platform
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyListState

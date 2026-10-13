@@ -13,9 +13,9 @@ import io.openflux.app.shell.OpenFluxApp2
 import io.openflux.desktop.model.InstalledChannel
 import io.openflux.desktop.model.NodeTransport
 import io.openflux.desktop.model.SshTarget
-import io.openflux.desktop.ui.NoBrowserViews
-import io.openflux.desktop.ui.NoScrollbars
-import io.openflux.desktop.ui.Shortcuts
+import io.openflux.app.platform.NoBrowserViews
+import io.openflux.app.platform.NoScrollbars
+import io.openflux.app.platform.Shortcuts
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -12,7 +12,7 @@ import io.openflux.desktop.service.AccountRepository
 import io.openflux.desktop.service.Accounts
 import io.openflux.desktop.service.ProbeResult
 import io.openflux.desktop.service.SessionProbe
-import io.openflux.desktop.ui.BrowserPage
+import io.openflux.app.platform.BrowserPage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

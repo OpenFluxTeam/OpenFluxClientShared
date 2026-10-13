@@ -1,24 +1,25 @@
-package io.openflux.desktop
+package io.openflux.app
 
+import io.openflux.app.servers.LoginForm
+import io.openflux.app.servers.NodeEditorModel
+import io.openflux.app.servers.ServerLink
+import io.openflux.desktop.core.CliCoreLinks
 import io.openflux.desktop.core.CoreBinary
 import io.openflux.desktop.core.CoreConnectionService
+import io.openflux.desktop.core.DesktopScriptRepository
 import io.openflux.desktop.data.FileAccountRepository
 import io.openflux.desktop.data.HttpSessionProbe
-import io.openflux.desktop.core.CliCoreLinks
-import io.openflux.desktop.model.CoreShareLinkCodec
 import io.openflux.desktop.model.AppSettings
 import io.openflux.desktop.model.ConnectionMode
+import io.openflux.desktop.model.CoreShareLinkCodec
 import io.openflux.desktop.model.CoreSource
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.node.CoreNodeWizard
 import io.openflux.desktop.platform.JvmPlatformServices
 import io.openflux.desktop.service.AppContainer
-import io.openflux.desktop.core.DesktopScriptRepository
 import io.openflux.desktop.service.Accounts
 import io.openflux.desktop.service.ProfileRepository
 import io.openflux.desktop.service.SettingsRepository
-import io.openflux.desktop.ui.node.NodeWizardModel
-import io.openflux.desktop.ui.node.WizardStep
 import io.openflux.desktop.web.KcefAccountBrowser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,17 +31,19 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 /**
- * The whole desktop "Своя нода" wizard without clicks, direct only:
- * OPENFLUX_LIVE_WIZARD="core|host|user|keyfile" runs it (and removes the channel).
+ * A quick node on a real server through the new editor, without clicks, then removed:
+ * OPENFLUX_LIVE_WIZARD="core|host|user|keyfile" runs it; without it the test does nothing.
  */
-class WizardFlowLiveTest {
+class NodeEditorLiveTest {
     @Test
-    fun wholeWizard() = runBlocking {
+    fun quickNodeOnARealServer() = runBlocking {
         val spec = System.getenv("OPENFLUX_LIVE_WIZARD") ?: return@runBlocking
         val (core, host, user, keyFile) = spec.split("|")
-        val dir = Files.createTempDirectory("wizard").toFile()
+        val dir = Files.createTempDirectory("editor").toFile()
         val settings = object : SettingsRepository {
             override val settings = MutableStateFlow(AppSettings(coreSource = CoreSource.Custom, customCorePath = core, mode = ConnectionMode.Client, socksPort = 18094, systemProxy = false, debugLevel = 1))
             override fun update(transform: (AppSettings) -> AppSettings) { settings.value = transform(settings.value) }
@@ -60,41 +63,51 @@ class WizardFlowLiveTest {
         val service = CoreNodeWizard(settings, binary, accounts)
         val container = AppContainer(profiles, settings, connection, platform, CoreShareLinkCodec(CliCoreLinks(settings, binary)), service, accounts, scripts = scripts)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        val wizard = NodeWizardModel(container, scope)
-        suspend fun idle(what: String, limitMs: Long = 240_000) {
-            val start = System.currentTimeMillis()
-            delay(300)
-            var last: String? = null
-            while ((wizard.busy != null || wizard.hostKeyPrompt == null && false) && System.currentTimeMillis() - start < limitMs) {
-                if (wizard.busy != last) { println("  … ${wizard.busy}"); last = wizard.busy }
-                delay(300)
-            }
-            println("$what: step=${wizard.step} error=${wizard.error} verifyFailed=${wizard.verifyFailed} ip=${wizard.verifiedIp}")
-        }
+        val link = ServerLink(container)
         withContext(Dispatchers.Default) {
-            wizard.host = host
-            wizard.user = user
-            wizard.useKey = true
-            wizard.privateKey = File(keyFile).readText()
-            wizard.connect()
-            idle("connect")
-            wizard.hostKeyPrompt?.let { println("trusting ${it.fingerprint}"); wizard.trustHostKey(); idle("connect again") }
-            wizard.useVolga = false
-            wizard.next()
-            idle("plan")
-            println(wizard.plan?.actions?.joinToString("\n  ", "  "))
+            val form = LoginForm(link).apply {
+                this.host = host
+                this.user = user
+                useKey = true
+                privateKey = File(keyFile).readText()
+            }
+            var id = form.connect()
+            if (id == null && link.hostKeyPrompt != null) {
+                println("trusting ${link.hostKeyPrompt?.fingerprint}")
+                id = form.trust()
+            }
+            assertNotNull(id, form.error ?: "no access")
+            val editor = NodeEditorModel(container, link, id, null, scope)
+            suspend fun idle(what: String, limitMs: Long = 240_000) {
+                val start = System.currentTimeMillis()
+                delay(300)
+                var last: String? = null
+                while (editor.busy != null && System.currentTimeMillis() - start < limitMs) {
+                    if (editor.busy != last) { println("  … ${editor.busy}"); last = editor.busy }
+                    delay(300)
+                }
+                println("$what: error=${editor.error} verifyFailed=${editor.verifyFailed} verified=${editor.verified} done=${editor.done}")
+            }
             val t0 = System.currentTimeMillis()
-            wizard.install()
+            editor.install()
             idle("install+verify")
             println("took ${(System.currentTimeMillis() - t0) / 1000}s")
             println("--- wizard log ---")
             service.logs.value.takeLast(30).forEach { println("${it.level} ${it.text.take(220)}") }
             println("--- connection log ---")
             connection.logs.value.filterNot { "[TUNNEL]" in it.text }.takeLast(40).forEach { println("${it.level} ${it.text.take(220)}") }
-            if (wizard.installed) { wizard.removeChannel(); idle("remove") }
-            wizard.close()
+            val failure = editor.error ?: editor.verifyFailed
             connection.disconnect()
+            editor.done?.let { done ->
+                NodeEditorModel(container, link, id, done.channel, scope).apply {
+                    load(); delay(300); while (busy != null) delay(300)
+                    remove {}; delay(300); while (busy != null) delay(300)
+                    println("removed: error=$error")
+                }
+            } ?: editor.removeFailed()
             delay(1500)
+            link.close()
+            assertNull(failure, failure)
         }
     }
 }

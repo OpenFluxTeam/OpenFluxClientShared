@@ -12,8 +12,8 @@ import io.openflux.app.shell.OpenFluxApp2
 import io.openflux.desktop.FakeShareLinkCodec
 import io.openflux.desktop.model.ShareConfig
 import io.openflux.desktop.model.ShareTransport
-import io.openflux.desktop.ui.NoScrollbars
-import io.openflux.desktop.ui.Shortcuts
+import io.openflux.app.platform.NoScrollbars
+import io.openflux.app.platform.Shortcuts
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -16,7 +16,7 @@ import io.openflux.desktop.model.ShareTransport
 import io.openflux.desktop.model.SshTarget
 import io.openflux.desktop.model.YandexDocument
 import io.openflux.desktop.service.NodeWizardService
-import io.openflux.desktop.ui.BrowserPage
+import io.openflux.app.platform.BrowserPage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 

@@ -1,4 +1,4 @@
-package io.openflux.desktop.ui
+package io.openflux.app.platform
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.ScrollbarStyle
@@ -11,7 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.openflux.desktop.ui.theme.AppTheme
+import io.openflux.app.theme.AppTheme2
 
 /** Thin rounded scrollbars in the app's colours; darker while hovered. */
 object DesktopScrollbars : Scrollbars {
@@ -21,8 +21,8 @@ object DesktopScrollbars : Scrollbars {
         thickness = 8.dp,
         shape = RoundedCornerShape(4.dp),
         hoverDurationMillis = 250,
-        unhoverColor = AppTheme.colors.textHint.copy(alpha = 0.35f),
-        hoverColor = AppTheme.colors.textSecondary.copy(alpha = 0.6f),
+        unhoverColor = AppTheme2.colors.textMuted.copy(alpha = 0.35f),
+        hoverColor = AppTheme2.colors.textSecondary.copy(alpha = 0.6f),
     )
 
     @Composable

@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.openflux.app.nav.LocalInPane
 import io.openflux.app.theme.AppTheme2
-import io.openflux.desktop.ui.LocalScrollbars
+import io.openflux.app.platform.LocalScrollbars
 
 /**
  * The frame of a screen: the back arrow, the title and the actions, then the page (scrolling when [scroll]),

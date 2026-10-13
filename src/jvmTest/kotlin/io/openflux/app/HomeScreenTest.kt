@@ -16,8 +16,8 @@ import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.TrafficStats
 import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.service.AppContainer
-import io.openflux.desktop.ui.NoScrollbars
-import io.openflux.desktop.ui.Shortcuts
+import io.openflux.app.platform.NoScrollbars
+import io.openflux.app.platform.Shortcuts
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

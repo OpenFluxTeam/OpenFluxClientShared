@@ -5,7 +5,7 @@ import dev.datlag.kcef.KCEFBrowser
 import dev.datlag.kcef.KCEFClient
 import io.openflux.desktop.data.AppDirs
 import io.openflux.desktop.model.SetupPages
-import io.openflux.desktop.ui.BrowserPage
+import io.openflux.app.platform.BrowserPage
 import io.openflux.desktop.model.YandexDisk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
