@@ -52,6 +52,8 @@ data class AccountInfo(
     val devices: List<DeviceInfo> = emptyList(),
     val deviceLimit: Int = 1,
     val support: String = "",
+    /** Set when the service has moved: where the app should go. */
+    val service: ServiceMove? = null,
 )
 
 @Serializable
@@ -91,6 +93,48 @@ data class OrderInfo(
     val instructions: String = "",
 ) {
     val paid: Boolean get() = status == "paid"
+
+    /** Paid, or over without being paid; anything else (pending, a status this build does not know) is still waited for. */
+    val closed: Boolean get() = status in CLOSED_ORDER
+}
+
+private val CLOSED_ORDER = setOf("paid", "canceled", "expired", "failed")
+
+/** An order the app waits to be paid, kept across restarts: the person may pay in a bank's app while this one is closed. */
+@Serializable
+data class PendingOrder(
+    val orderId: String,
+    val planId: String = "",
+    /** The platform clock's milliseconds when it was made. */
+    val createdAt: Long = 0,
+    val paymentUrl: String = "",
+) {
+    override fun toString() = "PendingOrder($orderId)"
+}
+
+/**
+ * The service's new address, from its document or account answer. The app
+ * follows it once the new address answers with the new pin.
+ */
+@Serializable
+data class ServiceMove(val url: String, val pin: String = "") {
+    /** The endpoint to move to, or null when the address or pin is not one the app would trust. */
+    fun endpoint(): ServiceEndpoint? {
+        val u = url.trim().trimEnd('/')
+        val scheme = u.substringBefore("://", "")
+        val authority = u.substringAfter("://", "").substringBefore('/')
+        val host = if (authority.startsWith("[")) authority.substringBefore(']') + "]" else authority.substringBefore(':')
+        if (host.isEmpty() || authority.contains('@') || u.contains('?') || u.contains('#')) return null
+        if (scheme != "https" && !(scheme == "http" && host in LOCAL_HOSTS)) return null
+        val p = pin.trim().lowercase()
+        if (p.isNotEmpty() && !HEX64.matches(p)) return null
+        return ServiceEndpoint(u, p)
+    }
+
+    private companion object {
+        val HEX64 = Regex("^[0-9a-f]{64}$")
+        val LOCAL_HOSTS = setOf("localhost", "127.0.0.1", "[::1]")
+    }
 }
 
 @Serializable
@@ -109,6 +153,8 @@ data class SubscriptionDocument(
     val support: String = "",
     val announce: String = "",
     val profiles: List<DocProfile> = emptyList(),
+    /** Set when the service has moved: where the app should go. */
+    val service: ServiceMove? = null,
 )
 
 enum class SubscriptionKind { Account, Key }
@@ -136,6 +182,8 @@ data class SubscriptionState(
     val lastError: String? = null,
     /** The message the owner wants shown, which the user has already closed. */
     val announceSeen: String = "",
+    /** The order the app waits to be paid; null when there is none. */
+    val pendingOrder: PendingOrder? = null,
 ) {
     val active: Boolean get() = status == SubStatus.ACTIVE
     val signedIn: Boolean get() = kind == SubscriptionKind.Key || deviceToken.isNotEmpty()

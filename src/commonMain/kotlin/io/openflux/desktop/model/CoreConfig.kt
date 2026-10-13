@@ -41,6 +41,9 @@ data class CoreLaunch(
 object CoreConfig {
     const val LOOPBACK = "127.0.0.1"
 
+    /** Why a profile with Telemost alone does not connect through the full tunnel. */
+    const val TELEMOST_TUN = "Телемост пока не работает в режиме «Весь трафик»: выключите его в настройках или добавьте профилю другой транспорт"
+
     /** Why a profile with a JS transport does not connect while the experimental features are off. */
     const val SCRIPTS_OFF = "В профиле JS-транспорт, а экспериментальные функции выключены: включите их в настройках («Экспериментальные функции»)"
 
@@ -93,7 +96,10 @@ object CoreConfig {
             appendLine("EncryptionKeyFile = ${confValue(paths.keyFile ?: error("Session requires a key"))}")
             appendLine("CookieStore = ${confValue(paths.cookieStore)}")
             if (!exit && profile.bonding) appendLine("Bonding = yes")
+            // The core refuses Telemost under its TUN: the rest of the profile still connects.
             val specs = profile.sessionSpecs().filterNot { exit && it.type == TransportType.DIRECT }
+                .filterNot { !exit && settings.fullTunnel && it.type == TransportType.TELEMOST }
+            require(specs.isNotEmpty()) { TELEMOST_TUN }
             for (spec in specs) {
                 appendLine()
                 appendLine("[Transport ${spec.name}]")
@@ -181,6 +187,7 @@ object CoreConfig {
     }
 
     private fun classic(profile: Profile, settings: AppSettings, paths: CorePaths, exit: Boolean, socks: String, http: String): CoreLaunch {
+        require(exit || !settings.fullTunnel || profile.transport != TransportType.TELEMOST) { TELEMOST_TUN }
         val args = buildList {
             if (exit) {
                 // The same exit a Session profile runs, serving classic

@@ -140,6 +140,16 @@ fun AccountScreen() {
             if (account != null) ValueRow("Устройства", "${account.devices.size} из ${account.deviceLimit}")
         }
         s.lastError?.let { Banner("Не удалось обновить: $it", Tone.Warning) }
+        s.pendingOrder?.let { p ->
+            Banner(
+                "Ждём оплату заказа ${p.orderId}",
+                Tone.Info,
+                action = "Проверить",
+                onAction = m::checkOrder,
+                secondAction = if (p.paymentUrl.startsWith("https://")) "Открыть оплату снова" else null,
+                onSecondAction = if (p.paymentUrl.startsWith("https://")) m::reopenPayment else null,
+            )
+        }
         if (s.announce.isNotBlank() && s.announce != s.announceSeen) {
             Banner(s.announce, Tone.Info, action = "Закрыть", onAction = container.subscription::dismissAnnounce)
         }

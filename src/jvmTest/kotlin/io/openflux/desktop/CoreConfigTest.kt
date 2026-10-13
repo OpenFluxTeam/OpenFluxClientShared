@@ -89,6 +89,22 @@ class CoreConfigTest {
         assertTrue(launch.usesIpc)
     }
 
+    /** The core refuses Telemost under its TUN: a Session goes without it, Telemost alone does not start. */
+    @Test
+    fun telemostIsLeftOutOfTheFullTunnel() {
+        val withTelemost = session.copy(extras = session.extras + ExtraTransport(TransportType.TELEMOST, "https://telemost.yandex.ru/j/88936358186517", priority = 85))
+        assertTrue("Type = telemost" in CoreConfig.build(withTelemost, AppSettings(), paths).conf!!, "the proxies keep it")
+        val tun = CoreConfig.build(withTelemost, AppSettings(fullTunnel = true), paths).conf!!
+        assertFalse("telemost" in tun)
+        assertTrue("Type = vyandex" in tun && "Type = direct" in tun, "the rest still connects")
+
+        val alone = Profile(id = "t", name = "T", transport = TransportType.TELEMOST, value = "https://telemost.yandex.ru/j/88936358186517", secret = secret)
+        assertTrue("--transport=telemost" in CoreConfig.build(alone, AppSettings(), paths).arguments)
+        assertEquals(CoreConfig.TELEMOST_TUN, assertFailsWith<IllegalArgumentException> { CoreConfig.build(alone, AppSettings(fullTunnel = true), paths) }.message)
+        val onlyTelemost = alone.copy(session = true)
+        assertEquals(CoreConfig.TELEMOST_TUN, assertFailsWith<IllegalArgumentException> { CoreConfig.build(onlyTelemost, AppSettings(fullTunnel = true), paths) }.message)
+    }
+
     @Test
     fun fullTunnelUsesTheTunInboundAndNoProxies() {
         val launch = CoreConfig.build(session, AppSettings(fullTunnel = true), paths)

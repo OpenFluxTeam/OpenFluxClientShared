@@ -11,6 +11,7 @@ val TransportType.title: String
         TransportType.MAILRU -> "Документ Mail.ru"
         TransportType.BOARDS -> "Яндекс Доска"
         TransportType.CUPSONLINE -> "Cups.online"
+        TransportType.TELEMOST -> "Яндекс Телемост"
         TransportType.ONEME -> "MAX"
         TransportType.DIRECT -> "Прямое подключение"
         TransportType.SCRIPT -> "JS-транспорт"

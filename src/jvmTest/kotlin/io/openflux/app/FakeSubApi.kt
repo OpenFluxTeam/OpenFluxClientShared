@@ -90,4 +90,8 @@ class FakeSubApi : SubscriptionApi {
         calls += "delete:$token"
         deleteFailure?.let { throw it }
     }
+
+    override suspend fun health(ep: ServiceEndpoint) {
+        calls += "health:${ep.url}"
+    }
 }

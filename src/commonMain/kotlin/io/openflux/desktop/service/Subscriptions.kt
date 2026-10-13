@@ -6,10 +6,12 @@ import io.openflux.desktop.model.isActive
 import io.openflux.desktop.model.profile
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.OrderInfo
+import io.openflux.desktop.model.PendingOrder
 import io.openflux.desktop.model.PlansResult
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.ServiceEndpoint
+import io.openflux.desktop.model.ServiceMove
 import io.openflux.desktop.model.SubStatus
 import io.openflux.desktop.model.SubscriptionDocument
 import io.openflux.desktop.model.SubscriptionException
@@ -49,6 +51,8 @@ interface SubscriptionApi {
     suspend fun logout(ep: ServiceEndpoint, token: String)
     suspend fun removeDevice(ep: ServiceEndpoint, token: String, deviceId: String): AccountInfo
     suspend fun deleteAccount(ep: ServiceEndpoint, token: String, password: String)
+    /** Succeeds when the service at [ep] answers, with its pin: where a moved service is checked before the app follows it. */
+    suspend fun health(ep: ServiceEndpoint)
 }
 
 /** Where the subscription is kept between runs. */
@@ -80,6 +84,7 @@ object NoSubscriptionApi : SubscriptionApi {
     override suspend fun logout(ep: ServiceEndpoint, token: String) = unsupported()
     override suspend fun removeDevice(ep: ServiceEndpoint, token: String, deviceId: String) = unsupported()
     override suspend fun deleteAccount(ep: ServiceEndpoint, token: String, password: String) = unsupported()
+    override suspend fun health(ep: ServiceEndpoint) = unsupported()
 }
 
 /** What a pasted key shows before it is added. */
@@ -151,18 +156,22 @@ class SubscriptionManager(
 
     /** Refreshes now (the card's button, the app starting); a failure is kept for the card, not thrown. */
     suspend fun refresh(): Boolean {
-        val state = state.value ?: return false
+        if (state.value == null) return false
         _refreshing.value = true
         return try {
-            lock.withLock { refreshLocked(state) }
+            lock.withLock { refreshLocked() }
         } finally {
             _refreshing.value = false
         }
     }
 
-    private suspend fun refreshLocked(state: SubscriptionState): Boolean = try {
-        fetchAndApply(state)
-        true
+    private suspend fun refreshLocked(): Boolean = try {
+        // Read under the lock: a sign-out or an order may have changed it since refresh() was called.
+        val state = repo.state.value
+        if (state == null) false else {
+            fetchAndApply(checkOrder(state))
+            true
+        }
     } catch (e: CancellationException) {
         throw e
     } catch (e: SubscriptionException) {
@@ -176,13 +185,51 @@ class SubscriptionManager(
 
     private suspend fun fetchAndApply(state: SubscriptionState) {
         if (state.kind == SubscriptionKind.Key) {
-            applyDocument(state, api.keyDocument(state.endpoint, state.keyUrl))
+            val doc = api.keyDocument(state.endpoint, state.keyUrl)
+            applyDocument(state, doc)
+            follow(doc.service)
             return
         }
         val doc = api.document(state.endpoint, state.deviceToken)
         // The account (devices, plan) comes along; its failure does not spoil the document.
         val account = runCatching { api.account(state.endpoint, state.deviceToken) }.getOrNull()
         applyDocument(state.copy(account = account ?: state.account), doc)
+        follow(doc.service ?: account?.service)
+    }
+
+    /**
+     * Asks about the order the app waits for before the document, so a paid one shows in it. One that is over, or
+     * older than a day, is no longer waited for; a failed question keeps it for the next refresh.
+     */
+    private suspend fun checkOrder(state: SubscriptionState): SubscriptionState {
+        val pending = state.pendingOrder ?: return state
+        if (state.kind != SubscriptionKind.Account || platform.now() - pending.createdAt > ORDER_WAIT_MS) {
+            return state.copy(pendingOrder = null).also(repo::save)
+        }
+        val order = try {
+            api.order(state.endpoint, state.deviceToken, pending.orderId)
+        } catch (e: SubscriptionException) {
+            if (e.unauthorized) throw e
+            return state
+        }
+        return if (order.closed) state.copy(pendingOrder = null).also(repo::save) else state
+    }
+
+    /**
+     * Follows a moved service: the new address must answer with its pin first, or the app stays where it is and
+     * asks again on the next refresh. The device token (and a key's token) go along unchanged.
+     */
+    private suspend fun follow(move: ServiceMove?) {
+        val target = move?.endpoint() ?: return
+        val s = repo.state.value ?: return
+        if (target.base == s.endpoint.base && target.pin == s.endpoint.pin) return
+        try {
+            api.health(target)
+        } catch (e: SubscriptionException) {
+            return
+        }
+        val keyUrl = if (s.kind == SubscriptionKind.Key && s.keyUrl.contains("/sub/")) target.base + "/sub/" + s.keyUrl.substringAfter("/sub/") else s.keyUrl
+        repo.save(s.copy(endpoint = target, keyUrl = keyUrl))
     }
 
     /**
@@ -236,10 +283,28 @@ class SubscriptionManager(
 
     suspend fun startTrial(): AccountInfo = authed { token -> api.startTrial(endpoint, token) }.also { refresh() }
 
-    suspend fun checkout(planId: String): OrderInfo = authed { token -> api.checkout(endpoint, token, planId) }
+    /** Orders [planId]; the order is kept (as [SubscriptionState.pendingOrder]) until it is paid or over. */
+    suspend fun checkout(planId: String): OrderInfo {
+        val order = authed { token -> api.checkout(endpoint, token, planId) }
+        lock.withLock {
+            val s = repo.state.value
+            if (s?.kind == SubscriptionKind.Account) repo.save(s.copy(pendingOrder = PendingOrder(order.orderId, planId, platform.now(), order.paymentUrl)))
+        }
+        return order
+    }
 
-    /** The order's state; a paid one refreshes the subscription. */
-    suspend fun order(orderId: String): OrderInfo = authed { token -> api.order(endpoint, token, orderId) }.also { if (it.paid) refresh() }
+    /** The order's state; a paid one refreshes the subscription, and one that is over is no longer waited for. */
+    suspend fun order(orderId: String): OrderInfo {
+        val order = authed { token -> api.order(endpoint, token, orderId) }
+        if (order.closed) {
+            lock.withLock {
+                val s = repo.state.value
+                if (s?.pendingOrder?.orderId == orderId) repo.save(s.copy(pendingOrder = null))
+            }
+        }
+        if (order.paid) refresh()
+        return order
+    }
 
     suspend fun changePassword(password: String, newPassword: String): AccountInfo =
         authed { token -> api.changePassword(endpoint, token, password, newPassword) }.also { setAccount(it) }
@@ -299,5 +364,7 @@ class SubscriptionManager(
 
     private companion object {
         const val CHECK_EVERY_MS = 5 * 60 * 1000L
+        /** How long an unpaid order is waited for: a payment link does not live longer. */
+        const val ORDER_WAIT_MS = 24 * 60 * 60 * 1000L
     }
 }

@@ -39,6 +39,15 @@ enum class TransportType(
     CUPSONLINE("cupsonline", "Cups.online", "Cups", ValueKind.DocumentUrl,
         "Код комнат от ноды", "ic_code"),
 
+    /**
+     * A Yandex Telemost conference: the tunnel rides as video through its SFU, striped over several
+     * participants. Its media goes over WebRTC's own UDP sockets, which the desktop's full tunnel would
+     * swallow, so the core refuses it there (see [CoreConfig]).
+     */
+    @SerialName("telemost")
+    TELEMOST("telemost", "Яндекс Телемост", "Телемост", ValueKind.DocumentUrl,
+        "https://telemost.yandex.ru/j/…", "ic_yandex"),
+
     @SerialName("oneme")
     ONEME("oneme", "MAX (OneMe)", "MAX", ValueKind.Token,
         "Токен MAX Web", "ic_max"),
@@ -60,6 +69,9 @@ enum class TransportType(
 
     /** Whether an `openflux://` link can carry it (MAX tokens are per account). */
     val shareable: Boolean get() = this != ONEME && this != SCRIPT
+
+    /** The types this build can run from a link: what it tells the subscription service (X-OpenFlux-Transports). */
+    val linkable: Boolean get() = shareable && this != DIRECT
 
     /** Needs an authenticated Session: no document to meet in, or (script) params ride the Session specs. */
     val sessionOnly: Boolean get() = this == DIRECT || this == SCRIPT

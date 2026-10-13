@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
 
 /** The client against real HTTP and TLS servers: the wire format, the errors and, above all, the pin. */
 class HttpSubscriptionApiTest {
-    private class Seen(val method: String, val path: String, val auth: String?, val body: String)
+    private class Seen(val method: String, val path: String, val auth: String?, val body: String, val transports: String? = null)
 
     private val seen = CopyOnWriteArrayList<Seen>()
     private val servers = mutableListOf<com.sun.net.httpserver.HttpServer>()
@@ -38,13 +38,14 @@ class HttpSubscriptionApiTest {
 
     private val handler = HttpHandler { ex: HttpExchange ->
         val body = ex.requestBody.readBytes().toString(Charsets.UTF_8)
-        seen += Seen(ex.requestMethod, ex.requestURI.rawPath, ex.requestHeaders.getFirst("Authorization"), body)
+        seen += Seen(ex.requestMethod, ex.requestURI.rawPath, ex.requestHeaders.getFirst("Authorization"), body, ex.requestHeaders.getFirst("X-OpenFlux-Transports"))
         val (code, json) = when (ex.requestURI.rawPath) {
             "/api/v1/plans" -> 200 to """{"plans":[{"id":"month","name":"Месяц","days":30,"devices":3,"price":"299 ₽"}],"payment":{"provider":"manual","instructions":"Напишите в поддержку"},"future":"field"}"""
             "/api/v1/register" -> 201 to """{"deviceToken":"tok","deviceId":"d1","recoveryKey":"AAAA-BBBB","account":{"id":"u","login":"ivan","status":"active","expires":2000000000,"plan":{"id":"trial","name":"Пробный","devices":1},"trialAvailable":false,"devices":[{"id":"d1","name":"Тест","current":true}],"deviceLimit":1}}"""
             "/api/v1/login" -> 409 to """{"error":"device_limit","message":"Достигнут предел устройств.","devices":[{"id":"d9","name":"Телефон","createdAt":1,"lastSeen":2}]}"""
             "/api/v1/account" -> if (ex.requestHeaders.getFirst("Authorization") == "Bearer tok") 200 to """{"login":"ivan","status":"active"}""" else 401 to """{"error":"unauthorized","message":"Войдите в аккаунт."}"""
             "/api/v1/subscription" -> 200 to """{"version":1,"title":"OpenFlux","status":"active","expires":2000000000,"updateHours":6,"profiles":[{"id":"de","name":"Германия","link":"openflux://v1/x"}]}"""
+            "/healthz" -> 200 to "ok\n"
             "/sub/KEY" -> 200 to """{"version":1,"status":"expired","profiles":[]}"""
             "/sub/NULL" -> 200 to """{"version":1,"status":"active","profiles":null}"""
             "/api/v1/orders/o%2F1" -> 200 to """{"orderId":"o/1","status":"paid","expires":5}"""
@@ -176,6 +177,35 @@ class HttpSubscriptionApiTest {
         assertEquals("Сервис не отвечает. Проверьте сеть.", ex.message)
     }
 
+    /** The service builds links only from what the app can run: never a type it would drop the location for. */
+    @Test
+    fun everyRequestNamesTheTransportsThisBuildRuns() = runBlocking {
+        val ep = http()
+        api.document(ep, "tok")
+        api.keyDocument(ep, ep.base + "/sub/KEY")
+        for (s in seen) {
+            val names = s.transports.orEmpty().split(",")
+            assertEquals(listOf("vyandex", "yandex", "boards", "mailru", "cupsonline", "telemost"), names, s.path)
+        }
+    }
+
+    @Test
+    fun healthWantsTheServiceToAnswer() = runBlocking {
+        val ep = http()
+        api.health(ep)
+        assertEquals("/healthz", seen.last().path)
+        assertEquals(null, seen.last().auth, "no token goes to an address being checked")
+        val port = java.net.ServerSocket(0).use { it.localPort }
+        assertTrue(assertFailsWith<SubscriptionException> { api.health(ServiceEndpoint("http://127.0.0.1:$port")) }.network)
+        val noHealth = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0).apply {
+            createContext("/") { it.sendResponseHeaders(404, -1); it.close() }
+            start()
+        }
+        servers += noHealth
+        assertFailsWith<SubscriptionException> { api.health(ServiceEndpoint("http://127.0.0.1:${noHealth.address.port}")) }
+        Unit
+    }
+
     // ---- the pin ----
 
     @Test
@@ -196,6 +226,14 @@ class HttpSubscriptionApiTest {
         assertEquals(SubscriptionException.BAD_PIN, ex.code)
         assertTrue(ex.message!!.contains("Логин и пароль не отправлены"), ex.message)
         assertTrue(seen.isEmpty(), "the password must not reach a server with another certificate: ${seen.map { it.path }}")
+    }
+
+    @Test
+    fun healthChecksTheNewPin() = runBlocking {
+        val port = https()
+        api.health(ServiceEndpoint("https://127.0.0.1:$port", realPin))
+        val wrong = realPin.replaceFirstChar { if (it == '0') '1' else '0' }
+        assertEquals(SubscriptionException.BAD_PIN, assertFailsWith<SubscriptionException> { api.health(ServiceEndpoint("https://127.0.0.1:$port", wrong)) }.code)
     }
 
     @Test

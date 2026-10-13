@@ -15,6 +15,7 @@ import io.openflux.desktop.model.PlansResult
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.ServiceEndpoint
+import io.openflux.desktop.model.ServiceMove
 import io.openflux.desktop.model.ShareConfig
 import io.openflux.desktop.model.ShareTransport
 import io.openflux.desktop.model.SubStatus
@@ -299,6 +300,181 @@ class SubscriptionManagerTest {
         assertEquals(2_100_000_000, e.repo.state.value?.expires, "the new end shows at once")
     }
 
+    // ---- an order waited for across restarts (C1) ----
+
+    /** The app is closed while the person pays in the bank's app: a new manager on the same storage finds the order. */
+    @Test
+    fun anOrderPaidWhileTheAppWasClosedIsFoundOnTheNextStart() = runTest {
+        val e = env()
+        e.doc("de" to "Германия", expires = 1_900_000_000)
+        e.manager.login("ivan", "pw")
+        e.manager.checkout("month")
+        val kept = assertNotNull(e.repo.state.value?.pendingOrder)
+        assertEquals("o1", kept.orderId)
+        assertEquals("month", kept.planId)
+
+        e.api.orderStatus = "paid"
+        e.doc("de" to "Германия", expires = 2_100_000_000)
+        val restarted = SubscriptionManager(e.api, e.repo, e.profiles, FakeShareLinkCodec(), e.platform, e.connection, ep)
+        e.api.calls.clear()
+        assertTrue(restarted.refresh())
+        assertEquals(
+            listOf("order:o1", "document:token-1@${ep.url}"),
+            e.api.calls.filter { it.startsWith("order") || it.startsWith("document") },
+            "the order is asked about before the document",
+        )
+        assertNull(e.repo.state.value?.pendingOrder, "a paid order is no longer waited for")
+        assertEquals(2_100_000_000, e.repo.state.value?.expires)
+    }
+
+    @Test
+    fun aPendingOrderIsKeptAndAnOrderThatIsOverIsForgotten() = runTest {
+        for (status in listOf("canceled", "expired", "failed")) {
+            val e = env()
+            e.doc("de" to "Германия")
+            e.manager.login("ivan", "pw")
+            e.manager.checkout("month")
+            assertTrue(e.manager.refresh())
+            assertNotNull(e.repo.state.value?.pendingOrder, "pending: still waited for")
+            e.api.orderStatus = "refunding" // a status this build does not know
+            assertTrue(e.manager.refresh())
+            assertNotNull(e.repo.state.value?.pendingOrder, "an unknown status is still waited for")
+            e.api.orderStatus = status
+            assertTrue(e.manager.refresh())
+            assertNull(e.repo.state.value?.pendingOrder, "$status: no longer waited for")
+        }
+    }
+
+    @Test
+    fun askingAboutTheOrderOnTheScreenForgetsOneThatIsOver() = runTest {
+        val e = env()
+        e.doc("de" to "Германия")
+        e.manager.login("ivan", "pw")
+        e.manager.checkout("month")
+        e.manager.order("o1")
+        assertNotNull(e.repo.state.value?.pendingOrder)
+        e.api.orderStatus = "canceled"
+        e.manager.order("o1")
+        assertNull(e.repo.state.value?.pendingOrder)
+    }
+
+    @Test
+    fun anOrderOlderThanADayIsDroppedWithoutAsking() = runTest {
+        val e = env()
+        e.doc("de" to "Германия")
+        e.manager.login("ivan", "pw")
+        e.manager.checkout("month")
+        e.platform.clock += 25 * 3_600_000L
+        e.api.calls.clear()
+        assertTrue(e.manager.refresh())
+        assertTrue(e.api.calls.none { it.startsWith("order") })
+        assertNull(e.repo.state.value?.pendingOrder)
+    }
+
+    @Test
+    fun aFailedOrderQuestionKeepsTheOrderAndStillRefreshes() = runTest {
+        val e = env()
+        e.doc("de" to "Германия")
+        e.manager.login("ivan", "pw")
+        e.manager.checkout("month")
+        e.api.orderFailure = SubscriptionException(SubscriptionException.NETWORK, "Сервис не отвечает.")
+        e.doc("de" to "Германия", "nl" to "Нидерланды")
+        assertTrue(e.manager.refresh())
+        assertNotNull(e.repo.state.value?.pendingOrder)
+        assertEquals(setOf("sub-de", "sub-nl"), e.profiles.profiles.value.map { it.id }.toSet())
+    }
+
+    @Test
+    fun applyingTheDocumentKeepsTheOrder() = runTest {
+        val e = env()
+        e.doc("de" to "Германия")
+        e.manager.login("ivan", "pw")
+        e.manager.checkout("month")
+        assertTrue(e.manager.refresh())
+        assertTrue(e.manager.refresh())
+        assertEquals("o1", e.repo.state.value?.pendingOrder?.orderId)
+    }
+
+    // ---- a service that moved (C3) ----
+
+    private val moved = ServiceEndpoint("https://sub.example.org", "cd".repeat(32))
+
+    @Test
+    fun theAppFollowsAMovedServiceOnceItAnswers() = runTest {
+        val e = env()
+        e.doc("de" to "Германия")
+        e.manager.login("ivan", "pw")
+        e.api.document = e.api.document.copy(service = ServiceMove(moved.url + "/", moved.pin.uppercase()))
+        e.api.calls.clear()
+        assertTrue(e.manager.refresh())
+        assertTrue("health:${moved.url}|${moved.pin}" in e.api.calls, "the new address is asked first, with its pin")
+        val s = assertNotNull(e.repo.state.value)
+        assertEquals(moved, s.endpoint)
+        assertEquals("token-1", s.deviceToken, "the device stays signed in")
+        assertEquals(moved, e.manager.endpoint)
+
+        e.api.calls.clear()
+        assertTrue(e.manager.refresh())
+        assertTrue("document:token-1@${moved.url}" in e.api.calls, "the next refresh goes to the new address")
+        assertTrue(e.api.calls.none { it.startsWith("health") }, "already there: nothing to check")
+    }
+
+    @Test
+    fun theAccountAnswerCanCarryTheMoveToo() = runTest {
+        val e = env()
+        e.doc("de" to "Германия")
+        e.manager.login("ivan", "pw")
+        e.api.accountService = ServiceMove(moved.url, moved.pin)
+        assertTrue(e.manager.refresh())
+        assertEquals(moved, e.repo.state.value?.endpoint)
+    }
+
+    @Test
+    fun aMoveToAnAddressThatDoesNotAnswerIsNotFollowed() = runTest {
+        val e = env()
+        e.doc("de" to "Германия")
+        e.manager.login("ivan", "pw")
+        e.api.document = e.api.document.copy(service = ServiceMove(moved.url, moved.pin))
+        e.api.healthFailure = SubscriptionException(SubscriptionException.BAD_PIN, "сертификат не совпал")
+        assertTrue(e.manager.refresh(), "the refresh itself succeeds")
+        assertEquals(ep, e.repo.state.value?.endpoint)
+        assertEquals(listOf("sub-de"), e.profiles.profiles.value.map { it.id })
+    }
+
+    @Test
+    fun aMoveTheAppWouldNotTrustIsIgnored() = runTest {
+        val untrusted = listOf(
+            ServiceMove("http://sub.example.org", moved.pin),
+            ServiceMove("https://sub.example.org", "not-a-pin"),
+            ServiceMove("https://user@sub.example.org", moved.pin),
+            ServiceMove("ftp://sub.example.org"),
+            ServiceMove(""),
+        )
+        for (bad in untrusted) {
+            val e = env()
+            e.doc("de" to "Германия")
+            e.manager.login("ivan", "pw")
+            e.api.document = e.api.document.copy(service = bad)
+            e.api.calls.clear()
+            assertTrue(e.manager.refresh())
+            assertEquals(ep, e.repo.state.value?.endpoint, "$bad")
+            assertTrue(e.api.calls.none { it.startsWith("health") }, "$bad is not even asked")
+        }
+        assertEquals(ServiceEndpoint("http://127.0.0.1:8080", ""), ServiceMove("http://127.0.0.1:8080").endpoint(), "plain http for this machine only")
+    }
+
+    @Test
+    fun aKeyMovesWithItsToken() = runTest {
+        val e = env()
+        e.doc("de" to "Германия")
+        e.manager.addKey(e.manager.previewKey("https://203.0.113.5:8443/sub/TOKEN#pin=" + "ab".repeat(32)))
+        e.api.document = e.api.document.copy(service = ServiceMove(moved.url, moved.pin))
+        assertTrue(e.manager.refresh())
+        val s = assertNotNull(e.repo.state.value)
+        assertEquals(moved, s.endpoint)
+        assertEquals("${moved.url}/sub/TOKEN", s.keyUrl)
+    }
+
     @Test
     fun accountCallsNeedASignedInAccount() = runTest {
         val e = env()
@@ -375,6 +551,9 @@ class SubscriptionManagerTest {
         var logoutFailure: SubscriptionException? = null
         var deleteFailure: SubscriptionException? = null
         var orderStatus = "pending"
+        var orderFailure: SubscriptionException? = null
+        var healthFailure: SubscriptionException? = null
+        var accountService: ServiceMove? = null
         private var tokens = 0
 
         private fun account(login: String) = AccountInfo(id = "u1", login = login, status = document.status, expires = document.expires)
@@ -403,11 +582,11 @@ class SubscriptionManagerTest {
         override suspend fun account(ep: ServiceEndpoint, token: String): AccountInfo {
             calls += "account:$token"
             failure?.let { throw it }
-            return account("ivan")
+            return account("ivan").copy(service = accountService)
         }
 
         override suspend fun document(ep: ServiceEndpoint, token: String): SubscriptionDocument {
-            calls += "document:$token"
+            calls += "document:$token@${ep.url}"
             failure?.let { throw it }
             return document
         }
@@ -428,6 +607,7 @@ class SubscriptionManagerTest {
         override suspend fun order(ep: ServiceEndpoint, token: String, orderId: String): OrderInfo {
             calls += "order:$orderId"
             failure?.let { throw it }
+            orderFailure?.let { throw it }
             return OrderInfo(orderId, "month", orderStatus, document.expires)
         }
 
@@ -445,6 +625,11 @@ class SubscriptionManagerTest {
         override suspend fun deleteAccount(ep: ServiceEndpoint, token: String, password: String) {
             calls += "delete:$token"
             deleteFailure?.let { throw it }
+        }
+
+        override suspend fun health(ep: ServiceEndpoint) {
+            calls += "health:${ep.url}|${ep.pin}"
+            healthFailure?.let { throw it }
         }
     }
 

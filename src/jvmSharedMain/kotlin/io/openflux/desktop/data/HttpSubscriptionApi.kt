@@ -8,6 +8,7 @@ import io.openflux.desktop.model.PlansResult
 import io.openflux.desktop.model.ServiceEndpoint
 import io.openflux.desktop.model.SubscriptionDocument
 import io.openflux.desktop.model.SubscriptionException
+import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.service.SubscriptionApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,6 +33,8 @@ import javax.net.ssl.X509TrustManager
  * pin the only certificate trusted is the one whose SHA-256 it is: the service
  * runs on an address without a domain, and no password or token is sent to any
  * other server. Plain http is accepted for this machine only (tests).
+ * Every request names the transports this build runs, so the service's links
+ * carry no type the app could not read (a link it cannot read loses the location).
  */
 class HttpSubscriptionApi : SubscriptionApi {
     // coerceInputValues: a service answering "profiles":null (no usable pool) is
@@ -89,6 +92,26 @@ class HttpSubscriptionApi : SubscriptionApi {
         send(ep, "POST", "/api/v1/account/delete", token, obj("password" to password), Ok.serializer())
     }
 
+    /** `/healthz` answers plain text: only the status counts (and the pin, checked on the way). */
+    override suspend fun health(ep: ServiceEndpoint) = withContext(Dispatchers.IO) {
+        val conn = try {
+            open(ep, ep.base + "/healthz")
+        } catch (e: IOException) {
+            throw network(e)
+        }
+        try {
+            conn.connectTimeout = 10_000
+            conn.readTimeout = 20_000
+            conn.instanceFollowRedirects = false
+            val code = conn.responseCode
+            if (code != 200) throw SubscriptionException(SubscriptionException.BAD_RESPONSE, "Сервис ответил ошибкой $code")
+        } catch (e: IOException) {
+            throw network(e)
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     @Serializable
     private class Ok(val ok: Boolean = true)
 
@@ -114,6 +137,7 @@ class HttpSubscriptionApi : SubscriptionApi {
                 conn.readTimeout = 20_000
                 conn.instanceFollowRedirects = false
                 conn.setRequestProperty("Accept", "application/json")
+                conn.setRequestProperty(TRANSPORTS_HEADER, TRANSPORTS)
                 if (token != null) conn.setRequestProperty("Authorization", "Bearer $token")
                 if (body != null) {
                     conn.doOutput = true
@@ -190,5 +214,7 @@ class HttpSubscriptionApi : SubscriptionApi {
 
     private companion object {
         const val MAX_BYTES = 1 shl 20
+        const val TRANSPORTS_HEADER = "X-OpenFlux-Transports"
+        val TRANSPORTS = TransportType.entries.filter { it.linkable }.joinToString(",") { it.cliName }
     }
 }

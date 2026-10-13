@@ -172,6 +172,12 @@ class SubscriptionModel(private val container: AppContainer, private val scope: 
     fun signOut() = call("Выхожу…") { manager.signOut() }
     fun removeDevice(id: String) = call("Убираю устройство…") { manager.removeDevice(id) }
 
+    /** Opens the order's payment page again: the person closed it, or paid on another device. */
+    fun reopenPayment() {
+        val url = manager.state.value?.pendingOrder?.paymentUrl.orEmpty()
+        if (url.startsWith("https://")) container.platform.openUrl(url)
+    }
+
     fun openSupport() {
         val url = manager.state.value?.support.orEmpty()
         if (url.startsWith("https://") || url.startsWith("http://")) container.platform.openUrl(url)
@@ -239,8 +245,9 @@ class SubscriptionModel(private val container: AppContainer, private val scope: 
         }
     }
 
+    /** Asks about the order on screen, or the one kept from before the app was closed. */
     fun checkOrder() {
-        val id = order?.orderId ?: return
+        val id = order?.orderId ?: manager.state.value?.pendingOrder?.orderId ?: return
         scope.launch { checkOrderNow(id) }
     }
 
@@ -258,12 +265,18 @@ class SubscriptionModel(private val container: AppContainer, private val scope: 
     private suspend fun checkOrderNow(orderId: String) {
         try {
             val o = manager.order(orderId)
-            order = o
+            if (plansOpen) order = o
             if (o.paid) paid = true
+            // Asked from the card, the sheet is not there to say it.
+            if (!plansOpen) notice = when {
+                o.paid -> "Оплата получена. Подписка продлена"
+                o.closed -> "Заказ ${o.orderId} не оплачен. Оформите новый"
+                else -> "Оплата ещё не пришла"
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: SubscriptionException) {
-            plansError = e.message
+            if (plansOpen) plansError = e.message else error = e.message
         }
     }
 
