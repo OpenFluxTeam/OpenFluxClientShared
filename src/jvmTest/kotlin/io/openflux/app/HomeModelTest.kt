@@ -41,6 +41,40 @@ class HomeModelTest {
         assertEquals("a", m.selected()?.id)
     }
 
+    /** Stopping the exit node from anywhere leaves the device a client; the shortcut, the tray and the tile never start the node. */
+    @Test
+    fun theShortcutAndTheButtonAgreeAfterTheExitNode() {
+        listOf(a, b).forEach(c.profiles::upsert)
+        val modes = mutableListOf<ConnectionMode?>()
+        conn.onConnect = { p, mode -> modes += mode; ConnectionState.Connected(p, mode ?: c.settings.settings.value.mode, 0) }
+        c.settings.update { it.copy(mode = ConnectionMode.Exit, selectedProfileId = "b") }
+        conn.state.value = ConnectionState.Connected(b, ConnectionMode.Exit, 0)
+
+        io.openflux.app.shell.toggleConnection(c)
+        assertEquals(ConnectionState.Idle, conn.state.value)
+        assertEquals(ConnectionMode.Client, c.settings.settings.value.mode, "stopping the node returns to the client mode")
+
+        io.openflux.app.shell.toggleConnection(c)
+        assertEquals(listOf<ConnectionMode?>(ConnectionMode.Client), modes, "the shortcut connects as a client")
+
+        m.toggle()
+        c.settings.update { it.copy(mode = ConnectionMode.Exit) }
+        conn.state.value = ConnectionState.Connected(b, ConnectionMode.Exit, 0)
+        m.toggle()
+        assertEquals(ConnectionState.Idle, conn.state.value, "the Home button disconnects, as its label says")
+        assertEquals(ConnectionMode.Client, c.settings.settings.value.mode)
+    }
+
+    @Test
+    fun choosingDoesNotTouchARunningExitNode() {
+        listOf(a, b).forEach(c.profiles::upsert)
+        c.settings.update { it.copy(mode = ConnectionMode.Exit, selectedProfileId = "b") }
+        conn.state.value = ConnectionState.Connected(b, ConnectionMode.Exit, 0)
+        m.choose(a)
+        assertEquals("b", (conn.state.value as ConnectionState.Connected).profile.id, "the node keeps running as itself")
+        assertEquals("a", c.settings.settings.value.selectedProfileId)
+    }
+
     @Test
     fun choosingWhileConnectedSwitches() {
         listOf(a, b).forEach(c.profiles::upsert)

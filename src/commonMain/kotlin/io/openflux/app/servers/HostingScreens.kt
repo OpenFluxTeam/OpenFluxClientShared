@@ -158,10 +158,7 @@ fun HostingScreen(dest: Dest.Hosting) {
         val through = connection.isActive && connection.profile?.id == p.id
         FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
             if (through) SecondaryButton("Отключить", { container.connection.disconnect() }, leading = Icons.Rounded.Stop)
-            else SecondaryButton("Подключить себе", {
-                container.settings.update { it.copy(selectedProfileId = p.id) }
-                container.connection.connect(p)
-            }, leading = Icons.Rounded.PlayArrow)
+            else SecondaryButton("Подключить себе", { io.openflux.app.shell.connectAsClient(container, p) }, leading = Icons.Rounded.PlayArrow)
             SecondaryButton("Поделиться", { navigator.open(Dest.Give(p.id)) }, leading = Icons.Rounded.Share)
         }
         Section("Нода на хостинге") {

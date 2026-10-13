@@ -180,7 +180,7 @@ fun UpdateLine(modifier: Modifier = Modifier) {
         is UpdateState.Available -> Banner(
             "Вышла версия ${s.release.version}", Tone.Info, pad,
             action = if (s.asset == null) "Скачать" else "Обновить", onAction = updates::install,
-            secondAction = "Позже", onSecondAction = updates::dismiss,
+            more = listOf("Позже" to updates::dismiss, "Пропустить эту версию" to updates::skip),
         )
         is UpdateState.Downloading -> Column(pad) {
             Text(

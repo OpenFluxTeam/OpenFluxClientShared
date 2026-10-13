@@ -65,18 +65,11 @@ class HomeModel(private val container: AppContainer) {
     /** Chooses [profile]; while connected, switches to it. */
     fun choose(profile: Profile) {
         settings.update { it.copy(selectedProfileId = profile.id) }
-        if (connection.state.value.isActive) connection.connect(profile)
+        // A running exit node stays itself: choosing on Home is about what the device connects to as a client.
+        if (connection.state.value.isActive && settings.settings.value.mode == ConnectionMode.Client) connection.connect(profile, ConnectionMode.Client)
     }
 
-    fun toggle() {
-        if (connection.state.value.isActive) {
-            connection.disconnect()
-            return
-        }
-        val p = selected() ?: return
-        settings.update { it.copy(selectedProfileId = p.id, mode = ConnectionMode.Client) }
-        connection.connect(p, ConnectionMode.Client)
-    }
+    fun toggle() = io.openflux.app.shell.toggleConnection(container)
 
     /** The full tunnel restarts a running connection in the new way. */
     fun setFullTunnel(on: Boolean) {

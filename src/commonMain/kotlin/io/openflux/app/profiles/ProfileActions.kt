@@ -31,10 +31,7 @@ class ProfileActions(private val container: AppContainer) {
         if (settings.settings.value.selectedProfileId == p.id) settings.update { it.copy(selectedProfileId = null) }
     }
 
-    fun connect(p: Profile) {
-        settings.update { it.copy(selectedProfileId = p.id) }
-        connection.connect(p)
-    }
+    fun connect(p: Profile) = io.openflux.app.shell.connectAsClient(container, p)
 
     /** The person runs this node: it is listed with their servers from now on. */
     fun markOwn(p: Profile) {

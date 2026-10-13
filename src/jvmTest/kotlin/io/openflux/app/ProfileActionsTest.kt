@@ -20,6 +20,18 @@ class ProfileActionsTest {
     private val sub = Profile(id = "s", name = "Амстердам", source = ProfileSource.Subscription)
 
     @Test
+    fun connectingAProfileIsAlwaysAsAClient() {
+        c.profiles.upsert(p)
+        val modes = mutableListOf<io.openflux.desktop.model.ConnectionMode?>()
+        conn.onConnect = { pr, mode -> modes += mode; ConnectionState.Connected(pr, mode ?: c.settings.settings.value.mode, 0) }
+        c.settings.update { it.copy(mode = io.openflux.desktop.model.ConnectionMode.Exit) }
+        a.connect(p)
+        assertEquals(listOf<io.openflux.desktop.model.ConnectionMode?>(io.openflux.desktop.model.ConnectionMode.Client), modes)
+        assertEquals(io.openflux.desktop.model.ConnectionMode.Client, c.settings.settings.value.mode)
+        assertEquals("p", c.settings.settings.value.selectedProfileId)
+    }
+
+    @Test
     fun duplicateMakesAManualCopy() {
         c.profiles.upsert(p)
         val copy = a.duplicate(p)!!

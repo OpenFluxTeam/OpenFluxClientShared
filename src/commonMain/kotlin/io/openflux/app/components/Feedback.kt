@@ -16,8 +16,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -46,6 +50,7 @@ fun Banner(
     onAction: (() -> Unit)? = null,
     secondAction: String? = null,
     onSecondAction: (() -> Unit)? = null,
+    more: List<Pair<String, () -> Unit>> = emptyList(),
 ) {
     val c = AppTheme2.colors
     val (icon, color) = when (tone) {
@@ -70,6 +75,13 @@ fun Banner(
         )
         if (secondAction != null && onSecondAction != null) TextButton2(secondAction, onSecondAction, color = c.textSecondary)
         if (action != null && onAction != null) TextButton2(action, onAction)
+        if (more.isNotEmpty()) Box {
+            var open by remember { mutableStateOf(false) }
+            IconButton2(Icons.Rounded.MoreVert, "Ещё", { open = true })
+            DropdownMenu(open, { open = false }) {
+                more.forEach { (label, run) -> DropdownMenuItem({ Text(label) }, { open = false; run() }) }
+            }
+        }
     }
 }
 

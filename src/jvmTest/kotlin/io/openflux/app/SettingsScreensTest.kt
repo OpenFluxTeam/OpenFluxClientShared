@@ -4,6 +4,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -38,12 +39,21 @@ class SettingsScreensTest {
     }
 
     @Test
-    fun theJournalFilters() = runComposeUiTest {
+    fun theJournalFiltersAndCopiesWhatItShows() = runComposeUiTest {
         val c = testContainer()
-        c.nodeWizard.note("ошибка входа по SSH", LogLevel.Error)
+        (c.connection as TestConnection).logs.value = listOf(
+            io.openflux.desktop.model.LogLine(1, 1, "соединение установлено", LogLevel.Info),
+            io.openflux.desktop.model.LogLine(2, 2, "ошибка входа по SSH", LogLevel.Error),
+        )
         c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.Logs) }.snapshot().encode()) }
         setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
-        onNodeWithText("Журнал пуст").assertIsDisplayed()
+        onNodeWithText("соединение установлено").assertIsDisplayed()
+        onNodeWithText("Ошибки").performClick()
+        assertEquals(0, onAllNodes(hasText("соединение установлено")).fetchSemanticsNodes().size)
+        onNodeWithText("ошибка входа по SSH").assertIsDisplayed()
+        onNodeWithContentDescription("Ещё").performClick()
+        onNodeWithText("Копировать показанное").performClick()
+        assertEquals("ошибка входа по SSH", (c.platform as TestPlatform).clipboard)
     }
 
     @Test
@@ -54,6 +64,23 @@ class SettingsScreensTest {
         repeat(10) { onNodeWithText("Версия приложения").performClick() }
         waitForIdle()
         assertEquals(true, c.settings.settings.value.developerMode)
+    }
+
+    @Test
+    fun aReleaseCanBeSkipped() = runComposeUiTest {
+        val p = TestPlatform().apply {
+            appVersion = "2.0.0"
+            releases = """[{"tag_name":"v2.1.0","draft":false,"prerelease":false,"body":"","html_url":"https://x","assets":[]}]"""
+        }
+        val c = testContainer(platform = p)
+        kotlinx.coroutines.runBlocking { c.updates.check(manual = false) }
+        setContent { OpenFluxApp2(c, NoScrollbars, Shortcuts()) }
+        onNodeWithText("Вышла версия 2.1.0").assertIsDisplayed()
+        onNodeWithContentDescription("Ещё").performClick()
+        onNodeWithText("Пропустить эту версию").performClick()
+        waitForIdle()
+        assertEquals("v2.1.0", c.settings.settings.value.skippedUpdate)
+        assertEquals(0, onAllNodes(hasText("Вышла версия 2.1.0")).fetchSemanticsNodes().size)
     }
 
     @Test

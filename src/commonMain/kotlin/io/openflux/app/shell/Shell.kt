@@ -157,13 +157,25 @@ private fun ShellShortcuts(navigator: AppNavigator, onAdd: () -> Unit, enabled: 
 /** Ctrl+Enter, the tray, the quick-settings tile: disconnect, or connect the chosen profile (else the first). */
 fun toggleConnection(container: io.openflux.desktop.service.AppContainer) {
     if (container.connection.state.value.isActive) {
-        container.connection.disconnect()
+        stopConnection(container)
         return
     }
     val list = container.profiles.profiles.value
     val id = container.settings.settings.value.selectedProfileId
     val profile = list.firstOrNull { it.id == id } ?: list.firstOrNull() ?: return
-    container.connection.connect(profile)
+    connectAsClient(container, profile)
+}
+
+/** Connects this device through [profile] and remembers it as the chosen one. The exit node starts only from «Это устройство». */
+fun connectAsClient(container: io.openflux.desktop.service.AppContainer, profile: io.openflux.desktop.model.Profile) {
+    container.settings.update { it.copy(selectedProfileId = profile.id, mode = io.openflux.desktop.model.ConnectionMode.Client) }
+    container.connection.connect(profile, io.openflux.desktop.model.ConnectionMode.Client)
+}
+
+/** Disconnects. An exit node stopped this way leaves the device a client: only «Это устройство» starts the node. */
+fun stopConnection(container: io.openflux.desktop.service.AppContainer) {
+    container.connection.disconnect()
+    container.settings.update { if (it.mode == io.openflux.desktop.model.ConnectionMode.Exit) it.copy(mode = io.openflux.desktop.model.ConnectionMode.Client) else it }
 }
 
 @Composable

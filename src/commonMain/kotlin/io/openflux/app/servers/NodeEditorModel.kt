@@ -193,8 +193,7 @@ class NodeEditorModel(
     /** Connects this device through the node. */
     fun connectHere() = run("Подключаюсь через ноду…") {
         val p = adopt()
-        container.settings.update { it.copy(selectedProfileId = p.id) }
-        container.connection.connect(p)
+        io.openflux.app.shell.connectAsClient(container, p)
         notice = "Подключаюсь через «${p.name}»"
     }
 

@@ -64,7 +64,7 @@ class TestConnection : ConnectionService {
     override val state = MutableStateFlow<ConnectionState>(ConnectionState.Idle)
     override val traffic = MutableStateFlow(TrafficStats())
     override val exitAddress = MutableStateFlow<ExitAddress>(ExitAddress.Unknown)
-    override val logs: StateFlow<List<LogLine>> = MutableStateFlow(emptyList())
+    override val logs = MutableStateFlow<List<LogLine>>(emptyList())
     override val captcha: StateFlow<CaptchaPrompt?> = MutableStateFlow(null)
     override val exitShareLink: StateFlow<String?> = MutableStateFlow(null)
     override val socksAddress: StateFlow<String?> = MutableStateFlow(null)
@@ -80,7 +80,7 @@ class TestConnection : ConnectionService {
 }
 
 class TestPlatform : PlatformServices {
-    override val appVersion = "test"
+    override var appVersion = "test"
     override val coreVersion = "test"
     override val clientRepo = "test"
     override val systemProxySupported = false
@@ -100,6 +100,9 @@ class TestPlatform : PlatformServices {
     var clipboard: String? = null
     override fun now() = clock
     override suspend fun latestRelease(): String? = null
+    /** The release feed GitHub would answer with; null fails the check. */
+    var releases: String? = null
+    override suspend fun httpText(url: String): String = releases ?: throw java.io.IOException("нет связи")
     var rooms = "packed-rooms"
     override suspend fun newCupsRooms(): String = rooms
     var secrets = 0
