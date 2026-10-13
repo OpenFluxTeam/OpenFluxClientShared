@@ -192,9 +192,8 @@ data class Profile(
             }
             return when (carrier.type.kind) {
                 ValueKind.DocumentUrl -> when {
-                    // Cups.online with no rooms is valid: the node generates its own
-                    // and prints the string for the client (transport/cupsonline.enterRooms).
                     carrier.type == TransportType.CUPSONLINE -> null
+                    carrier.type == TransportType.AVITO -> null
                     value.isEmpty() -> "нужна ссылка"
                     !value.startsWith("https://") -> "ссылка должна начинаться с https://"
                     else -> null

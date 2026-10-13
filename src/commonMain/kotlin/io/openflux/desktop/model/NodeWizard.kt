@@ -58,7 +58,7 @@ data class NodeTransport(val type: String, val url: String) {
 
 object NodeTransports {
     /** What the wizard offers besides direct, in the node's priority order. */
-    val offered = listOf(TransportType.VYANDEX, TransportType.MAILRU, TransportType.CUPSONLINE)
+    val offered = listOf(TransportType.VYANDEX, TransportType.MAILRU, TransportType.CUPSONLINE, TransportType.AVITO)
 
     private val MAILRU_URL = Regex("""^https://cloud\.mail\.ru/public/[A-Za-z0-9_-]{2,64}/[A-Za-z0-9_-]{2,128}$""")
 
