@@ -194,6 +194,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         state.look(),
         label = if (state.isActive) "Отключить" else "Подключить",
         onClick = m::toggle,
+        shortcut = "Ctrl+Enter",
     )
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(state.title(), style = AppTheme2.type.title, color = AppTheme2.colors.text, textAlign = TextAlign.Center)

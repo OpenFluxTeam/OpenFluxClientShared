@@ -79,6 +79,10 @@ fun NewHostingScreen() {
                             if (m.canRemove) TextButton2("Удалить с хостинга", m::removeFailed, color = AppTheme2.colors.danger)
                         }
                     }
+                    m.error != null && m.canRemove -> FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme2.spacing.s)) {
+                        PrimaryButton("Повторить", m::install)
+                        TextButton2("Удалить с хостинга", m::removeFailed, color = AppTheme2.colors.danger)
+                    }
                     else -> PrimaryButton(if (m.existing) "Подключить ноду" else "Установить", m::install, Modifier.fillMaxWidth())
                 }
             }

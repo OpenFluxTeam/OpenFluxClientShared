@@ -73,6 +73,8 @@ class HostingSetupModel(
 
     private var knownRoom = ""
     private var ftp: FtpTarget? = null
+    /** The key of the files this put on the hosting; a retry goes on from them without uploading again. */
+    private var deployedKey: String? = null
     private var made: Profile? = null
     private var job: Job? = null
 
@@ -105,6 +107,9 @@ class HostingSetupModel(
             if (existing) {
                 siteUrl = PhpHosts.nodeAddress(site)!!.site
                 key = token.trim()
+            } else if (ftp != null && deployedKey != null) {
+                siteUrl = PhpHosts.siteUrl(site)!!
+                key = deployedKey!!
             } else {
                 siteUrl = PhpHosts.siteUrl(site)!!
                 val target = FtpTarget(
@@ -133,6 +138,7 @@ class HostingSetupModel(
                 }
                 securityNote = PhpMessages.security(installed.security)
                 ftpPassword = ""
+                deployedKey = installed.token
                 key = installed.token
             }
             val target = when (carrier) {
@@ -179,6 +185,8 @@ class HostingSetupModel(
         if (p != null && node != null) runCatching { service.stop(node.siteUrl, node.token, p.transport.cliName, p.value) }
         ftp?.let { service.remove(it) }
         p?.let { container.profiles.delete(it.id) }
+        ftp = null
+        deployedKey = null
         made = null
         verifyFailed = null
     }
@@ -200,7 +208,7 @@ class HostingSetupModel(
             if (PhpHosts.nodeAddress(site) == null) return "Укажите адрес сайта с нодой или адрес её страницы, например https://ваш-сайт.ru"
             PhpHosts.tokenProblem(token.trim())?.let { return it }
         } else {
-            PhpHosts.ftpProblems(ftpHost, ftpPort, ftpUser, ftpPassword).firstOrNull()?.let { return it }
+            if (deployedKey == null) PhpHosts.ftpProblems(ftpHost, ftpPort, ftpUser, ftpPassword).firstOrNull()?.let { return it }
             if (PhpHosts.siteUrl(site) == null) return "Укажите адрес сайта на хостинге, например https://ваш-сайт.ru"
             PhpHosts.chosenTokenProblem(chosenToken.trim())?.let { return it }
         }

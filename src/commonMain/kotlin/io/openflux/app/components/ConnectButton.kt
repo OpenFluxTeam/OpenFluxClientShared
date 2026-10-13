@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material3.Icon
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,7 +40,18 @@ enum class ConnectLook { Off, Busy, On, Error }
  * connected, a red ring after a failure. [label] names the action for a screen reader.
  */
 @Composable
-fun ConnectButton(look: ConnectLook, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 168.dp) {
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+fun ConnectButton(look: ConnectLook, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 168.dp, shortcut: String? = null) {
+    if (shortcut == null || AppTheme2.touch) return ConnectCircle(look, label, onClick, modifier, size)
+    androidx.compose.material3.TooltipBox(
+        positionProvider = androidx.compose.material3.TooltipDefaults.rememberTooltipPositionProvider(androidx.compose.material3.TooltipAnchorPosition.Below),
+        tooltip = { PlainTooltip { androidx.compose.material3.Text("$label · $shortcut") } },
+        state = androidx.compose.material3.rememberTooltipState(),
+    ) { ConnectCircle(look, label, onClick, modifier, size) }
+}
+
+@Composable
+private fun ConnectCircle(look: ConnectLook, label: String, onClick: () -> Unit, modifier: Modifier, size: Dp) {
     val c = AppTheme2.colors
     val fill by animateColorAsState(if (look == ConnectLook.On) c.accent else c.surface)
     val iconColor by animateColorAsState(

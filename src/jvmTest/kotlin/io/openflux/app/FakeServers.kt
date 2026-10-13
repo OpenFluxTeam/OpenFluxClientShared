@@ -82,6 +82,7 @@ class FakeNodeService(vararg servers: FakeServer) : NodeWizardService {
         val s = here("apply")
         sudo(s, sudoPassword)
         s.autoupdate = autoUpdate
+        if (cookieHeader.isNotEmpty()) cookiesSent += cookieHeader
         s.channels[channel.id] = InstalledChannel(channel.id, "active", port, "ctx-${channel.id}", transports, mode.cli, channel.key)
     }
 

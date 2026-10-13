@@ -178,6 +178,28 @@ class NodeEditorModelTest {
     }
 
     @Test
+    fun aDocumentMadeHereTakesItsSignInToANewNode() = runTest {
+        val m = editor()
+        m.createYandexDocument(); advanceUntilIdle()
+        m.install(); advanceUntilIdle()
+        assertNull(m.error)
+        assertEquals(listOf("Session_id=s; yandex_login=ivan"), fake.cookiesSent)
+    }
+
+    @Test
+    fun theSignInGoesOnlyWithTheDocumentItMade() = runTest {
+        installedNode()
+        val m = editor("of-x")
+        m.load(); advanceUntilIdle()
+        m.createYandexDocument(); advanceUntilIdle()
+        m.edit { it.copy(yandexDoc = "https://docs.yandex.ru/edit/d/" + "b".repeat(20)) }
+        m.checkDocument(); advanceUntilIdle()
+        m.apply(); advanceUntilIdle()
+        assertNull(m.error)
+        assertEquals(emptyList(), fake.cookiesSent, "another document goes without the sign-in made for the first")
+    }
+
+    @Test
     fun aNodeWithoutAProfileHereGetsOneFromTheServersKey() = runTest {
         installedNode()
         val m = editor("of-x")

@@ -32,6 +32,8 @@ class FakeHosting : PhpHostingService() {
     var running = false
     var token = "tok12345"
     var siteDownFor = 0
+    /** A final reason the site gives on every check ("php_missing"); null when it works. */
+    var checkFails: String? = null
     val calls = mutableListOf<String>()
     override suspend fun probe(ftp: FtpTarget): PhpProbe {
         calls += "probe"
@@ -50,6 +52,7 @@ class FakeHosting : PhpHostingService() {
     override suspend fun check(site: String, token: String, carrier: String): PhpStatus {
         calls += "check"
         if (siteDownFor-- > 0) throw PhpHostingException("site_unreachable", site)
+        checkFails?.let { throw PhpHostingException(it, "usleep,openssl") }
         if (token != this.token) throw PhpHostingException("site_token")
         return PhpStatus()
     }
@@ -89,6 +92,35 @@ class HostingModelTest {
         assertEquals(Dest.Hosting(p.id), m.done)
         assertEquals("Этот хостинг принимает FTP только без шифрования: пароль FTP прошёл по сети открытым текстом. После установки смените его.", m.securityNote)
         assertEquals("", m.ftpPassword, "the password is forgotten once used")
+    }
+
+    @Test
+    fun filesOnAHostThatCannotRunTheNodeCanBeRetriedOrRemoved() = runTest {
+        hosting.webroot = "htdocs"
+        hosting.checkFails = "php_missing"
+        val m = setup().apply { ftpForm() }
+        m.install(); advanceUntilIdle()
+        assertTrue(m.error.orEmpty().isNotEmpty())
+        assertFalse(hosting.calls.any { it.startsWith("start") }, "not started on a host that cannot run it")
+        assertTrue(m.canRemove, "the files are there: removing them is offered")
+
+        hosting.checkFails = null
+        m.install(); advanceUntilIdle()
+        assertNull(m.error, "a retry needs no FTP password typed again")
+        assertEquals(1, hosting.calls.count { it == "deploy" }, "the files are not uploaded twice")
+        assertTrue(hosting.running)
+    }
+
+    @Test
+    fun filesLeftByAFailedInstallAreRemoved() = runTest {
+        hosting.webroot = "htdocs"
+        hosting.checkFails = "php_missing"
+        val m = setup().apply { ftpForm() }
+        m.install(); advanceUntilIdle()
+        m.removeFailed(); advanceUntilIdle()
+        assertFalse(hosting.uploaded)
+        assertFalse(m.canRemove)
+        assertTrue(c.profiles.profiles.value.isEmpty())
     }
 
     @Test

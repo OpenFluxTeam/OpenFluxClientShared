@@ -77,8 +77,9 @@ class NodeEditorModel(
     var sudoInput by mutableStateOf("")
     val needsSudo: Boolean get() = link.needsSudo(serverId)
 
-    /** The Yandex sign-in the document was made with; it goes to the node with the document. */
+    /** The Yandex sign-in the document was made with, and that document: the sign-in goes to the node only with it. */
     private var pendingCookies = ""
+    private var pendingCookiesDoc = ""
     private var candidate: Profile? = null
     private var job: Job? = null
 
@@ -262,7 +263,10 @@ class NodeEditorModel(
     /** Makes the node's Yandex document in the built-in browser (signing in to Yandex there) and checks it. */
     fun createYandexDocument() = run("Открываю Яндекс во встроенном браузере…") {
         val doc = container.nodeWizard.createDocument(NodeDocuments.fileName(draft.name, host, container.platform.now())) { busyText = it }
-        if (NodeDocuments.signedIn(doc.cookieHeader)) pendingCookies = doc.cookieHeader
+        if (NodeDocuments.signedIn(doc.cookieHeader)) {
+            pendingCookies = doc.cookieHeader
+            pendingCookiesDoc = NodeDocuments.clean(doc.url) ?: doc.url
+        }
         draft = draft.copy(yandexDoc = doc.url, volga = draft.volga || !draft.yandexDocs)
         checkDocumentNow(doc.url)
     }
@@ -315,7 +319,8 @@ class NodeEditorModel(
     }
 
     /** The sign-in goes along only with a Yandex document, and only the one it made. */
-    private fun cookiesFor(d: NodeDraft): String = if (d.needsYandexDoc) pendingCookies else ""
+    private fun cookiesFor(d: NodeDraft): String =
+        if (d.needsYandexDoc && pendingCookiesDoc.isNotEmpty() && d.yandexDoc == pendingCookiesDoc) pendingCookies else ""
 
     private fun renameHere(name: String) {
         val p = localProfile ?: return
