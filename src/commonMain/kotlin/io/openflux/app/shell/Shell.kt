@@ -156,10 +156,11 @@ private fun ShellShortcuts(navigator: AppNavigator, onAdd: () -> Unit, enabled: 
 
 /** Ctrl+Enter, the tray, the quick-settings tile: disconnect, or connect the chosen profile (else the first). */
 fun toggleConnection(container: io.openflux.desktop.service.AppContainer) {
-    if (container.connection.state.value.isActive) {
-        stopConnection(container)
-        return
-    }
+    if (container.connection.state.value.isActive) stopConnection(container) else connectChosen(container)
+}
+
+/** Connects the chosen profile (else the first) as a client: Ctrl+Enter, the tray, the tile, "Подключаться при запуске". */
+fun connectChosen(container: io.openflux.desktop.service.AppContainer) {
     val list = container.profiles.profiles.value
     val id = container.settings.settings.value.selectedProfileId
     val profile = list.firstOrNull { it.id == id } ?: list.firstOrNull() ?: return
