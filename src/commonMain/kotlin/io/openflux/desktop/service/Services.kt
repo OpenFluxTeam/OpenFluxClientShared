@@ -190,6 +190,10 @@ interface PlatformServices {
 
     fun clipboardText(): String?
     fun setClipboardText(text: String)
+    /** Whether [shareText] has somewhere to send a link: the system share sheet (Android); the desktop offers messengers instead. */
+    val shareSupported: Boolean get() = false
+    /** Hands [text] (a link) to another app to send; false if nothing took it. */
+    fun shareText(text: String): Boolean = false
     /** Whether [qrFromClipboardImage] can find images on the clipboard. */
     val clipboardImageSupported: Boolean get() = true
     /** Text of a QR code in the image on the clipboard, null when none. */

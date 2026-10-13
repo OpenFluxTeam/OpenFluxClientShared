@@ -46,6 +46,8 @@ import io.openflux.app.components.Field
 import io.openflux.app.components.IconAction
 import io.openflux.app.components.LocalToaster
 import io.openflux.app.components.RowItem
+import io.openflux.app.components.Segmented
+import io.openflux.app.servers.ExitNodeBody
 import io.openflux.app.components.ScreenScaffold
 import io.openflux.app.components.SecondaryButton
 import io.openflux.app.components.Section
@@ -182,6 +184,17 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     val platform = container.platform
     val exitMode = settings.mode == ConnectionMode.Exit && state.isActive
     val now by produceState(platform.now()) { while (true) { delay(1_000); value = platform.now() } }
+    // The exit node's controls, QR and link live here too: a switch above the button while nothing runs. A running
+    // node or client hides it: the switch could not leave either, their own button stops them.
+    var exitTab by rememberSaveable { mutableStateOf(false) }
+    val showExit = exitMode || (exitTab && !state.isActive)
+    if (!state.isActive) {
+        Segmented(listOf(false, true), showExit, { exitTab = it }, label = { if (it) "Выходная нода" else "Клиент" })
+    }
+    if (showExit) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) { ExitNodeBody() }
+        return
+    }
 
     ConnectButton(
         state.look(),

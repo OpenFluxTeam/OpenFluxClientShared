@@ -123,7 +123,8 @@ class JvmPlatformServices(
     }
 
     override fun openUrl(url: String) {
-        runCatching { Desktop.getDesktop().browse(URI(url)) }
+        // browse() is for web pages; a mail link goes to the mail client (the share buttons' «Почта»).
+        runCatching { if (url.startsWith("mailto:")) Desktop.getDesktop().mail(URI(url)) else Desktop.getDesktop().browse(URI(url)) }
     }
 
     override fun newSecret(): String {

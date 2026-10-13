@@ -19,6 +19,7 @@ import io.openflux.app.components.Field
 import io.openflux.app.components.PrimaryButton
 import io.openflux.app.components.ProgressLine
 import io.openflux.app.components.QrView
+import io.openflux.app.components.ShareLinkActions
 import io.openflux.app.components.RowItem
 import io.openflux.app.components.ScreenScaffold
 import io.openflux.app.components.SecondaryButton
@@ -157,7 +158,7 @@ fun GiveScreen(dest: Dest.Give) {
             else -> l.fold(
                 onSuccess = { text ->
                     QrView(text, container.platform)
-                    PrimaryButton("Копировать ссылку", { container.platform.setClipboardText(text); toaster.show("Ссылка скопирована") }, Modifier.fillMaxWidth())
+                    ShareLinkActions(text)
                     Text(
                         if (p.stream) "По этой ссылке подключится любой, у кого она есть."
                         else "По этой ссылке подключится любой. Одновременно работает одно устройство — второе вытеснит первое.",
