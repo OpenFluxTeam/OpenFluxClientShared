@@ -172,6 +172,7 @@ private fun StartPanel(hasSubscription: Boolean, preparing: Boolean) {
     Text("Приступим", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
     Text("Все способы — под кнопкой ＋", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
     Section(null) {
+        RowItem("Бот OpenFlux в Telegram", subtitle = "Купить в @${io.openflux.desktop.model.OpenFluxBot.USERNAME}, войти через Telegram, ссылки из бота", onClick = { navigator.open(Dest.Account) })
         RowItem("Аккаунт OpenFlux", subtitle = "Войти или создать: локации появятся сами", onClick = { navigator.open(Dest.Auth) })
         RowItem("Ключ или ссылка", subtitle = "От друга или из сервиса", onClick = { navigator.open(Dest.AddKey) })
         RowItem("Свой сервер", subtitle = "VDS по SSH: нода поставится сама", onClick = { navigator.open(Dest.AddServer) })
@@ -254,6 +255,14 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         is HomeBanner.Subscription -> Banner(b.look.line, Tone.Warning, action = "Продлить", onAction = { navigator.open(Dest.Account) })
         HomeBanner.ThisDevice -> Banner("Это устройство работает как нода", Tone.Info, action = "Открыть", onAction = { navigator.open(Dest.ThisDevice) })
         null -> Unit
+    }
+    // A connection from the bot that the bot no longer serves: the way to a new one.
+    val bot by container.bot.state.collectAsState()
+    if (chosen != null && bot.links.any { it.profileId == chosen.id && it.gone }) {
+        Banner(
+            io.openflux.desktop.service.BotAccountManager.GONE, Tone.Warning,
+            action = "Открыть бота", onAction = { platform.openUrl(io.openflux.desktop.model.OpenFluxBot.CHAT_URL) },
+        )
     }
     if (chosen != null && !exitMode) Details(m, chosen, state)
 }

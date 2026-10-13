@@ -17,6 +17,9 @@ import io.openflux.desktop.model.SubscriptionException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import io.openflux.desktop.model.BotException
+import io.openflux.desktop.model.OpenFluxBot
+import io.openflux.desktop.service.BotAccountManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -28,6 +31,8 @@ sealed interface KeyResult {
         val canAdd: Boolean get() = preview.document.status == SubStatus.ACTIVE
     }
     data class Profile(val config: ShareConfig, val link: String) : KeyResult
+    /** A connection link from the OpenFlux bot: what it resolved to now. */
+    data class Bot(val link: String, val connection: io.openflux.desktop.service.BotConnection) : KeyResult
     data class Invalid(val message: String) : KeyResult
 }
 
@@ -59,19 +64,24 @@ class AddKeyModel(private val container: AppContainer, private val scope: Corout
         val t = firstLine(value)
         result = when {
             t.isEmpty() -> KeyResult.Empty
-            t.startsWith(ShareLinkCodec.PREFIX) || SubscriptionInvite.looksLike(t) -> KeyResult.Checking
-            else -> KeyResult.Invalid("Это не ключ подписки и не ссылка openflux://")
+            t.startsWith(ShareLinkCodec.PREFIX) || SubscriptionInvite.looksLike(t) || OpenFluxBot.looksLike(t) -> KeyResult.Checking
+            else -> KeyResult.Invalid("Это не ключ подписки, не ссылка openflux:// и не ссылка из бота")
         }
         if (result !is KeyResult.Checking) return
         job = scope.launch {
             delay(250) // typing, not pasting: wait for the end of it
             result = try {
-                if (SubscriptionInvite.looksLike(t)) KeyResult.Subscription(container.subscription.previewKey(t))
-                else KeyResult.Profile(container.shareCodec.decode(t), t)
+                when {
+                    OpenFluxBot.looksLike(t) -> KeyResult.Bot(t, container.botApi.resolve(OpenFluxBot.connectToken(t)!!))
+                    SubscriptionInvite.looksLike(t) -> KeyResult.Subscription(container.subscription.previewKey(t))
+                    else -> KeyResult.Profile(container.shareCodec.decode(t), t)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: SubscriptionException) {
                 KeyResult.Invalid(e.message ?: "Не удалось проверить ключ")
+            } catch (e: BotException) {
+                KeyResult.Invalid(if (e.notFound) BotAccountManager.GONE else e.message ?: "Бот не ответил")
             } catch (e: Exception) {
                 KeyResult.Invalid(e.message ?: "Не удалось прочитать ссылку")
             }
@@ -116,6 +126,22 @@ class AddKeyModel(private val container: AppContainer, private val scope: Corout
             container.profiles.upsert(p)
             container.settings.update { it.copy(selectedProfileId = p.id) }
             Dest.Profile(p.id)
+        }
+        is KeyResult.Bot -> {
+            busy = true
+            scope.launch {
+                try {
+                    val p = container.bot.addLink(r.link)
+                    container.settings.update { it.copy(selectedProfileId = p.id) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    result = KeyResult.Invalid(e.message ?: "Не удалось добавить подключение из бота")
+                } finally {
+                    busy = false
+                }
+            }
+            Dest.Account
         }
         is KeyResult.Subscription -> {
             if (!r.canAdd) null

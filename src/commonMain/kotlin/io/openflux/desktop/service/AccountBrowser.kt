@@ -27,6 +27,12 @@ interface AccountBrowser {
 
     suspend fun evaluate(script: String): String
 
+    /**
+     * Every main-frame address the page has been at since it opened, oldest first: a page that clears its address
+     * right away (a fragment it reads and drops) leaves it here.
+     */
+    val history: List<String> get() = listOf(url)
+
     /** Sends the open page to [url]. */
     fun load(url: String)
 

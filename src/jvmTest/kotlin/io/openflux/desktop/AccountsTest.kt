@@ -34,6 +34,9 @@ class FakeBrowser : AccountBrowser {
     override var url = ""
     override var loading = false
     override var closed = true
+    /** Addresses the page went through; null: just the current one. */
+    var visited: MutableList<String>? = null
+    override val history: List<String> get() = visited?.toList() ?: listOf(url)
     var jar = mapOf<String, String>()
     val opened = mutableListOf<Pair<String, Map<String, String>>>()
     var script: (String) -> String = { """{"state":"done","url":"https://docs.yandex.ru/edit/d/AAAAAAAAAAAAAAAAAAAA?x=1"}""" }

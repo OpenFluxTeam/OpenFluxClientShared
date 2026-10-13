@@ -54,6 +54,9 @@ class KcefPage internal constructor(private val browser: KCEFBrowser) : BrowserP
 
     val url: String get() = browser.url.orEmpty()
 
+    /** Every main-frame address since the page opened (onAddressChange), oldest first. */
+    val history = java.util.concurrent.CopyOnWriteArrayList<String>()
+
     val loading: Boolean get() = runCatching { browser.isLoading }.getOrDefault(true)
 
     @Volatile var closed = false
@@ -109,6 +112,7 @@ class KcefPage internal constructor(private val browser: KCEFBrowser) : BrowserP
         if (closed) return
         closed = true
         BuiltInBrowser.forgetSetupPage(browser)
+        BuiltInBrowser.forgetPage(browser)
         val dispose = {
             val view = browser.uiComponent
             view.parent?.let { parent ->
@@ -145,6 +149,14 @@ object BuiltInBrowser {
      * registered.
      */
     private class SetupPage(val prefix: String, val onSubmit: ((String) -> Unit)?)
+
+    /** The open pages by browser, for what CEF reports about a browser (its addresses). */
+    private val pages = ConcurrentHashMap<KCEFBrowser, KcefPage>()
+    internal fun forgetPage(browser: KCEFBrowser) { pages -= browser }
+    private fun pageOf(browser: CefBrowser): KcefPage? {
+        val id = browser.identifier
+        return pages.entries.firstOrNull { (b, _) -> b.identifier == id }?.value
+    }
 
     private val setupPages = ConcurrentHashMap<KCEFBrowser, SetupPage>()
     internal fun forgetSetupPage(browser: KCEFBrowser) { setupPages -= browser }
@@ -279,7 +291,7 @@ object BuiltInBrowser {
         if (firstLoad != null) firstLoads[view.renderHandler] = firstLoad
         // Create it now, not when shown: scripts and cookies work before the page is on screen.
         browser.createImmediately()
-        KcefPage(browser)
+        KcefPage(browser).also { pages[browser] = it }
     }
 
     /** Cookies the browser would send to [url], HTTP-only ones included. */
@@ -490,6 +502,7 @@ object BuiltInBrowser {
         client.addDisplayHandler(object : CefDisplayHandlerAdapter() {
             override fun onAddressChange(browser: CefBrowser?, frame: CefFrame?, url: String?) {
                 if (frame?.isMain == true) BrowserLog.info("страница ${browser?.identifier}: адрес ${BrowserLog.short(url)}")
+                if (frame?.isMain == true && browser != null && url != null) pageOf(browser)?.history?.add(url)
             }
 
             override fun onConsoleMessage(browser: CefBrowser?, level: CefSettings.LogSeverity?, message: String?, source: String?, line: Int): Boolean {

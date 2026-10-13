@@ -90,6 +90,19 @@ class FileSettingsRepository(dir: File, defaults: AppSettings = AppSettings()) :
     }
 }
 
+/** The OpenFlux bot (its session token, the connections added from it) in bot.json, readable by its owner only. */
+class FileBotRepository(dir: File) : io.openflux.desktop.service.BotRepository {
+    private val store = JsonFile(File(dir, "bot.json"), io.openflux.desktop.model.BotState.serializer())
+    private val flow = MutableStateFlow(store.read() ?: io.openflux.desktop.model.BotState())
+    override val state: StateFlow<io.openflux.desktop.model.BotState> = flow.asStateFlow()
+
+    @Synchronized
+    override fun save(state: io.openflux.desktop.model.BotState) {
+        store.write(state)
+        flow.value = state
+    }
+}
+
 /** The subscription (the device token, the last document's status) in subscription.json, readable by its owner only. */
 class FileSubscriptionRepository(dir: File) : SubscriptionRepository {
     private val file = File(dir, "subscription.json")

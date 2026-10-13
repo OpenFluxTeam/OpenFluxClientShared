@@ -49,7 +49,13 @@ enum class AccountKind(
         finishCookie = "sdcs",
         opensSignedIn = false,
     ),
-    Max("MAX", "ic_max", "https://web.max.ru/", "https://web.max.ru/", ".max.ru", false, setOf(TransportType.ONEME), signsIn = false);
+    Max("MAX", "ic_max", "https://web.max.ru/", "https://web.max.ru/", ".max.ru", false, setOf(TransportType.ONEME), signsIn = false),
+
+    /**
+     * Telegram's sign-in for the OpenFlux bot (Accounts.telegramSignIn): no cookies kept, no documents; what it
+     * gives is the signed user, read from the address Telegram sends the browser to.
+     */
+    Telegram("Telegram", "ic_send", "", "", ".telegram.org", false, emptySet(), signsIn = false);
 
     /** Pages whose cookies together make up the sign-in. */
     val cookieUrls: List<String>
@@ -57,6 +63,7 @@ enum class AccountKind(
             Yandex -> YandexDisk.ACCOUNT_URLS
             Mailru -> listOf("https://cloud.mail.ru/", "https://auth.mail.ru/", "https://account.mail.ru/", "https://mail.ru/", "https://e.mail.ru/")
             Max -> listOf(homeUrl)
+            Telegram -> listOf("https://oauth.telegram.org/")
         }
 
     /**
@@ -90,7 +97,7 @@ enum class DocumentKind(val account: AccountKind, val label: String) {
         fun of(kind: AccountKind): DocumentKind? = when (kind) {
             AccountKind.Yandex -> YandexDocument
             AccountKind.Mailru -> MailruDocument
-            AccountKind.Max -> null
+            AccountKind.Max, AccountKind.Telegram -> null
         }
     }
 }
@@ -139,7 +146,7 @@ object AccountCookies {
         AccountKind.Yandex -> cookies["yandex_login"].orEmpty()
         // Mpop is "<time>:<hash>:<email>:"; the email is the login.
         AccountKind.Mailru -> cookies["Mpop"].orEmpty().split(':').firstOrNull { '@' in it }.orEmpty()
-        AccountKind.Max -> ""
+        AccountKind.Max, AccountKind.Telegram -> ""
     }
 
     /** "a=1; b=2" as a Cookie header sends them. */

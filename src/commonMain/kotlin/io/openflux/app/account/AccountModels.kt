@@ -178,6 +178,22 @@ class SubscriptionModel(private val container: AppContainer, private val scope: 
         if (url.startsWith("https://")) container.platform.openUrl(url)
     }
 
+    // ---- the OpenFlux bot ----
+
+    fun botSignIn() = call("Вход через Telegram…") {
+        try {
+            container.bot.signIn()
+            notice = "Вы вошли в бота OpenFlux"
+        } catch (e: io.openflux.desktop.service.AccountException) {
+            if (!e.cancelled) throw e
+        }
+    }
+
+    fun botSignOut() = call("Выхожу из бота…") { container.bot.signOut() }
+    fun botRefresh() = call("Обновляю данные бота…") { container.bot.refresh() }
+    fun removeBotLink(token: String) = call("Убираю подключение…") { container.bot.removeLink(token) }
+    fun openBot() = container.platform.openUrl(io.openflux.desktop.model.OpenFluxBot.CHAT_URL)
+
     fun openSupport() {
         val url = manager.state.value?.support.orEmpty()
         if (url.startsWith("https://") || url.startsWith("http://")) container.platform.openUrl(url)
@@ -290,6 +306,8 @@ class SubscriptionModel(private val container: AppContainer, private val scope: 
             } catch (e: CancellationException) {
                 throw e
             } catch (e: SubscriptionException) {
+                error = e.message
+            } catch (e: io.openflux.desktop.model.BotException) {
                 error = e.message
             } catch (e: Exception) {
                 error = e.message ?: "Не получилось"

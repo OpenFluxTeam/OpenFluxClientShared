@@ -54,9 +54,12 @@ fun createAppContainer(appVersion: String): AppContainer {
         scripts = scripts,
         subscriptionApi = HttpSubscriptionApi(),
         subscriptionRepo = FileSubscriptionRepository(AppDirs.config),
+        botApi = io.openflux.desktop.data.HttpBotApi(),
+        botRepo = io.openflux.desktop.data.FileBotRepository(AppDirs.config),
         settingsPageHost = KcefSettingsPageHost,
     )
     // The subscription's list of locations is refreshed in the background.
     container.subscription.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
+    container.bot.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
     return container
 }

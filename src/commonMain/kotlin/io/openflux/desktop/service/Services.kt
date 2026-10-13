@@ -398,6 +398,9 @@ class AppContainer(
     /** The subscription service client and where the subscription is kept; none unless the platform ships them. */
     val subscriptionApi: SubscriptionApi = NoSubscriptionApi,
     val subscriptionRepo: SubscriptionRepository = InMemorySubscriptionRepository(),
+    /** The OpenFlux bot's API and where its session and connections are kept. */
+    val botApi: BotApi = NoBotApi,
+    val botRepo: BotRepository = InMemoryBotRepository(),
     /** Shows a script's settings page in the platform's built-in browser. */
     settingsPageHost: SettingsPageHost = NoSettingsPageHost,
 ) {
@@ -405,6 +408,9 @@ class AppContainer(
     val subscription: SubscriptionManager by lazy {
         SubscriptionManager(subscriptionApi, subscriptionRepo, profiles, shareCodec, platform, connection, io.openflux.desktop.model.ServiceDefaults.endpoint)
     }
+
+    /** The OpenFlux bot: its connection links as profiles, and its subscription after a Telegram sign-in. */
+    val bot: BotAccountManager by lazy { BotAccountManager(botApi, botRepo, profiles, shareCodec, platform, connection, accounts) }
 
     /** The "Настройки" of an installed script transport (its wizard page, saved with the script). */
     val scriptSettings: ScriptSettingsService by lazy { ScriptSettingsService(scripts, platform, settingsPageHost) }

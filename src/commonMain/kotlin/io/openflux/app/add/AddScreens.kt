@@ -60,7 +60,7 @@ fun AddKeyScreen(scan: Boolean = false) {
         onBack = { navigator.back() },
         bottomBar = {
             val r = m.result
-            val ok = (r is KeyResult.Profile) || (r is KeyResult.Subscription && r.canAdd)
+            val ok = (r is KeyResult.Profile) || (r is KeyResult.Bot) || (r is KeyResult.Subscription && r.canAdd)
             if (ok) {
                 androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().padding(AppTheme.spacing.page)) {
                     PrimaryButton(
@@ -87,6 +87,10 @@ fun AddKeyScreen(scan: Boolean = false) {
                 ValueRow("Название", r.config.name.ifBlank { "без названия" })
                 ValueRow("Транспорты", r.config.transports.mapNotNull { TransportType.fromCli(it.type)?.title }.distinct().joinToString(", ").ifEmpty { "—" })
                 ValueRow("Шифрование", if (r.config.secret.isNotEmpty()) "AES-256-GCM" else "нет ключа")
+            }
+            is KeyResult.Bot -> Section("Подключение из бота OpenFlux") {
+                ValueRow("Название", r.connection.name.ifBlank { "OpenFlux" })
+                ValueRow("Обновление", "само, пока подключение действует в боте")
             }
             is KeyResult.Subscription -> {
                 val doc = r.preview.document

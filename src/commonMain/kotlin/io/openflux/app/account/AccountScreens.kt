@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import io.openflux.desktop.model.OpenFluxBot
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -127,6 +128,9 @@ fun AccountScreen() {
             Text("На этом устройстве нет подписки.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
             PrimaryButton("Войти или создать аккаунт", { navigator.replaceTop(Dest.Auth) }, Modifier.fillMaxWidth())
             SecondaryButton("У меня ключ подписки", { navigator.replaceTop(Dest.AddKey) }, Modifier.fillMaxWidth())
+            BotSection(m)
+            m.busy?.let { ProgressLine(it) }
+            m.error?.let { Banner(it, Tone.Danger) }
             return@ScreenScaffold
         }
         val platform = container.platform
@@ -174,6 +178,7 @@ fun AccountScreen() {
                 }
             }
         }
+        BotSection(m)
         Section(null) {
             if (s.support.isNotBlank()) RowItem("Поддержка", onClick = m::openSupport)
             if (s.kind == SubscriptionKind.Account) RowItem("Сменить пароль", onClick = { m.clearDialogError(); passwordOpen = true })
@@ -224,6 +229,48 @@ private fun DeleteSheet(m: SubscriptionModel, onClose: () -> Unit) {
             else io.openflux.app.components.DangerButton("Удалить навсегда", { m.deleteAccount(password, onDone = onClose) }, Modifier.fillMaxWidth())
         }
     }
+}
+
+/**
+ * The OpenFlux bot (@openflux_bot): people buy there. Its connection links become profiles here, and a Telegram
+ * sign-in (which also registers) shows the subscription bought in it. Buying itself stays in the bot for now.
+ */
+@Composable
+private fun BotSection(m: SubscriptionModel) {
+    val container = LocalAppContainer.current
+    val navigator = LocalNavigator.current
+    val bot by container.bot.state.collectAsState()
+    val platform = container.platform
+    val idle = m.busy == null
+    Section("Бот OpenFlux в Telegram") {
+        val session = bot.session
+        if (session == null) {
+            RowItem("Войти через Telegram", subtitle = "Регистрация и вход через @${OpenFluxBot.USERNAME}: здесь будет видна подписка из бота", onClick = m::botSignIn.takeIf { idle })
+        } else {
+            ValueRow("Telegram", if (session.username.isNotBlank()) "@${session.username}" else "id ${session.userId}")
+            val sub = bot.subscription
+            when {
+                sub == null -> ValueRow("Подписка", "обновляю…")
+                !sub.isActive -> ValueRow("Подписка", "нет действующей")
+                else -> {
+                    ValueRow("Тариф", sub.planName.ifBlank { sub.planId })
+                    if (sub.expiresAt > 0) ValueRow("Срок", "до ${Fmt.date(sub.expiresAt, platform.utcOffsetSeconds)}, ${Fmt.daysLeft(sub.daysLeft)}")
+                    if (sub.trafficLimitBytes > 0) ValueRow("Трафик", "${Fmt.bytes(sub.trafficUsedBytes)} из ${Fmt.bytes(sub.trafficLimitBytes)}")
+                }
+            }
+        }
+        RowItem(if (bot.subscription?.isActive == true) "Продлить в боте" else "Купить в боте", subtitle = "Оплата в @${OpenFluxBot.USERNAME}", onClick = m::openBot)
+        RowItem("Добавить ссылку из бота", subtitle = "link.openflux.dev/…: подключение появится здесь и будет обновляться само", onClick = { navigator.open(Dest.AddKey) })
+        for (link in bot.links) {
+            RowItem(
+                link.name.ifBlank { "Подключение из бота" },
+                subtitle = if (link.gone) "закончилось или заменено: возьмите новую ссылку в боте" else "из бота, обновляется само",
+                trailing = { TextAction("Убрать", { m.removeBotLink(link.token) }, enabled = idle) },
+            )
+        }
+        if (session != null) RowItem("Выйти из бота на этом устройстве", onClick = m::botSignOut.takeIf { idle })
+    }
+    bot.lastError?.let { Banner("Бот: $it", Tone.Warning) }
 }
 
 /** Renewing: a plan, the order and how to pay, then "paid" (spec 8.2). */

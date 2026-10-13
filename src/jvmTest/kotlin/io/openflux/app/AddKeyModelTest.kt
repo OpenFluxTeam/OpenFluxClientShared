@@ -65,7 +65,7 @@ class AddKeyModelTest {
     fun anythingElseIsSaidPlainly() = runTest {
         val m = AddKeyModel(c, this)
         m.onText("привет"); advanceUntilIdle()
-        assertEquals("Это не ключ подписки и не ссылка openflux://", (m.result as KeyResult.Invalid).message)
+        assertEquals("Это не ключ подписки, не ссылка openflux:// и не ссылка из бота", (m.result as KeyResult.Invalid).message)
         m.onText(""); advanceUntilIdle()
         assertIs<KeyResult.Empty>(m.result)
     }

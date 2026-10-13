@@ -8,10 +8,12 @@ enum class ProfileSource(val label: String) {
     Manual("Вручную"), Link("Ссылка openflux://"), Qr("QR-код"), Node("Своя нода"),
     /** A location that comes with the subscription: the app keeps it up to date and the user cannot change it. */
     Subscription("Подписка"),
+    /** A connection bought in the OpenFlux bot, from its short link: kept up to date like a subscription's. */
+    Bot("Бот OpenFlux"),
 }
 
 /** A profile of the subscription: read-only, its key and documents are not shown or shared. */
-val Profile.managed: Boolean get() = source == ProfileSource.Subscription
+val Profile.managed: Boolean get() = source == ProfileSource.Subscription || source == ProfileSource.Bot
 
 /**
  * A profile of a node the person may run: it has a key and a direct address

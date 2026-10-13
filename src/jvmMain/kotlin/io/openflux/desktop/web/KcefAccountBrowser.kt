@@ -16,6 +16,7 @@ class KcefAccountBrowser : AccountBrowser {
     private val current get() = _page.value as? KcefPage
 
     override val url get() = current?.url.orEmpty()
+    override val history: List<String> get() = current?.history?.toList() ?: listOf(url)
     override val loading get() = current?.loading ?: false
     override val closed get() = current?.closed ?: true
 
