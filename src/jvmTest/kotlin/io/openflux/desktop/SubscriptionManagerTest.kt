@@ -475,6 +475,68 @@ class SubscriptionManagerTest {
         assertEquals("${moved.url}/sub/TOKEN", s.keyUrl)
     }
 
+    // ---- locations the service is still making ----
+
+    private fun Env.documents() = api.calls.count { it.startsWith("document") }
+
+    private fun kotlinx.coroutines.test.TestScope.tick(e: Env, ms: Long) {
+        e.platform.clock += ms
+        advanceTimeBy(ms)
+        runCurrent()
+    }
+
+    /** A personal node is made on the first request and comes a minute later: the app asks often meanwhile, not in 6 hours. */
+    @Test
+    fun locationsBeingMadeAreAskedForOftenUntilTheyCome() = runTest {
+        val e = env()
+        e.doc() // active, no location yet
+        e.manager.start(backgroundScope)
+        runCurrent()
+        e.manager.login("ivan", "pw")
+        runCurrent()
+        assertTrue(e.manager.preparing.value)
+        e.api.calls.clear()
+
+        tick(e, 15_000)
+        assertEquals(1, e.documents(), "asked again within seconds")
+        e.doc("de" to "Германия")
+        tick(e, 15_000)
+        assertEquals(listOf("sub-de"), e.profiles.profiles.value.map { it.id })
+        assertFalse(e.manager.preparing.value)
+
+        e.api.calls.clear()
+        repeat(4) { tick(e, 5 * 60_000) }
+        assertEquals(0, e.documents(), "with a location, back to the service's updateHours")
+    }
+
+    @Test
+    fun locationsThatDoNotComeAreNoLongerAskedForOften() = runTest {
+        val e = env()
+        e.doc()
+        e.manager.start(backgroundScope)
+        runCurrent()
+        e.manager.login("ivan", "pw")
+        runCurrent()
+        repeat(44) { tick(e, 15_000) } // 11 minutes
+        assertFalse(e.manager.preparing.value, "after 10 minutes the card says there are none")
+        e.api.calls.clear()
+        repeat(4) { tick(e, 15_000) }
+        assertEquals(0, e.documents())
+    }
+
+    @Test
+    fun anEndedSubscriptionIsNotPreparing() = runTest {
+        val e = env()
+        e.doc(status = SubStatus.EXPIRED)
+        e.manager.login("ivan", "pw")
+        assertFalse(e.manager.preparing.value)
+        e.doc()
+        e.manager.refresh()
+        assertTrue(e.manager.preparing.value)
+        e.manager.signOut()
+        assertFalse(e.manager.preparing.value)
+    }
+
     @Test
     fun accountCallsNeedASignedInAccount() = runTest {
         val e = env()

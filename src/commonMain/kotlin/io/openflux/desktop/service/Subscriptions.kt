@@ -21,12 +21,13 @@ import io.openflux.desktop.model.SubscriptionState
 import io.openflux.desktop.model.ShareLinkCodec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -112,6 +113,19 @@ class SubscriptionManager(
     /** The refresh running now, for the card's spinner. */
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+
+    /**
+     * An active subscription without a location yet: the service makes a personal node on the first request and
+     * answers with none until it is up (a minute or two), so the app asks again often for a while.
+     */
+    private val _preparing = MutableStateFlow(false)
+    val preparing: StateFlow<Boolean> = _preparing.asStateFlow()
+
+    /** When an active document first came without locations; null once it has some (or is not active). */
+    private var emptySince: Long? = null
+
+    /** Wakes the background loop when it should start asking often. */
+    private val wake = Channel<Unit>(Channel.CONFLATED)
 
     /** Plans for sale; asked from the service when the screen needs them. */
     suspend fun plans(): PlansResult = api.plans(endpoint)
@@ -254,6 +268,10 @@ class SubscriptionManager(
                 wanted[id] = if (old == null) fresh else fresh.copy(createdAt = old.createdAt)
             }
         }
+        val empty = doc.status == SubStatus.ACTIVE && wanted.isEmpty()
+        emptySince = if (empty) emptySince ?: platform.now() else null
+        _preparing.value = waitingForLocations(platform.now())
+        if (empty) wake.trySend(Unit)
         for (profile in wanted.values) profiles.upsert(profile)
         val gone = profiles.profiles.value.filter { it.source == ProfileSource.Subscription && it.id !in wanted }
         val running = connection.state.value
@@ -273,6 +291,8 @@ class SubscriptionManager(
 
     /** The token is no longer good: the device is signed out, the subscription's profiles go. */
     private fun dropSession() {
+        emptySince = null
+        _preparing.value = false
         val running = connection.state.value
         if (running.isActive && running.profile?.source == ProfileSource.Subscription) connection.disconnect()
         profiles.profiles.value.filter { it.source == ProfileSource.Subscription }.forEach { profiles.delete(it.id) }
@@ -348,22 +368,35 @@ class SubscriptionManager(
 
     // ---- in the background ----
 
-    /** Refreshes when the app starts, then whenever the service's `updateHours` have passed. */
+    private fun waitingForLocations(now: Long) = emptySince?.let { now - it < LOCATIONS_WAIT_MS } == true
+
+    /**
+     * Refreshes when the app starts, then whenever the service's `updateHours` have passed, and every
+     * [LOCATIONS_EVERY_MS] while the locations are being prepared.
+     */
     fun start(scope: CoroutineScope) {
         scope.launch {
             var first = true
             while (true) {
                 val s = state.value
-                val due = s != null && (first || platform.now() - s.lastRefreshed >= s.updateHours * 3_600_000L)
+                val now = platform.now()
+                val due = s != null && (
+                    first || now - s.lastRefreshed >= s.updateHours * 3_600_000L ||
+                        (waitingForLocations(now) && now - s.lastRefreshed >= LOCATIONS_EVERY_MS)
+                    )
                 if (due) refresh()
                 first = false
-                delay(CHECK_EVERY_MS)
+                _preparing.value = waitingForLocations(platform.now())
+                withTimeoutOrNull(if (waitingForLocations(platform.now())) LOCATIONS_EVERY_MS else CHECK_EVERY_MS) { wake.receive() }
             }
         }
     }
 
     private companion object {
         const val CHECK_EVERY_MS = 5 * 60 * 1000L
+        /** How often, and for how long, an active subscription without locations is asked again. */
+        const val LOCATIONS_EVERY_MS = 15 * 1000L
+        const val LOCATIONS_WAIT_MS = 10 * 60 * 1000L
         /** How long an unpaid order is waited for: a payment link does not live longer. */
         const val ORDER_WAIT_MS = 24 * 60 * 60 * 1000L
     }

@@ -116,6 +116,7 @@ fun AccountScreen() {
     val toaster = LocalToaster.current
     val m = rememberScreenModel { SubscriptionModel(container, it) }
     val state by container.subscription.state.collectAsState()
+    val preparing by container.subscription.preparing.collectAsState()
     var passwordOpen by remember { mutableStateOf(false) }
     var deleteOpen by remember { mutableStateOf(false) }
     var signOutAsk by remember { mutableStateOf(false) }
@@ -139,6 +140,7 @@ fun AccountScreen() {
             account?.plan?.let { ValueRow("Тариф", it.name) }
             if (account != null) ValueRow("Устройства", "${account.devices.size} из ${account.deviceLimit}")
         }
+        if (preparing) ProgressLine("Готовим вашу локацию: обычно это минута-две")
         s.lastError?.let { Banner("Не удалось обновить: $it", Tone.Warning) }
         s.pendingOrder?.let { p ->
             Banner(

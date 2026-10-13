@@ -45,6 +45,7 @@ import io.openflux.app.components.ConnectLook
 import io.openflux.app.components.Field
 import io.openflux.app.components.IconAction
 import io.openflux.app.components.LocalToaster
+import io.openflux.app.components.ProgressLine
 import io.openflux.app.components.RowItem
 import io.openflux.app.components.Segmented
 import io.openflux.app.servers.ExitNodeBody
@@ -114,12 +115,13 @@ fun HomeRoot() {
     val settings by container.settings.settings.collectAsState()
     val state by container.connection.state.collectAsState()
     val subscription by container.subscription.state.collectAsState()
+    val preparing by container.subscription.preparing.collectAsState()
     var drawer by rememberSaveable { mutableStateOf(false) }
     val chosen = m.selected(profiles)
     ScreenScaffold(null, scroll = false) {
         if (profiles.isEmpty()) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.l)) {
-                StartPanel(hasSubscription = subscription != null)
+                StartPanel(hasSubscription = subscription != null, preparing = preparing)
             }
             return@ScreenScaffold
         }
@@ -156,8 +158,13 @@ fun HomeRoot() {
 
 /** No connections yet (spec 6): the three ways to start. */
 @Composable
-private fun StartPanel(hasSubscription: Boolean) {
+private fun StartPanel(hasSubscription: Boolean, preparing: Boolean) {
     val navigator = LocalNavigator.current
+    if (preparing) {
+        Text("Готовим вашу локацию", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
+        ProgressLine("Обычно это минута-две, она появится здесь сама")
+        return
+    }
     if (hasSubscription) {
         Banner("В подписке пока нет локаций", Tone.Info, action = "Открыть подписку", onAction = { navigator.open(Dest.Account) })
         return
