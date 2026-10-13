@@ -251,8 +251,6 @@ data class Profile(
             }
             return when (carrier.type.kind) {
                 ValueKind.DocumentUrl -> when {
-                    // Cups.online with no rooms is valid: the node generates its own
-                    // and prints the string for the client (transport/cupsonline.enterRooms).
                     carrier.type == TransportType.CUPSONLINE -> null
                     // Avito's rooms are a packed list, not a link.
                     carrier.type == TransportType.AVITO -> if (value.isEmpty()) "нужен код комнат" else null
