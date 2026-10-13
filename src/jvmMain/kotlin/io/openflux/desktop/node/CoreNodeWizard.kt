@@ -155,6 +155,8 @@ class CoreNodeWizard(
 
     override suspend fun createCupsRooms(): String = call("createRooms") {}.string("rooms")
 
+    override suspend fun createAvitoRooms(): String = call("createAvitoRooms") {}.string("rooms")
+
     override suspend fun shareLink(name: String, key: String, host: String, port: Int, transports: List<NodeTransport>): String =
         call("shareLink", "$host:$port ${transports.names()}") {
             put("name", name)

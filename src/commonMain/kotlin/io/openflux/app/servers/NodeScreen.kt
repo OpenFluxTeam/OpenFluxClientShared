@@ -50,7 +50,9 @@ import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.shell.LocalServerLink
 import io.openflux.app.shell.rememberScreenModel
 import io.openflux.app.theme.AppTheme
+import io.openflux.desktop.model.InstalledScript
 import io.openflux.desktop.model.NodeMode
+import io.openflux.desktop.model.NodeTransports
 import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.model.isActive
 import io.openflux.desktop.model.profile
@@ -87,6 +89,10 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
     val link = LocalServerLink.current
     val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
+    val settings by container.settings.settings.collectAsState()
+    // JS transports are an experimental feature: offered while it is on (a node that already runs some shows them anyway).
+    val allScripts by container.scripts.scripts.collectAsState()
+    val installedScripts = if (settings.experimental) allScripts else emptyList()
     var leaveAsk by remember { mutableStateOf(false) }
     var removeAsk by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
@@ -197,10 +203,38 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
                     TextAction("Создать доску", m::createBoard, enabled = editable)
                 }
             }
+            Toggle(TransportType.TELEMOST.title, d.telemost, { on -> m.edit { it.copy(telemost = on) } }, enabled = editable)
+            if (d.telemost) {
+                LinkRow(d.telemostLink, { v -> m.edit { it.copy(telemostLink = v) } }, "Ссылка на конференцию Телемоста") {
+                    TextAction("Открыть Телемост", { container.platform.openUrl("https://telemost.yandex.ru/") }, enabled = editable)
+                }
+            }
             Toggle(
                 TransportType.CUPSONLINE.title, d.cups, { on -> m.edit { it.copy(cups = on) } },
                 subtitle = if (d.cups && d.cupsRooms.isEmpty()) "Комнаты создадутся сами" else null, enabled = editable,
             )
+            Toggle(
+                TransportType.AVITO.title, d.avito, { on -> m.edit { it.copy(avito = on) } },
+                subtitle = if (d.avito && d.avitoRooms.isEmpty()) "Комнаты создадутся сами" else null, enabled = editable,
+            )
+            // Signed .flux packages installed here; the app sends each one to the node.
+            val runnable = installedScripts.filter(NodeTransports::nodeCanRun)
+            val onNode = d.scripts.map { it.id }.toSet()
+            for (script in runnable + d.scripts.filter { s -> runnable.none { it.id == s.id } }.map { s -> missingScript(s.id) }) {
+                val chosen = d.scripts.firstOrNull { it.id == script.id }
+                Toggle(
+                    "JS: " + script.name.ifBlank { script.id }, script.id in onNode,
+                    { on -> m.edit { it.copy(scripts = if (on) it.scripts + NodeScript(script.id) else it.scripts.filterNot { s -> s.id == script.id }) } },
+                    subtitle = if (script.fileName.isEmpty()) "не установлен на этом устройстве" else null,
+                    enabled = editable && (script.fileName.isNotEmpty() || script.id in onNode),
+                )
+                val param = script.primaryParam
+                if (chosen != null && param != null) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.s)) {
+                        Field(chosen.value, { v -> m.edit { it.copy(scripts = it.scripts.map { s -> if (s.id == script.id) s.copy(value = v) else s }) } }, param.label.ifBlank { "Параметр" }, mono = true)
+                    }
+                }
+            }
             RowItem(TransportType.DIRECT.title, subtitle = "Всегда включено: запасной путь, если другие недоступны", enabled = false)
         }
         m.documentWarning?.let { Banner(it, Tone.Info) }
@@ -257,3 +291,6 @@ private fun LinkRow(value: String, onValue: (String) -> Unit, label: String, act
         FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.xs)) { actions() }
     }
 }
+
+/** A package the node runs that this device does not have: shown so it can be turned off. */
+private fun missingScript(id: String) = InstalledScript(id = id, name = id, pubkeyHex = "", fingerprint = "", fileName = "")

@@ -9,6 +9,30 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class NodeDraftTest {
+    @Test
+    fun telemostAvitoAndScripts() {
+        val d = io.openflux.app.servers.NodeDraft(
+            telemost = true, telemostLink = "https://telemost.yandex.ru/j/123456/", avito = true, avitoRooms = "rooms",
+            scripts = listOf(io.openflux.app.servers.NodeScript("mtslink", " v ")),
+        )
+        kotlin.test.assertNull(d.problem())
+        kotlin.test.assertTrue(d.hasTransport)
+        val ts = d.toTransports()
+        kotlin.test.assertEquals(listOf("telemost", "avito", "script"), ts.map { it.type })
+        kotlin.test.assertEquals("https://telemost.yandex.ru/j/123456", ts[0].url)
+        kotlin.test.assertEquals("v", ts[2].url)
+        kotlin.test.assertEquals("mtslink", ts[2].script)
+
+        kotlin.test.assertNotNull(d.copy(telemostLink = "https://example.com/j/1").problem())
+        kotlin.test.assertNotNull(d.copy(scripts = listOf(io.openflux.app.servers.NodeScript("x", "a#b"))).problem())
+
+        val back = io.openflux.app.servers.NodeDraft.of(
+            io.openflux.desktop.model.InstalledChannel("c", transports = ts.map { if (it.type == "avito") it.copy(url = "rooms") else it }), "",
+        )
+        kotlin.test.assertEquals(0, d.copy(avitoRooms = "rooms", telemostLink = ts[0].url, scripts = listOf(io.openflux.app.servers.NodeScript("mtslink", "v"))).changes(back.copy(name = "")))
+        kotlin.test.assertEquals(1, back.changes(back.copy(scripts = emptyList())), "a script turned off is a change")
+    }
+
     private val doc = "https://docs.yandex.ru/edit/d/" + "a".repeat(20)
     private val mailru = "https://cloud.mail.ru/public/DEmN/ETbZW2MPY"
     private val board = "https://boards.yandex.ru/whiteboard/?hash=820d6571111dffeb9e85de65ccfc880a"

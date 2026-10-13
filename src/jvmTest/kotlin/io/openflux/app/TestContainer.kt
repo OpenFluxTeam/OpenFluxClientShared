@@ -40,11 +40,13 @@ fun testContainer(
     connection: ConnectionService = TestConnection(),
     hosting: PhpHostingService = PhpHostingService(),
     subscriptions: SubscriptionApi = io.openflux.desktop.service.NoSubscriptionApi,
+    scripts: io.openflux.desktop.service.ScriptRepository = io.openflux.desktop.service.InMemoryScriptRepository(),
 ): AppContainer = AppContainer(
     TestProfiles(), TestSettings(), connection, platform, FakeShareLinkCodec(), node,
     testAccounts(CoroutineScope(Dispatchers.Unconfined)),
     phpHosting = hosting,
     subscriptionApi = subscriptions,
+    scripts = scripts,
 )
 
 class TestSettings : SettingsRepository {

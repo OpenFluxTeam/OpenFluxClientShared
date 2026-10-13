@@ -96,6 +96,7 @@ fun TransportType.blurb(): String = when (this) {
     TransportType.MAILRU -> "Публичный файл Облака Mail.ru"
     TransportType.CUPSONLINE -> "Комнаты cups.online, код выдаёт нода"
     TransportType.TELEMOST -> "Конференция Яндекс Телемоста, по ссылке-приглашению"
+    TransportType.AVITO -> "Комнаты Avito Code, код выдаёт нода"
     TransportType.ONEME -> "Звонок в MAX, нужен токен MAX Web"
     TransportType.DIRECT -> "Прямое TCP-соединение с нодой"
     TransportType.SCRIPT -> "JS-транспорт"
@@ -312,7 +313,7 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
                     c.type == TransportType.SCRIPT -> param?.label?.ifBlank { null } ?: "Параметр"
                     c.type.kind == ValueKind.DocumentUrl -> when {
                         d.stream && c.type == TransportType.CUPSONLINE -> "Адрес комнаты cups.online"
-                        c.type == TransportType.CUPSONLINE -> "Код комнат"
+                        c.type == TransportType.CUPSONLINE || c.type == TransportType.AVITO -> "Код комнат"
                         else -> "Ссылка на документ"
                     }
                     c.type.kind == ValueKind.Address -> "Адрес ноды"

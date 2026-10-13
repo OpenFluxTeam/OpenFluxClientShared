@@ -185,7 +185,7 @@ class HttpSubscriptionApiTest {
         api.keyDocument(ep, ep.base + "/sub/KEY")
         for (s in seen) {
             val names = s.transports.orEmpty().split(",")
-            assertEquals(listOf("vyandex", "yandex", "boards", "mailru", "cupsonline", "telemost"), names, s.path)
+            assertEquals(listOf("vyandex", "yandex", "boards", "mailru", "cupsonline", "telemost", "avito"), names, s.path)
         }
     }
 

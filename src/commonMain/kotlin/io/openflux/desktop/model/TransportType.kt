@@ -48,6 +48,11 @@ enum class TransportType(
     TELEMOST("telemost", "Яндекс Телемост", "Телемост", ValueKind.DocumentUrl,
         "https://telemost.yandex.ru/j/…", "ic_yandex"),
 
+    /** Avito Code rooms: like cups.online, the node makes them and the link carries their packed list. */
+    @SerialName("avito")
+    AVITO("avito", "Avito Code", "Avito", ValueKind.DocumentUrl,
+        "Код комнат от ноды", "ic_code"),
+
     @SerialName("oneme")
     ONEME("oneme", "MAX (OneMe)", "MAX", ValueKind.Token,
         "Токен MAX Web", "ic_max"),

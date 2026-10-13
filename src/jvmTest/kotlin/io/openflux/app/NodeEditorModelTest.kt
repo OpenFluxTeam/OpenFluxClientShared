@@ -11,7 +11,14 @@ import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodeTransport
 import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.SshTarget
+import io.openflux.desktop.model.InstalledScript
+import io.openflux.desktop.model.ScriptParam
+import io.openflux.desktop.model.ScriptSettingsCodec
 import io.openflux.desktop.model.TransportType
+import io.openflux.app.servers.NodeScript
+import io.openflux.desktop.service.InMemoryScriptRepository
+import io.openflux.desktop.service.ScriptRepository
+import kotlin.io.encoding.Base64
 import io.openflux.desktop.service.AppContainer
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -28,7 +35,24 @@ class NodeEditorModelTest {
     private val server = FakeServer("a.example")
     private val fake = FakeNodeService(server)
     private val conn = ScriptedConnection().apply { address = { ExitAddress.Known("a.example") } }
-    private val c: AppContainer = testContainer(node = fake, connection = conn)
+    /** Installed scripts with their package bytes, as the platform repositories keep them. */
+    private class Scripts(private val inner: InMemoryScriptRepository = InMemoryScriptRepository()) : ScriptRepository by inner {
+        val bytes = mutableMapOf<String, ByteArray>()
+        override fun packageBytes(id: String) = bytes[id]?.let { it to ByteArray(0) }
+    }
+    private val scripts = Scripts()
+    private val c: AppContainer = testContainer(node = fake, connection = conn, scripts = scripts)
+    private val authorKey = "ab".repeat(32)
+
+    private fun installScript(id: String, file: String = "$id.flux") {
+        scripts.upsert(
+            InstalledScript(
+                id = id, name = "MTS Link", pubkeyHex = authorKey, fingerprint = "f", fileName = file,
+                params = listOf(ScriptParam("room", "Комната", scope = "profile"), ScriptParam("speed", scope = "settings")),
+            ),
+        )
+        scripts.bytes[id] = "flux-$id".encodeToByteArray()
+    }
     private val link = ServerLink(c)
     private val id = "a.example:22:root"
 
@@ -58,6 +82,75 @@ class NodeEditorModelTest {
         assertEquals(Dest.Node(id, made.id), m.done)
         assertNull(m.error)
         assertTrue(conn.state.value is ConnectionState.Connected, "the check connected through it")
+    }
+
+    /** Telemost and Avito go as they are (Avito's rooms made first); a script goes with this device's package. */
+    @Test
+    fun aNodeWithEveryKindOfTransport() = runTest {
+        installScript("mtslink")
+        val m = editor()
+        m.edit {
+            it.copy(
+                telemost = true, telemostLink = "https://telemost.yandex.ru/j/88936358186517?x=1", avito = true,
+                scripts = listOf(NodeScript("mtslink", "https://my.mts-link.ru/j/1", mapOf("speed" to "fast"))),
+            )
+        }
+        m.install(); advanceUntilIdle()
+        assertNull(m.error)
+        val made = server.channels.values.single()
+        assertEquals(listOf("telemost", "avito", "script"), made.transports.map { it.type })
+        assertEquals("https://telemost.yandex.ru/j/88936358186517", made.transports[0].url)
+        assertEquals("avito-rooms", made.transports[1].url, "rooms made before the install")
+        val s = made.transports[2]
+        assertEquals("mtslink", s.script)
+        assertEquals(authorKey, s.pubkey)
+        assertEquals("flux-mtslink", Base64.decode(s.pkg).decodeToString(), "this device's package")
+        assertEquals(mapOf("speed" to "fast", "room" to "https://my.mts-link.ru/j/1"), ScriptSettingsCodec.decode(s.params), "the primary value rides in the settings, as the app runs it")
+
+        val p = c.profiles.profiles.value.single()
+        val extra = p.extras.single { it.type == TransportType.SCRIPT }
+        assertEquals("mtslink", extra.scriptId)
+        assertEquals("https://my.mts-link.ru/j/1", extra.value)
+        assertEquals(mapOf("speed" to "fast"), extra.settings)
+        assertTrue(p.session)
+        assertTrue(p.carriers.any { it.type == TransportType.TELEMOST } && p.carriers.any { it.type == TransportType.AVITO })
+    }
+
+    @Test
+    fun aScriptThisDeviceCannotSendIsSaidBeforeInstalling() = runTest {
+        installScript("bare", file = "bare.js")
+        val m = editor()
+        m.edit { it.copy(scripts = listOf(NodeScript("bare"))) }
+        m.install(); advanceUntilIdle()
+        assertTrue(m.error.orEmpty().contains("bare"), m.error)
+        assertTrue(server.channels.isEmpty())
+
+        m.edit { it.copy(scripts = listOf(NodeScript("gone"))) }
+        m.install(); advanceUntilIdle()
+        assertTrue(m.error.orEmpty().contains("не установлен"), m.error)
+    }
+
+    @Test
+    fun anInstalledNodesScriptsAreReadBackAndKeptInItsProfile() = runTest {
+        installScript("mtslink")
+        val ch = InstalledChannel(
+            "of-s", "active", 8445, "ctx",
+            listOf(NodeTransport("mailru", "https://cloud.mail.ru/public/aa/bb"), NodeTransport("script", "v1", script = "mtslink", params = ScriptSettingsCodec.encode(mapOf("room" to "v1", "speed" to "slow")))),
+            "l4", "k".repeat(64),
+        )
+        server.channels[ch.id] = ch
+        val m = editor(ch.id)
+        m.load(); advanceUntilIdle()
+        assertEquals(listOf(NodeScript("mtslink", "v1", mapOf("room" to "v1", "speed" to "slow"))), m.draft.scripts)
+        m.edit { it.copy(scripts = it.scripts.map { s -> s.copy(value = "v2") }) }
+        assertEquals(1, m.changes)
+        m.apply(); advanceUntilIdle()
+        assertNull(m.error)
+        val sent = server.channels.getValue("of-s").transports.single { it.type == "script" }
+        assertEquals("v2", ScriptSettingsCodec.decode(sent.params)["room"], "the new value replaces the old one in the settings")
+        m.connectHere(); advanceUntilIdle()
+        val p = c.profiles.profiles.value.single()
+        assertEquals(listOf("mtslink"), p.extras.filter { it.type == TransportType.SCRIPT }.map { it.scriptId })
     }
 
     @Test

@@ -12,6 +12,7 @@ val TransportType.title: String
         TransportType.BOARDS -> "Яндекс Доска"
         TransportType.CUPSONLINE -> "Cups.online"
         TransportType.TELEMOST -> "Яндекс Телемост"
+        TransportType.AVITO -> "Avito Code"
         TransportType.ONEME -> "MAX"
         TransportType.DIRECT -> "Прямое подключение"
         TransportType.SCRIPT -> "JS-транспорт"

@@ -14,6 +14,11 @@ import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.TransportType
+import io.openflux.desktop.model.ExtraTransport
+import io.openflux.desktop.model.NodeTransport
+import io.openflux.desktop.model.NodeTransports
+import io.openflux.desktop.model.ScriptSettingsCodec
+import kotlin.io.encoding.Base64
 import io.openflux.desktop.service.AccountException
 import io.openflux.desktop.service.AppContainer
 import kotlinx.coroutines.CancellationException
@@ -142,7 +147,7 @@ class NodeEditorModel(
         run("Применяю на сервере…") {
             val id = installedId ?: return@run
             val ready = withRooms(d)
-            val transports = ready.toTransports()
+            val transports = withPackages(ready.toTransports())
             val now = link.call(serverId) { setTransports(id, transports, sudo(), cookiesFor(ready), ready.mode) }
             pendingCookies = ""
             installed = now
@@ -187,6 +192,7 @@ class NodeEditorModel(
         val text = link.call(serverId) { channelShareLink(name, info.key, host, info.port, info.transports, info.context) }
         val made = Profile.fromShare(container.shareCodec.decode(text), container.profiles.newId(), container.platform.now(), ProfileSource.Node)
             .copy(icon = "ic_terminal", name = name)
+            .withScripts(info.transports)
         container.profiles.upsert(made)
         return made
     }
@@ -205,7 +211,7 @@ class NodeEditorModel(
         run("Готовлю ноду…") {
             val ch = link.call(serverId) { newChannel() }
             val ready = withRooms(draft)
-            val transports = ready.toTransports()
+            val transports = withPackages(ready.toTransports())
             busyText = "Спрашиваю сервер, что изменится…"
             val plan = link.call(serverId, retry = true) { plan(ch.id, transports, cookiesFor(ready).isNotEmpty(), ready.autoUpdate, ready.mode) }
             busyText = "Устанавливаю ноду: ядро, настройки, запуск…"
@@ -216,6 +222,7 @@ class NodeEditorModel(
             val text = link.call(serverId) { shareLink(name, ch.key, host, plan.port, transports) }
             val p = Profile.fromShare(container.shareCodec.decode(text), container.profiles.newId(), container.platform.now(), ProfileSource.Node)
                 .copy(icon = "ic_terminal", name = name)
+                .withScripts(transports)
             container.profiles.upsert(p)
             container.settings.update { it.copy(selectedProfileId = p.id) }
             candidate = p
@@ -312,10 +319,54 @@ class NodeEditorModel(
     }
 
     private suspend fun withRooms(d: NodeDraft): NodeDraft {
-        if (!d.cups || d.cupsRooms.isNotEmpty()) return d
-        busyText = "Создаю комнаты cups.online…"
-        val rooms = link.call(serverId) { createCupsRooms() }
-        return d.copy(cupsRooms = rooms).also { r -> draft = draft.copy(cupsRooms = r.cupsRooms) }
+        var r = d
+        if (r.cups && r.cupsRooms.isEmpty()) {
+            busyText = "Создаю комнаты cups.online…"
+            val rooms = link.call(serverId) { createCupsRooms() }
+            r = r.copy(cupsRooms = rooms)
+            draft = draft.copy(cupsRooms = rooms)
+        }
+        if (r.avito && r.avitoRooms.isEmpty()) {
+            busyText = "Создаю комнаты Avito…"
+            val rooms = link.call(serverId) { createAvitoRooms() }
+            r = r.copy(avitoRooms = rooms)
+            draft = draft.copy(avitoRooms = rooms)
+        }
+        return r
+    }
+
+    /**
+     * The JS transports as the node gets them: this device's package (it goes to the server each time, so the node
+     * runs the version the app has), the author's key, and the primary parameter folded into the settings line the
+     * way the app runs it (CoreConfig).
+     */
+    private fun withPackages(ts: List<NodeTransport>): List<NodeTransport> = ts.map { t ->
+        if (t.type != TransportType.SCRIPT.cliName) return@map t
+        val installed = container.scripts.byId(t.script)?.takeIf(NodeTransports::nodeCanRun)
+            ?: throw NodeWizardException("JS-транспорт ${t.script} не установлен на этом устройстве как подписанный пакет .flux")
+        val bytes = container.scripts.packageBytes(t.script)?.first
+            ?: throw NodeWizardException("Пакет JS-транспорта ${installed.name.ifBlank { t.script }} не читается: переустановите его")
+        val settings = ScriptSettingsCodec.decode(t.params) + (installed.primaryParam?.key?.let { mapOf(it to t.url) } ?: emptyMap())
+        t.copy(
+            pubkey = installed.pubkeyHex,
+            pkg = Base64.encode(bytes),
+            params = if (settings.isEmpty()) "" else ScriptSettingsCodec.encode(settings),
+        )
+    }
+
+    /** The link cannot carry a JS transport: the node's profile gets them here, as the node runs them. */
+    private fun Profile.withScripts(ts: List<NodeTransport>): Profile {
+        val scripts = ts.filter { it.type == TransportType.SCRIPT.cliName && it.script.isNotEmpty() }
+        if (scripts.isEmpty()) return this
+        val installed = scripts.associate { it.script to container.scripts.byId(it.script) }
+        val extras = scripts.map { t ->
+            val primary = installed[t.script]?.primaryParam?.key
+            ExtraTransport(
+                TransportType.SCRIPT, t.url, priority = SCRIPT_PRIORITY, scriptId = t.script,
+                settings = ScriptSettingsCodec.decode(t.params).filterKeys { it != primary },
+            )
+        }
+        return copy(session = true, extras = this.extras.filterNot { it.type == TransportType.SCRIPT } + extras)
     }
 
     /** The sign-in goes along only with a Yandex document, and only the one it made. */
@@ -333,6 +384,7 @@ class NodeEditorModel(
         val text = link.call(serverId) { channelShareLink(name.trim().ifEmpty { p.name }, key, host, now.port, now.transports, now.context) }
         val fresh = Profile.fromShare(container.shareCodec.decode(text), p.id, p.createdAt, p.source)
             .copy(icon = p.icon, name = name.trim().ifEmpty { p.name })
+            .withScripts(now.transports)
         container.profiles.upsert(fresh)
     }
 
@@ -363,5 +415,10 @@ class NodeEditorModel(
                 busyText = null
             }
         }
+    }
+
+    private companion object {
+        /** The node's priority for its JS transports (provision.transportPriority). */
+        const val SCRIPT_PRIORITY = 60
     }
 }

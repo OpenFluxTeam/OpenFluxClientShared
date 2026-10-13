@@ -69,11 +69,22 @@ data class NewChannel(val id: String, val key: String) {
 /**
  * One of a new channel's carriers besides direct, as the core's
  * provision.ChannelTransport: [type] is the CLI name (vyandex, mailru,
- * cupsonline), [url] the document link or cups.online's room list.
+ * cupsonline, telemost, avito, script), [url] the document link, a packed room
+ * list or a script's primary parameter. A script carrier also names its
+ * package ([script], the installed id), the author's key, the .flux itself
+ * (base64, only to install or replace it; the server never gives it back) and
+ * the settings its wizard saved ([ScriptSettingsCodec]).
  */
 @Serializable
-data class NodeTransport(val type: String, val url: String) {
-    override fun toString() = "NodeTransport($type)"
+data class NodeTransport(
+    val type: String,
+    val url: String = "",
+    val script: String = "",
+    val pubkey: String = "",
+    @kotlinx.serialization.SerialName("package") val pkg: String = "",
+    val params: String = "",
+) {
+    override fun toString() = if (type == TransportType.SCRIPT.cliName) "NodeTransport(script:$script)" else "NodeTransport($type)"
 }
 
 /**
@@ -104,7 +115,10 @@ data class InstalledChannel(
 
 object NodeTransports {
     /** What the wizard offers besides direct, in the node's priority order. */
-    val offered = listOf(TransportType.VYANDEX, TransportType.YANDEX, TransportType.MAILRU, TransportType.BOARDS, TransportType.CUPSONLINE)
+    val offered = listOf(
+        TransportType.VYANDEX, TransportType.YANDEX, TransportType.MAILRU, TransportType.TELEMOST, TransportType.BOARDS,
+        TransportType.AVITO, TransportType.CUPSONLINE, TransportType.SCRIPT,
+    )
 
     private val MAILRU_URL = Regex("""^https://cloud\.mail\.ru/public/[A-Za-z0-9_-]{2,64}/[A-Za-z0-9_-]{2,128}$""")
 
@@ -114,6 +128,24 @@ object NodeTransports {
 
     /** A Yandex board link with only its hash; null if it is not one. */
     fun cleanBoard(url: String): String? = YandexBoards.clean(url)
+
+    private val TELEMOST_URL = Regex("""^https://telemost\.yandex\.ru/j/[0-9]{6,32}$""")
+
+    /** A Telemost conference link without query, fragment or trailing slash; null if it is not one. */
+    fun cleanTelemost(url: String): String? =
+        url.trim().replace(Regex("[?#].*$"), "").trimEnd('/').takeIf(TELEMOST_URL::matches)
+
+    private val SCRIPT_ID = Regex("^[a-z0-9][a-z0-9_-]{0,31}$")
+
+    /**
+     * Whether a node can run [script]: a signed .flux (a bare .js needs its signature beside it) whose id the
+     * installer can name a file by.
+     */
+    fun nodeCanRun(script: InstalledScript): Boolean = script.fileName.endsWith(".flux") && SCRIPT_ID.matches(script.id)
+
+    /** Why a script's primary parameter does not fit the node's config line; null when it does. */
+    fun scriptValueProblem(value: String): String? =
+        if (value.length > 4096 || value.any { it == '#' || it == ';' || it == '\n' || it == '\r' }) "без символов # ; и переводов строк" else null
 
     /** How the wizard names [types] for people, primary first: "Volga, Mail.ru и Direct". */
     fun describe(types: List<TransportType>): String {

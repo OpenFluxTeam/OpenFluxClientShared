@@ -353,6 +353,8 @@ interface NodeWizardService {
     suspend fun checkDocument(documentUrl: String)
     /** New cups.online rooms for the channel: the packed list the node and its link take. */
     suspend fun createCupsRooms(): String
+    /** Avito Code rooms for a new channel, packed as the node takes them; they need no sign-in. */
+    suspend fun createAvitoRooms(): String = throw NodeWizardException("Комнаты Avito здесь не создаются: обновите приложение")
     /** The channel's `openflux://` link: [transports], then direct to host:port as the backup. */
     suspend fun shareLink(name: String, key: String, host: String, port: Int, transports: List<NodeTransport>): String
     /** The addresses [host] resolves to, to compare with the tunnel's exit. */

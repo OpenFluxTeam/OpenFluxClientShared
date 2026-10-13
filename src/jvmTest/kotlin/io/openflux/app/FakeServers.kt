@@ -116,6 +116,7 @@ class FakeNodeService(vararg servers: FakeServer) : NodeWizardService {
 
     override suspend fun checkDocument(documentUrl: String) { here("checkDocument") }
     override suspend fun createCupsRooms(): String { here("createRooms"); return "rooms" }
+    override suspend fun createAvitoRooms(): String { here("createAvitoRooms"); return "avito-rooms" }
     override suspend fun shareLink(name: String, key: String, host: String, port: Int, transports: List<NodeTransport>): String =
         link(name, key, host, port, transports)
 
@@ -124,7 +125,8 @@ class FakeNodeService(vararg servers: FakeServer) : NodeWizardService {
         FakeShareLinkCodec().encode(
             ShareConfig(
                 name = name, negotiate = true, secret = key, context = context,
-                transports = transports.mapIndexed { i, t -> ShareTransport(type = t.type, url = t.url, priority = 90 - i) } +
+                // As the core: a link cannot carry a script package.
+                transports = transports.filter { it.type != "script" }.mapIndexed { i, t -> ShareTransport(type = t.type, url = t.url, priority = 90 - i) } +
                     ShareTransport(type = "direct", dial = "$host:$port", priority = 50),
             ),
         )
