@@ -27,6 +27,7 @@ import io.openflux.desktop.model.OpenFluxBot
 import io.openflux.desktop.model.OpenFluxId
 import io.openflux.desktop.service.AppContainer
 import io.openflux.desktop.service.LocalAppContainer
+import io.openflux.desktop.service.SignInWay
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -59,6 +60,7 @@ class SignInModel(
     var ui by mutableStateOf<SignInUi>(SignInUi.Idle)
         private set
     private var job: Job? = null
+    private var way: SignInWay? = null
 
     /** Begins a sign-in; one at a time. */
     fun start() {
@@ -67,8 +69,13 @@ class SignInModel(
         job = scope.launch {
             try {
                 run()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // An answer of a shape nobody expected must end in words on the screen, never in a crash.
+                ui = SignInUi.Failed(GENERIC)
             } finally {
-                container.signIn.closeReturn()
+                way?.close()
             }
         }
     }
@@ -77,7 +84,7 @@ class SignInModel(
     fun cancel() {
         job?.cancel()
         job = null
-        container.signIn.closeReturn()
+        way?.close()
         ui = SignInUi.Idle
     }
 
@@ -97,23 +104,30 @@ class SignInModel(
             return
         }
         val attempt = support.newAttempt()
-        val redirect = try {
-            support.openReturn()
+        val way = try {
+            support.begin(attempt.state)
         } catch (e: BotException) {
             ui = SignInUi.Failed(e.message ?: GENERIC)
             return
         }
-        val page = OpenFluxId.authorizeUrl(support.clientId, redirect, attempt, support.issuer)
+        this.way = way
+        val page = OpenFluxId.authorizeUrl(support.clientId, way.redirectUri, attempt, support.issuer)
         support.openPage(page)
         ui = SignInUi.Waiting(page)
-        val answer = withTimeoutOrNull(waitMs) {
-            var a: AuthAnswer
-            do {
-                a = OpenFluxId.readReturn(support.awaitReturn(), attempt.state)
-            } while (a == AuthAnswer.Foreign)
-            a
+        val answer = try {
+            withTimeoutOrNull(waitMs) {
+                var a: AuthAnswer
+                do {
+                    a = OpenFluxId.readReturn(way.await(), attempt.state)
+                } while (a == AuthAnswer.Foreign)
+                a
+            }
+        } catch (e: BotException) {
+            // A newer sign-in took the way back over, or this one was closed.
+            ui = SignInUi.Failed(e.message ?: GENERIC)
+            return
         }
-        support.closeReturn()
+        way.close()
         val code = when (answer) {
             null -> { ui = SignInUi.Expired; return }
             is AuthAnswer.Refused -> { ui = SignInUi.Failed(refusal(answer.error)); return }
@@ -122,7 +136,7 @@ class SignInModel(
         }
         ui = SignInUi.Checking
         val session = try {
-            container.bot.exchange(code, attempt.verifier, redirect)
+            container.bot.exchange(code, attempt.verifier, way.redirectUri)
         } catch (e: CancellationException) {
             throw e
         } catch (e: BotException) {

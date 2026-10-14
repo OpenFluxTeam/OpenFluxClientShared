@@ -106,7 +106,6 @@ class SignInWireTest {
             assertTrue(c.profiles.profiles.value.isEmpty())
         } finally {
             server.stop(0)
-            browser.closeReturn()
         }
     }
 }

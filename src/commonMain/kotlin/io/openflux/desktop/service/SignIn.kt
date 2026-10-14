@@ -13,21 +13,31 @@ interface SignInSupport {
     val clientId: String
     val issuer: String get() = OpenFluxId.ISSUER
     fun newAttempt(): AuthAttempt
-    /** Gets the way back ready and gives the redirect_uri to send; drops returns of earlier attempts. BotException("no_return") when there is none. */
-    suspend fun openReturn(): String
-    /** Waits for the browser to come back on the address [openReturn] gave; the full address with its query. */
-    suspend fun awaitReturn(): String
+    /**
+     * Readies the way back for the attempt with this [state] and ends any earlier one (its [SignInWay.await] fails).
+     * BotException("no_return") when there is none.
+     */
+    suspend fun begin(state: String): SignInWay
     fun openPage(url: String)
-    /** Ends the way back (a computer stops listening); harmless twice. */
-    fun closeReturn()
+}
+
+/** One attempt's way back from the browser. Each attempt owns its own: closing one never touches another. */
+interface SignInWay {
+    /** The redirect_uri to send. */
+    val redirectUri: String
+    /**
+     * Waits for the browser to come back with this attempt's state: the full address with its query.
+     * Fails with BotException("superseded") when a newer sign-in began, "closed" when this way was closed.
+     */
+    suspend fun await(): String
+    /** Ends this way back only (a computer stops listening); harmless twice. */
+    fun close()
 }
 
 object NoSignIn : SignInSupport {
     private fun unsupported(): Nothing = throw BotException("unsupported", "Вход здесь не поддерживается")
     override val clientId = ""
     override fun newAttempt() = unsupported()
-    override suspend fun openReturn() = unsupported()
-    override suspend fun awaitReturn() = unsupported()
+    override suspend fun begin(state: String) = unsupported()
     override fun openPage(url: String) = Unit
-    override fun closeReturn() = Unit
 }

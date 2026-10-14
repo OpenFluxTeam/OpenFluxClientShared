@@ -10,6 +10,7 @@ import io.openflux.desktop.model.BotSubscription
 import io.openflux.desktop.service.BotApi
 import io.openflux.desktop.service.BotConnection
 import io.openflux.desktop.service.SignInSupport
+import io.openflux.desktop.service.SignInWay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -27,21 +28,28 @@ class SignInModelTest {
     class FakeSignIn(override val clientId: String = "openflux-test") : SignInSupport {
         val returns = Channel<String>(Channel.UNLIMITED)
         val pages = mutableListOf<String>()
-        var opens = 0
+        var begins = 0
         var closes = 0
-        var openError: BotException? = null
+        var beginError: BotException? = null
+        var awaitError: Exception? = null
         override fun newAttempt() = AuthAttempt("st1", "v".repeat(43), "ch1")
-        override suspend fun openReturn(): String { opens++; openError?.let { throw it }; return "http://127.0.0.1:47621/callback" }
-        override suspend fun awaitReturn() = returns.receive()
+        override suspend fun begin(state: String): SignInWay {
+            begins++
+            beginError?.let { throw it }
+            return object : SignInWay {
+                override val redirectUri = "http://127.0.0.1:47621/callback"
+                override suspend fun await(): String { awaitError?.let { throw it }; return returns.receive() }
+                override fun close() { closes++ }
+            }
+        }
         override fun openPage(url: String) { pages += url }
-        override fun closeReturn() { closes++ }
     }
 
     private class Api(val result: Any) : BotApi {
         val exchanges = mutableListOf<Triple<String, String, String>>()
         override suspend fun exchange(code: String, verifier: String, redirectUri: String): BotSession {
             exchanges += Triple(code, verifier, redirectUri)
-            return when (result) { is BotSession -> result; is BotException -> throw result; else -> error("bad") }
+            return when (result) { is BotSession -> result; is Exception -> throw result; else -> error("bad") }
         }
         override suspend fun subscription(token: String) = BotSubscription()
         override suspend fun signOut(token: String) = Unit
@@ -121,7 +129,7 @@ class SignInModelTest {
 
     @Test
     fun noWayBackIsSaid() = runTest {
-        val s = FakeSignIn().apply { openError = BotException("no_return", "порты заняты") }
+        val s = FakeSignIn().apply { beginError = BotException("no_return", "порты заняты") }
         val m = SignInModel(testContainer(bot = Api(session), signIn = s), this)
         m.start(); runCurrent()
         assertEquals(SignInUi.Failed("порты заняты"), m.ui)
@@ -146,7 +154,7 @@ class SignInModelTest {
         val m = SignInModel(testContainer(bot = Api(session), signIn = s), this)
         m.start(); runCurrent(); m.start(); runCurrent()
         assertEquals(1, s.pages.size)
-        assertEquals(1, s.opens)
+        assertEquals(1, s.begins)
         m.cancel()
     }
 
@@ -160,5 +168,24 @@ class SignInModelTest {
         assertEquals(s.pages[0], s.pages[1])
         assertEquals(s.pages[0], platform.clipboard)
         m.cancel()
+    }
+
+    @Test
+    fun aNewerSignInTakingOverIsSaid() = runTest {
+        val s = FakeSignIn().apply { awaitError = BotException("superseded", "Вход начат заново") }
+        val m = SignInModel(testContainer(bot = Api(session), signIn = s), this)
+        m.start(); runCurrent()
+        assertEquals(SignInUi.Failed("Вход начат заново"), m.ui)
+        assertTrue(s.closes >= 1)
+    }
+
+    @Test
+    fun anAnswerNobodyExpectedEndsInWordsNotACrash() = runTest {
+        val s = FakeSignIn()
+        val m = SignInModel(testContainer(bot = Api(IllegalArgumentException("not an object")), signIn = s), this)
+        m.start(); runCurrent()
+        s.returns.send("$back?state=st1&code=c1"); runCurrent()
+        assertEquals(SignInUi.Failed("Не получилось войти"), m.ui)
+        assertTrue(s.closes >= 1)
     }
 }

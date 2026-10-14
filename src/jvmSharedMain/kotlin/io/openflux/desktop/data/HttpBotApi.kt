@@ -57,10 +57,11 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appKey:
             mapOf("code" to JsonPrimitive(code), "code_verifier" to JsonPrimitive(verifier), "redirect_uri" to JsonPrimitive(redirectUri)),
         )
         val o = try {
-            request("POST", "/api/v1/auth/app/exchange", null, body, mapOf("X-App-Key" to appKey)).jsonObject
+            request("POST", "/api/v1/auth/app/exchange", null, body, mapOf("X-App-Key" to appKey)) as? JsonObject
         } catch (e: BotException) {
             throw signInError(e)
         }
+        if (o == null) throw BotException("bad_response", "Сервис ответил непонятно: обновите приложение")
         val token = o.str("token")
         if (token.isEmpty()) throw BotException("bad_response", "Сервис не выдал сессию: обновите приложение")
         val userId = o.long("userId").takeIf { it > 0 } ?: o.long("user_id")

@@ -81,6 +81,14 @@ class BotLoginApiTest {
     }
 
     @Test
+    fun anAnswerThatIsNotAnObjectIsRefusedNotThrown() = runBlocking {
+        for (body in listOf("null", "[]", "\"x\"", "7")) {
+            val api = HttpBotApi(server { _, _ -> 200 to body }, key)
+            assertEquals("bad_response", assertFailsWith<BotException> { api.exchange("c", "v".repeat(43), "x:/y") }.code, body)
+        }
+    }
+
+    @Test
     fun everyRefusalOfTheServiceHasItsOwnCode() = runBlocking {
         val cases = mapOf(400 to "bad_request", 401 to "sign_in_failed", 403 to "blocked", 404 to "not_ready", 429 to "rate_limited", 503 to "unavailable")
         for ((status, code) in cases) {

@@ -19,6 +19,7 @@ import io.openflux.desktop.model.BotSubscription
 import io.openflux.desktop.service.BotApi
 import io.openflux.desktop.service.BotConnection
 import io.openflux.desktop.service.SignInSupport
+import io.openflux.desktop.service.SignInWay
 import kotlinx.coroutines.channels.Channel
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -32,10 +33,12 @@ class SignInScreenTest {
         private val back = Channel<String>(Channel.UNLIMITED)
         override val clientId = "openflux-test"
         override fun newAttempt() = AuthAttempt("st1", "v".repeat(43), "ch1")
-        override suspend fun openReturn() = "http://127.0.0.1:47621/callback"
-        override suspend fun awaitReturn() = back.receive()
+        override suspend fun begin(state: String) = object : SignInWay {
+            override val redirectUri = "http://127.0.0.1:47621/callback"
+            override suspend fun await() = back.receive()
+            override fun close() = Unit
+        }
         override fun openPage(url: String) { back.trySend("http://127.0.0.1:47621/callback?$query") }
-        override fun closeReturn() = Unit
     }
 
     private class Api(val session: BotSession?) : BotApi {
