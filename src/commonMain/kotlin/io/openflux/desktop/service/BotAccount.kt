@@ -1,7 +1,10 @@
 package io.openflux.desktop.service
 
+import io.openflux.desktop.model.BotBanner
 import io.openflux.desktop.model.BotException
+import io.openflux.desktop.model.BotInvoice
 import io.openflux.desktop.model.BotLink
+import io.openflux.desktop.model.BotPlan
 import io.openflux.desktop.model.BotSession
 import io.openflux.desktop.model.BotSessionItem
 import io.openflux.desktop.model.BotState
@@ -43,6 +46,19 @@ interface BotApi {
     suspend fun sessions(token: String): List<BotSessionItem> = throw BotException("unsupported", "Бот OpenFlux здесь не поддерживается")
     /** Makes a connection in a free automatic slot; "forbidden" when there is none. */
     suspend fun createSession(token: String): BotSessionItem = throw BotException("unsupported", "Бот OpenFlux здесь не поддерживается")
+
+    /** The terms the person (or, without [token], anybody) may buy. */
+    suspend fun plans(token: String?): List<BotPlan> = throw BotException("unsupported", "Покупка здесь не поддерживается")
+    /**
+     * An invoice for a NEW slot on the term [termCode]. A repeat with the same [idempotencyKey] (8–64 of `A-Z a-z 0-9 - _`)
+     * returns the same invoice, so a call lost on the way is repeated with the key it had.
+     */
+    suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String): BotInvoice =
+        throw BotException("unsupported", "Покупка здесь не поддерживается")
+    /** One of the person's own invoices; not_found for anyone else's. */
+    suspend fun invoice(token: String, id: String): BotInvoice = throw BotException("unsupported", "Покупка здесь не поддерживается")
+    /** The service's banners for everyone. */
+    suspend fun banners(): List<BotBanner> = throw BotException("unsupported", "Сервис OpenFlux здесь не поддерживается")
 }
 
 object NoBotApi : BotApi {

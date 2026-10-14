@@ -86,7 +86,11 @@ data class BotState(
     val connectionNote: String? = null,
 )
 
-/** A failed API call; [code] is "network", "unauthorized", "forbidden", "not_found", "rate_limited" or "http_<n>", and for a sign-in "no_app_id", "sign_in_failed", "blocked", "not_ready", "unavailable" or "bad_request". */
+/**
+ * A failed API call; [code] is "network", "unauthorized", "forbidden", "not_found", "rate_limited" or "http_<n>", for a
+ * sign-in "no_app_id", "sign_in_failed", "blocked", "not_ready", "unavailable" or "bad_request", and for an invoice
+ * "slot_limit", "blocked", "plan_gone", "busy", "payments_off" or "bad_request".
+ */
 class BotException(val code: String, message: String) : Exception(message) {
     val unauthorized: Boolean get() = code == "unauthorized"
     val forbidden: Boolean get() = code == "forbidden"
@@ -97,6 +101,64 @@ class BotException(val code: String, message: String) : Exception(message) {
 data class BotSessionItem(val id: String, val status: String, val connectToken: String) {
     val ready: Boolean get() = status == "running" && connectToken.isNotEmpty()
     override fun toString() = "BotSessionItem($id, $status)"
+}
+
+/**
+ * One term on sale, as GET /api/v1/plans lists it. [id] is the term's code, what an invoice takes back; [name] is the
+ * tariff's and repeats on each of its terms. Every purchase buys a new slot (one connection), never a renewal.
+ */
+@Serializable
+data class BotPlan(
+    val id: String,
+    val name: String = "",
+    val durationDays: Int = 0,
+    /** 0 when the term has no traffic limit. */
+    val trafficLimitBytes: Long = 0,
+    val description: String = "",
+    /** In minor units of [currency] (kopecks for RUB). */
+    val price: Long = 0,
+    val currency: String = "RUB",
+) {
+    /** The price as people read it: "30 ₽", "30,50 ₽", "1 250 ₽". */
+    val priceText: String
+        get() {
+            val whole = (price / 100).toString().reversed().chunked(3).joinToString(" ").reversed()
+            val cents = price % 100
+            val amount = if (cents == 0L) whole else "$whole," + cents.toString().padStart(2, '0')
+            return "$amount ${if (currency == "RUB") "₽" else currency}"
+        }
+}
+
+/** An invoice of a purchase, as the service reports it; [id] is ours (GET /api/v1/subscription/invoices/{id}). */
+@Serializable
+data class BotInvoice(
+    val id: String,
+    /** The payment page (https); empty when there is nothing to pay (the free tier settles at once). */
+    val payUrl: String = "",
+    /** The amount as the service writes it ("30.00"). */
+    val amount: String = "",
+    /** "active" (waiting for the payment), "paid" or "expired". */
+    val status: String = "",
+    /** Unix seconds. */
+    val createdAt: Long = 0,
+    /** Unix seconds: an unpaid invoice ends then (a day after it was made). */
+    val expiresAt: Long = 0,
+) {
+    val paid: Boolean get() = status == "paid"
+    val expired: Boolean get() = status == "expired"
+}
+
+/** A banner of the service (GET /api/v1/banners): what the bot shows everyone right now. */
+@Serializable
+data class BotBanner(
+    val id: Long,
+    /** "info", "success", "warning" or "error". */
+    val kind: String = "info",
+    val textRu: String = "",
+    val textEn: String = "",
+) {
+    /** The text in [lang] ("ru" or "en"), or in the other language when this one is missing. */
+    fun text(lang: String): String = if (lang == "en") textEn.ifBlank { textRu } else textRu.ifBlank { textEn }
 }
 
 /** How the person signed in, for the account screen: a number below [OpenFluxBot.EMAIL_ACCOUNT_IDS] is a Telegram id. */

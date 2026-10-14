@@ -1,6 +1,9 @@
 package io.openflux.desktop.data
 
+import io.openflux.desktop.model.BotBanner
 import io.openflux.desktop.model.BotException
+import io.openflux.desktop.model.BotInvoice
+import io.openflux.desktop.model.BotPlan
 import io.openflux.desktop.model.BotSession
 import io.openflux.desktop.model.BotSessionItem
 import io.openflux.desktop.model.BotSubscription
@@ -9,6 +12,7 @@ import io.openflux.desktop.service.BotAccountManager
 import io.openflux.desktop.service.BotApi
 import io.openflux.desktop.service.BotConnection
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -83,6 +87,76 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
 
     private fun sessionItem(o: JsonObject) = BotSessionItem(o.str("sessionId"), o.str("status"), o.str("connectToken"))
 
+    override suspend fun plans(token: String?): List<BotPlan> {
+        val e = request("GET", "/api/v1/plans", token, null, refuse = ::plansRefusal)
+        val array = e as? JsonArray ?: (e as? JsonObject)?.get("plans") as? JsonArray ?: return emptyList()
+        return array.mapNotNull { item ->
+            val o = item as? JsonObject ?: return@mapNotNull null
+            BotPlan(
+                id = o.str("id").ifEmpty { return@mapNotNull null },
+                name = o.str("name"), durationDays = o.long("durationDays").toInt(), trafficLimitBytes = o.long("trafficLimitBytes"),
+                description = o.str("description"), price = o.long("price"), currency = o.str("currency").ifEmpty { "RUB" },
+            )
+        }
+    }
+
+    override suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String): BotInvoice {
+        if (!IDEMPOTENCY_KEY.matches(idempotencyKey)) throw BotException("bad_request", BAD_REQUEST)
+        val body = JsonObject(mapOf("plan_id" to JsonPrimitive(termCode)))
+        val headers = mapOf("Idempotency-Key" to idempotencyKey)
+        val o = try {
+            request("POST", "/api/v1/subscription/invoice", token, body, headers, ::invoiceRefusal)
+        } catch (e: BotException) {
+            if (e.code != "busy") throw e
+            // The same key is still being handled (a call before this one, lost on the way): asked once more.
+            delay(BUSY_RETRY_MS)
+            request("POST", "/api/v1/subscription/invoice", token, body, headers, ::invoiceRefusal)
+        }
+        return invoiceOf(o)
+    }
+
+    override suspend fun invoice(token: String, id: String): BotInvoice {
+        if (!INVOICE_ID.matches(id)) throw BotException("bad_request", BAD_REQUEST)
+        return invoiceOf(request("GET", "/api/v1/subscription/invoices/$id", token, null))
+    }
+
+    override suspend fun banners(): List<BotBanner> {
+        val e = request("GET", "/api/v1/banners", null, null)
+        val array = e as? JsonArray ?: (e as? JsonObject)?.get("banners") as? JsonArray ?: return emptyList()
+        return array.mapNotNull { item ->
+            val o = item as? JsonObject ?: return@mapNotNull null
+            BotBanner(o.long("id"), o.str("kind").ifEmpty { "info" }, o.str("textRu"), o.str("textEn"))
+                .takeIf { it.textRu.isNotBlank() || it.textEn.isNotBlank() }
+        }
+    }
+
+    /** An invoice the service answered with: our id, and a payment page only over https (it is opened in the browser). */
+    private fun invoiceOf(e: JsonElement): BotInvoice {
+        val o = e as? JsonObject ?: throw BotException("bad_response", BAD_RESPONSE)
+        val inv = BotInvoice(o.str("id"), o.str("payUrl"), o.str("amount"), o.str("status"), o.long("createdAt"), o.long("expiresAt"))
+        if (inv.id.isEmpty()) throw BotException("bad_response", BAD_RESPONSE)
+        if (inv.payUrl.isNotEmpty() && !inv.payUrl.startsWith("https://")) throw BotException("bad_response", BAD_RESPONSE)
+        return inv
+    }
+
+    /** Why an invoice was refused, in the person's words; the service's own are English and technical. */
+    private fun invoiceRefusal(status: Int, said: String): BotException? = when (status) {
+        400 -> if ("slot limit" in said) {
+            BotException("slot_limit", "Больше мест на этом аккаунте взять нельзя. Освободите одно или напишите в поддержку в @${OpenFluxBot.USERNAME}")
+        } else {
+            BotException("bad_request", BAD_REQUEST)
+        }
+        403 -> BotException("blocked", "Этот аккаунт заблокирован. Напишите в поддержку в @${OpenFluxBot.USERNAME}")
+        404 -> BotException("plan_gone", "Этот тариф больше не продаётся. Обновите список тарифов")
+        409 -> BotException("busy", "Счёт ещё создаётся. Попробуйте через пару секунд")
+        503 -> BotException("payments_off", "Оплата временно недоступна. Попробуйте позже")
+        in 500..599 -> BotException("http_$status", "Сервис OpenFlux не смог создать счёт. Попробуйте позже")
+        else -> null
+    }
+
+    private fun plansRefusal(status: Int, said: String): BotException? =
+        if (status == 503) BotException("unavailable", russian(said) ?: "Тарифы временно недоступны. Попробуйте позже") else null
+
     /** The service answers every failed sign-in alike (401): wrong or used code, unconfirmed email, foreign address, unknown app id. */
     private fun signInError(e: BotException): BotException = when (e.code) {
         "unauthorized" -> BotException("sign_in_failed", "Не получилось войти. Если входили по почте, подтвердите адрес по ссылке из письма и попробуйте снова")
@@ -96,7 +170,18 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
     private fun JsonObject.str(k: String) = (this[k] as? JsonPrimitive)?.contentOrNull.orEmpty()
     private fun JsonObject.long(k: String) = (this[k] as? JsonPrimitive)?.let { it.longOrNull ?: it.contentOrNull?.toLongOrNull() } ?: 0L
 
-    private suspend fun request(method: String, path: String, token: String?, body: JsonObject?, headers: Map<String, String> = emptyMap()): JsonElement =
+    /**
+     * One call; a refusal (HTTP 300 and up) fails with [BotException]: the one [refuse] makes of the status and the
+     * service's message when it makes one, else the usual one for the status.
+     */
+    private suspend fun request(
+        method: String,
+        path: String,
+        token: String?,
+        body: JsonObject?,
+        headers: Map<String, String> = emptyMap(),
+        refuse: (status: Int, said: String) -> BotException? = { _, _ -> null },
+    ): JsonElement =
         withContext(Dispatchers.IO) {
             val conn = try {
                 URL(base.trimEnd('/') + path).openConnection() as HttpURLConnection
@@ -119,12 +204,13 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
                 val code = conn.responseCode
                 val stream = if (code >= 400) conn.errorStream else conn.inputStream
                 val text = stream?.use { it.readNBytes(MAX_BYTES).toString(Charsets.UTF_8) }.orEmpty()
+                if (code >= 300) refuse(code, rawWords(text))?.let { throw it }
                 when {
                     code == 401 -> throw BotException("unauthorized", "Войдите заново")
                     code == 403 -> throw BotException("forbidden", serverWords(text) ?: BotAccountManager.HttpForbidden)
                     code == 404 -> throw BotException("not_found", "Не найдено")
-                    code == 429 -> throw BotException("rate_limited", "Слишком много запросов к боту, подождите минуту")
-                    code >= 300 -> throw BotException("http_$code", "Бот ответил ошибкой $code")
+                    code == 429 -> throw BotException("rate_limited", "Слишком много запросов к сервису OpenFlux, подождите минуту")
+                    code >= 300 -> throw BotException("http_$code", serverWords(text) ?: "Сервис OpenFlux ответил ошибкой $code")
                 }
                 try {
                     json.parseToJsonElement(text.ifBlank { "{}" })
@@ -138,22 +224,34 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
             }
         }
 
+    /** The message of a refusal (gRPC-gateway: {"code":7,"message":"…"}) as the service wrote it, or "". */
+    private fun rawWords(body: String): String =
+        runCatching { (json.parseToJsonElement(body) as? JsonObject)?.str("message") }.getOrNull().orEmpty()
+
     /**
-     * What the service said in its own words (gRPC-gateway: {"code":7,"message":"…"}), made fit to show: the
-     * bot's HTML and emoji out, the technical prefix and line breaks out. Null when it said nothing usable.
+     * What the service said in its own words, made fit to show: the bot's HTML and emoji out, the technical prefix
+     * and line breaks out. Null when it said nothing usable, or only in English: those words are for developers
+     * ("no free slot for an automatic connection", a database error), not for the person.
      */
-    private fun serverWords(body: String): String? {
-        val message = runCatching { (json.parseToJsonElement(body) as? JsonObject)?.str("message") }.getOrNull().orEmpty()
+    private fun serverWords(body: String): String? = russian(rawWords(body))
+
+    private fun russian(message: String): String? {
         val clean = message
             .replace(Regex("<[^>]+>"), "")
             .removePrefix("session creation blocked:")
             .filterNot { it.isSurrogate() || it == '⚠' || it == '☁' || it == '️' }
             .replace(Regex("\\s+"), " ")
             .trim()
-        return clean.takeIf { it.isNotEmpty() }?.take(400)
+        return clean.takeIf { s -> s.any { it in 'А'..'я' || it == 'ё' || it == 'Ё' } }?.take(400)
     }
 
     private companion object {
         const val MAX_BYTES = 1 shl 20
+        const val BUSY_RETRY_MS = 1_000L
+        val IDEMPOTENCY_KEY = Regex("^[A-Za-z0-9_-]{8,64}$")
+        /** Our invoice ids are UUIDs: nothing else is put into a path. */
+        val INVOICE_ID = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+        const val BAD_REQUEST = "Приложение отправило неверный запрос: обновите приложение"
+        const val BAD_RESPONSE = "Сервис OpenFlux ответил непонятно: обновите приложение"
     }
 }

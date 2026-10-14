@@ -62,6 +62,12 @@ class BotLoginApiTest {
     }
 
     @Test
+    fun aRefusalInEnglishIsNotShownToThePerson() = runBlocking {
+        val api = HttpBotApi(server { _, _ -> 403 to """{"code":7,"message":"no free slot for an automatic connection"}""" }, appId)
+        assertEquals(io.openflux.desktop.service.BotAccountManager.HttpForbidden, assertFailsWith<BotException> { api.createSession("ofs_x") }.message)
+    }
+
+    @Test
     fun exchangeSendsTheCodeVerifierAndAddressWithTheKey() = runBlocking {
         val api = HttpBotApi(server { _, _ -> 200 to """{"userId":"7","role":"user","token":"ofs_tok","expiresAt":"1900000000","sessionId":"s1"}""" }, appId)
         val s = api.exchange("c0de", "v".repeat(43), "http://127.0.0.1:47621/callback")
