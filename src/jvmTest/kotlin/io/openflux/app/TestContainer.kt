@@ -41,6 +41,7 @@ fun testContainer(
     hosting: PhpHostingService = PhpHostingService(),
     subscriptions: SubscriptionApi = io.openflux.desktop.service.NoSubscriptionApi,
     bot: io.openflux.desktop.service.BotApi = io.openflux.desktop.service.NoBotApi,
+    signIn: io.openflux.desktop.service.SignInSupport = io.openflux.desktop.service.NoSignIn,
     scripts: io.openflux.desktop.service.ScriptRepository = io.openflux.desktop.service.InMemoryScriptRepository(),
 ): AppContainer = AppContainer(
     TestProfiles(), TestSettings(), connection, platform, FakeShareLinkCodec(), node,
@@ -48,6 +49,7 @@ fun testContainer(
     phpHosting = hosting,
     subscriptionApi = subscriptions,
     botApi = bot,
+    signIn = signIn,
     scripts = scripts,
 )
 

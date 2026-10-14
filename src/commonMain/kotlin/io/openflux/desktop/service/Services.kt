@@ -401,6 +401,7 @@ class AppContainer(
     /** The OpenFlux bot's API and where its session and connections are kept. */
     val botApi: BotApi = NoBotApi,
     val botRepo: BotRepository = InMemoryBotRepository(),
+    val signIn: SignInSupport = NoSignIn,
     /** Shows a script's settings page in the platform's built-in browser. */
     settingsPageHost: SettingsPageHost = NoSettingsPageHost,
 ) {
