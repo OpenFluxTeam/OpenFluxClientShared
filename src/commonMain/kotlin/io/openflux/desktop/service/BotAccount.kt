@@ -99,10 +99,31 @@ class BotAccountManager(
         return session
     }
 
+    suspend fun startLogin(): LoginStart = api.startLogin()
+
+    suspend fun pollLogin(nonce: String): LoginPoll = api.pollLogin(nonce)
+
+    /** Keeps the session a finished Telegram sign-in gave, then brings the account's subscription and connection in. */
+    suspend fun completeLogin(session: BotSession) {
+        lock.withLock { repo.save(repo.state.value.copy(session = session, lastError = null, connectionNote = null)) }
+        refresh()
+    }
+
+    /** Signs out of this device: the account's connection goes with it, links added by hand stay. */
     suspend fun signOut() {
         val s = repo.state.value.session ?: return
         runCatching { api.signOut(s.token) }
-        lock.withLock { repo.save(repo.state.value.copy(session = null, subscription = null)) }
+        lock.withLock {
+            val mine = repo.state.value.links.filter { it.account }
+            stopIfRunning(mine.map { it.profileId }.toSet())
+            mine.forEach { profiles.delete(it.profileId) }
+            repo.save(
+                repo.state.value.copy(
+                    session = null, subscription = null, links = repo.state.value.links.filterNot { it.account },
+                    preparing = false, connectionNote = null,
+                ),
+            )
+        }
     }
 
     // ---- connection links ----
@@ -110,24 +131,28 @@ class BotAccountManager(
     /** Turns a bot link into a profile (or updates the one it made before); returns the profile. */
     suspend fun addLink(text: String): Profile {
         val token = OpenFluxBot.connectToken(text) ?: throw BotException("bad_link", "Это не ссылка бота OpenFlux")
+        return lock.withLock { addLinkLocked(token, account = false) }
+    }
+
+    private suspend fun addLinkLocked(token: String, account: Boolean): Profile {
         val conn = try {
             api.resolve(token)
         } catch (e: BotException) {
             if (e.notFound) throw BotException("not_found", GONE) else throw e
         }
-        return lock.withLock {
-            val known = repo.state.value.links.firstOrNull { it.token == token }
-            val p = profileOf(conn, known?.profileId ?: profiles.newId(), known)
-            profiles.upsert(p)
-            val link = BotLink(token, p.id, conn.name, platform.now())
-            saveLinks(repo.state.value.links.filterNot { it.token == token } + link)
-            p
-        }
+        val known = repo.state.value.links.firstOrNull { it.token == token }
+        val p = profileOf(conn, known?.profileId ?: profiles.newId(), known)
+        profiles.upsert(p)
+        val link = BotLink(token, p.id, conn.name, platform.now(), account = account || known?.account == true)
+        saveLinks(repo.state.value.links.filterNot { it.token == token } + link)
+        return p
     }
 
     /** Forgets a connection: its profile goes too. */
-    suspend fun removeLink(token: String) = lock.withLock {
-        val link = repo.state.value.links.firstOrNull { it.token == token } ?: return@withLock
+    suspend fun removeLink(token: String) = lock.withLock { removeLinkLocked(token) }
+
+    private fun removeLinkLocked(token: String) {
+        val link = repo.state.value.links.firstOrNull { it.token == token } ?: return
         stopIfRunning(setOf(link.profileId))
         profiles.delete(link.profileId)
         saveLinks(repo.state.value.links.filterNot { it.token == token })
@@ -180,15 +205,71 @@ class BotAccountManager(
             }
         }
         repo.save(s.copy(lastError = error))
+        ensureConnectionLocked()
     }
 
-    /** Refreshes when the app starts and then every few hours. */
+    /** The signed-in account's connection: the running one of the bot, or a new one in a free slot. */
+    private suspend fun ensureConnectionLocked() {
+        val session = repo.state.value.session ?: return
+        // A connection the bot ended or replaced goes; below asks for the current one.
+        for (l in repo.state.value.links.filter { it.account && it.gone }) removeLinkLocked(l.token)
+
+        val items = try {
+            api.sessions(session.token)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: BotException) {
+            return ensureFailed(e)
+        }
+        val ready = items.firstOrNull { it.ready }
+        val item = when {
+            ready != null -> ready
+            items.any { it.status == "creating" } -> null
+            else -> try {
+                api.createSession(session.token)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: BotException) {
+                return ensureFailed(e)
+            }
+        }
+        if (item == null || !item.ready) {
+            repo.save(repo.state.value.copy(preparing = true, connectionNote = null))
+            return
+        }
+        val current = repo.state.value.links.firstOrNull { it.account }
+        if (current != null && current.token != item.connectToken) removeLinkLocked(current.token)
+        if (repo.state.value.links.none { it.token == item.connectToken }) {
+            try {
+                addLinkLocked(item.connectToken, account = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: BotException) {
+                return ensureFailed(e)
+            }
+        }
+        repo.save(repo.state.value.copy(preparing = false, connectionNote = null))
+    }
+
+    private fun ensureFailed(e: BotException) {
+        val s = repo.state.value
+        repo.save(
+            when {
+                e.unauthorized -> s.copy(session = null, subscription = null, preparing = false)
+                e.forbidden -> s.copy(preparing = false, connectionNote = NO_SLOT)
+                e.notFound -> s.copy(preparing = true, connectionNote = null) // the link is not ready yet
+                else -> s.copy(preparing = false, lastError = e.message)
+            },
+        )
+    }
+
+    /** Refreshes when the app starts and then every few hours (every few seconds while the connection is being made). */
     fun start(scope: CoroutineScope) {
         scope.launch {
             while (true) {
                 val s = repo.state.value
                 if (s.session != null || s.links.isNotEmpty()) refresh()
-                delay(REFRESH_MS)
+                delay(if (repo.state.value.preparing) PREPARE_MS else REFRESH_MS)
             }
         }
     }
@@ -209,6 +290,8 @@ class BotAccountManager(
 
     companion object {
         const val GONE = "Бот больше не обслуживает это подключение: подписка закончилась или подключение заменили. Возьмите новую ссылку в @${OpenFluxBot.USERNAME}"
+        const val NO_SLOT = "Подключения нет: подписка не действует или все места заняты. Продлите подписку в @${OpenFluxBot.USERNAME}"
+        private const val PREPARE_MS = 15 * 1000L
         private const val REFRESH_MS = 3 * 60 * 60 * 1000L
     }
 }

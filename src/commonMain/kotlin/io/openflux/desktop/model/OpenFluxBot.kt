@@ -122,6 +122,8 @@ data class BotLink(
     val checkedAt: Long = 0,
     /** The bot no longer serves it: the subscription ended, or the connection was replaced by a new one. */
     val gone: Boolean = false,
+    /** The connection of the signed-in account (made or found by the app), not one added by hand: sign-out takes it away. */
+    val account: Boolean = false,
 ) {
     override fun toString() = "BotLink($profileId, gone=$gone)"
 }
@@ -133,6 +135,10 @@ data class BotState(
     val subscription: BotSubscription? = null,
     val links: List<BotLink> = emptyList(),
     val lastError: String? = null,
+    /** The account's connection is being made (or its link is not ready yet): the app asks again soon. */
+    val preparing: Boolean = false,
+    /** Why the signed-in account has no connection (no free slot, subscription ended), in words for the person. */
+    val connectionNote: String? = null,
 )
 
 /** A failed bot API call; [code] is "network", "unauthorized", "forbidden", "not_found" or "http_<n>", and for a sign-in "no_app_key" or "app_disabled". */
