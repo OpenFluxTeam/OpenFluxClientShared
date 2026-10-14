@@ -3,8 +3,11 @@ package io.openflux.desktop.service
 import io.openflux.desktop.model.BotException
 import io.openflux.desktop.model.BotLink
 import io.openflux.desktop.model.BotSession
+import io.openflux.desktop.model.BotSessionItem
 import io.openflux.desktop.model.BotState
 import io.openflux.desktop.model.BotSubscription
+import io.openflux.desktop.model.LoginPoll
+import io.openflux.desktop.model.LoginStart
 import io.openflux.desktop.model.OpenFluxBot
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ProfileSource
@@ -35,6 +38,14 @@ interface BotApi {
     suspend fun signOut(token: String)
     /** The connection behind a short link; not_found once it ended or was replaced. */
     suspend fun resolve(connectToken: String): BotConnection
+
+    /** Begins a Telegram sign-in: the link that opens the bot, and the nonce to ask about. */
+    suspend fun startLogin(): LoginStart = throw BotException("unsupported", "Бот OpenFlux здесь не поддерживается")
+    suspend fun pollLogin(nonce: String): LoginPoll = throw BotException("unsupported", "Бот OpenFlux здесь не поддерживается")
+    /** The account's connections. */
+    suspend fun sessions(token: String): List<BotSessionItem> = throw BotException("unsupported", "Бот OpenFlux здесь не поддерживается")
+    /** Makes a connection in a free automatic slot; "forbidden" when there is none. */
+    suspend fun createSession(token: String): BotSessionItem = throw BotException("unsupported", "Бот OpenFlux здесь не поддерживается")
 }
 
 object NoBotApi : BotApi {
