@@ -18,9 +18,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The way back on a computer (RFC 8252 §7.3): for one sign-in the app listens on 127.0.0.1 at the first free port of
- * [ports], the page returns the browser to http://127.0.0.1:<port>/callback. The service checks the address exactly,
- * so each of [PORTS] is registered with it. Only a return carrying the attempt's own state is taken; anything else
- * is refused, so junk sent to the port can neither end the attempt nor push the real return out.
+ * [ports] (0 = the system gives one), the page returns the browser to http://127.0.0.1:<port>/callback. The service
+ * ignores the port of a loopback address, so the system's choice needs no registration; the same address, port
+ * included, goes to the sign-in page and to the exchange. Only a return carrying the attempt's own state is taken;
+ * anything else is refused, so junk sent to the port can neither end the attempt nor push the real return out.
  */
 class LoopbackSignIn(
     override val clientId: String,
@@ -42,19 +43,19 @@ class LoopbackSignIn(
             } catch (e: IOException) {
                 continue
             }
-            val way = Way(server, port, state)
+            val way = Way(server, state)
             server.createContext("/") { way.answer(it) }
             server.start()
             synchronized(this@LoopbackSignIn) { current = way }
             return@withContext way
         }
-        throw BotException("no_return", "Не получилось начать вход: порты ${ports.first()}–${ports.last()} на этом компьютере заняты. Закройте лишние программы и повторите")
+        throw BotException("no_return", "Не получилось начать вход: на этом компьютере не открывается порт для возврата из браузера (127.0.0.1). Закройте лишние программы (VPN, защитные) и повторите")
     }
 
     override fun openPage(url: String) = open(url)
 
-    private inner class Way(private val server: HttpServer, port: Int, private val state: String) : SignInWay {
-        override val redirectUri = "http://127.0.0.1:$port$PATH"
+    private inner class Way(private val server: HttpServer, private val state: String) : SignInWay {
+        override val redirectUri = "http://127.0.0.1:${server.address.port}$PATH"
         private val arrivals = Channel<String>(Channel.CONFLATED)
         private val delivered = AtomicBoolean(false)
         private val closed = AtomicBoolean(false)
@@ -101,8 +102,8 @@ class LoopbackSignIn(
     }
 
     companion object {
-        /** Registered with the service as http://127.0.0.1:<port>/callback, all five. */
-        val PORTS = (47621..47625).toList()
+        /** Port 0: the system gives a free one (the service takes any port of 127.0.0.1, RFC 8252 §7.3). */
+        val PORTS = listOf(0)
         const val PATH = "/callback"
         private const val HEAD = """<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>OpenFlux</title></head>
 <body style="font-family:system-ui,sans-serif;max-width:32em;margin:4em auto;padding:0 1em"><h1>OpenFlux</h1>"""

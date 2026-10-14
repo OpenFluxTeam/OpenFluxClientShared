@@ -25,7 +25,7 @@ class LoopbackSignInTest {
     @AfterTest
     fun cleanUp() { ways.forEach { it.close() }; held.forEach { it.close() } }
 
-    /** Ports free right now (taken and let go): the tests never touch 47621–47625, the real app's. */
+    /** Ports free right now (taken and let go), for tests that name their ports. */
     private fun freePorts(n: Int) = List(n) { ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort } }
     private fun signIn(ports: List<Int>) = LoopbackSignIn("openflux-desktop", ports, open = {})
     private suspend fun LoopbackSignIn.start(state: String = "st") = begin(state).also { ways += it }
@@ -78,7 +78,19 @@ class LoopbackSignInTest {
         ports.forEach(::hold)
         val e = assertFailsWith<BotException> { signIn(ports).start() }
         assertEquals("no_return", e.code)
-        assertTrue(e.message!!.contains("заняты"))
+        assertTrue(e.message!!.contains("порт"))
+    }
+
+    @Test
+    fun byDefaultTheSystemGivesThePortAndTheReturnComesThere() = runBlocking {
+        val way = LoopbackSignIn("openflux-desktop", open = {}).start("st")
+        val port = way.redirectUri.removePrefix("http://127.0.0.1:").substringBefore("/").toInt()
+        assertTrue(port > 0 && port !in 47621..47625, "the system's port, not a registered one: $port")
+        // two sign-ins at once never meet on one port
+        val other = LoopbackSignIn("openflux-desktop", open = {}).start("st2")
+        assertTrue(other.redirectUri != way.redirectUri)
+        assertEquals(200, get("${way.redirectUri}?state=st&code=c").first)
+        assertEquals("${way.redirectUri}?state=st&code=c", withTimeout(5_000) { way.await() })
     }
 
     @Test
