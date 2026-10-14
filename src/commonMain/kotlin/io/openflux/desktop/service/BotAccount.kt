@@ -215,10 +215,14 @@ class BotAccountManager(
         ensureConnectionLocked()
     }
 
-    /** The signed-in account's connection: the running one of the bot, or a new one in a free slot. */
+    /**
+     * The signed-in account's connections: every one of the bot that has a link, running or paused, becomes a
+     * profile (a paused connection keeps its slot, key and carriers, and works again the moment it is resumed in
+     * the bot); a new one is asked for only when none runs and none is being made.
+     */
     private suspend fun ensureConnectionLocked() {
         val session = repo.state.value.session ?: return
-        // A connection the bot ended or replaced goes; below asks for the current one.
+        // A connection the bot ended or replaced goes; below asks for the current ones.
         for (l in repo.state.value.links.filter { it.account && it.gone }) removeLinkLocked(l.token)
 
         val items = try {
@@ -228,32 +232,63 @@ class BotAccountManager(
         } catch (e: BotException) {
             return ensureFailed(e)
         }
-        // The connection already held wins over another ready one, so a reordered list never cuts a live tunnel.
-        val held = repo.state.value.links.firstOrNull { it.account }?.token
-        val ready = items.firstOrNull { it.ready && it.connectToken == held } ?: items.firstOrNull { it.ready }
-        val item = when {
-            ready != null -> ready
-            // Something is being made, or is up but without its link yet: never make another over it. A paused
-            // connection is neither: it holds a slot and does not run, so a new one is asked for (an automatic
-            // slot brings it back; otherwise the service says why not).
-            items.any { it.status !in ENDED && it.status != PAUSED } -> null
-            else -> try {
-                api.createSession(session.token)
+        // A link of the account whose connection is over (or replaced) goes. One that is merely restarting stays,
+        // so a tunnel in use is never cut by a status that passes.
+        val alive = items.filter { it.connectToken.isNotEmpty() && it.status !in ENDED }.map { it.connectToken }.toSet()
+        for (l in repo.state.value.links.filter { it.account && it.token !in alive }) removeLinkLocked(l.token)
+
+        var waiting = false
+        var unreadable: String? = null
+        for (item in items.filter { it.connectToken.isNotEmpty() && (it.status == RUNNING || it.status == PAUSED) }) {
+            if (repo.state.value.links.any { it.token == item.connectToken }) continue
+            try {
+                addLinkLocked(item.connectToken, account = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: BotException) {
-                return ensureFailed(e)
+                if (e.notFound) waiting = true else return ensureFailed(e) // not found: the link is not ready yet
+            } catch (e: ShareLinkException) {
+                unreadable = unreadable(e) // one the core cannot read must not hide the others
             }
         }
-        if (item == null || !item.ready) {
+        // A connection that runs and whose link is held: the account has one (a running one whose link is not ready yet is still "being made").
+        val running = items.any { item -> item.ready && repo.state.value.links.any { it.token == item.connectToken } }
+        val paused = items.any { it.status == PAUSED }
+        when {
+            running -> {
+                repo.save(repo.state.value.copy(preparing = false, connectionNote = null, lastError = unreadable ?: repo.state.value.lastError))
+                return
+            }
+            // A connection the core cannot read: said with its reason; nothing is waited for and nothing is made over it.
+            !waiting && unreadable != null -> {
+                repo.save(repo.state.value.copy(preparing = false, connectionNote = null, lastError = unreadable))
+                return
+            }
+            // Something is being made, or is up but without its link yet: never make another over it.
+            waiting || items.any { it.status !in ENDED && it.status != PAUSED } -> {
+                repo.save(repo.state.value.copy(preparing = true, connectionNote = null, lastError = unreadable ?: repo.state.value.lastError))
+                return
+            }
+        }
+        // Nothing runs and nothing is being made: a new connection is asked for (an automatic slot brings a paused
+        // one back; otherwise the service says why not).
+        val made = try {
+            api.createSession(session.token)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: BotException) {
+            if (paused && e.forbidden) {
+                return repo.save(repo.state.value.copy(preparing = false, connectionNote = PAUSED_NOTE, lastError = unreadable ?: repo.state.value.lastError))
+            }
+            return ensureFailed(e)
+        }
+        if (!made.ready) {
             repo.save(repo.state.value.copy(preparing = true, connectionNote = null))
             return
         }
-        val current = repo.state.value.links.firstOrNull { it.account }
-        if (current != null && current.token != item.connectToken) removeLinkLocked(current.token)
-        if (repo.state.value.links.none { it.token == item.connectToken }) {
+        if (repo.state.value.links.none { it.token == made.connectToken }) {
             try {
-                addLinkLocked(item.connectToken, account = true)
+                addLinkLocked(made.connectToken, account = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: BotException) {
@@ -264,7 +299,6 @@ class BotAccountManager(
         }
         repo.save(repo.state.value.copy(preparing = false, connectionNote = null))
     }
-
     private fun ensureFailed(e: BotException) {
         val s = repo.state.value
         repo.save(
@@ -311,7 +345,9 @@ class BotAccountManager(
     companion object {
         /** The words an HTTP 403 carries when the service said nothing of its own; not shown as a reason. */
         const val HttpForbidden = "Нет доступа: подписка не действует или нет свободного места"
+        private const val RUNNING = "running"
         private const val PAUSED = "paused"
+        const val PAUSED_NOTE = "Подключения приостановлены в боте и заняли все места. Они уже добавлены здесь: возобновите одно в боте, в «☁️ Мои подключения», и оно заработает само"
         const val GONE = "Бот больше не обслуживает это подключение: подписка закончилась или подключение заменили. Возьмите новую ссылку в @${OpenFluxBot.USERNAME}"
         const val UNREADABLE = "Не удалось прочитать подключение от бота: обновите приложение"
         /** A connection in one of these statuses is over; any other (running, creating, starting…) is still the account's. */

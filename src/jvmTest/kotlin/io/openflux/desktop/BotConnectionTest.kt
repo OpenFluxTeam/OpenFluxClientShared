@@ -256,13 +256,28 @@ class BotConnectionTest {
     }
 
     @Test
-    fun aPausedConnectionDoesNotMakeTheAppWaitForever() = runTest {
-        val (m, _, api) = env()
+    fun aPausedConnectionIsAProfileAndTheNoteSaysToResumeIt() = runTest {
+        val (m, c, api) = env()
         api.sessions += BotSessionItem("s1", "paused", tokenA)
+        api.links[tokenA] = BotConnection("Slot 2", link("x", "ab".repeat(32)))
         m.completeLogin(session)
-        assertEquals(1, api.created, "a new connection is asked for: an automatic slot brings the paused one back")
-        assertEquals(BotAccountManager.NO_SLOT, m.state.value.connectionNote)
+        assertEquals("Slot 2", c.profiles.profiles.value.single().name, "the paused connection is added: it works once resumed")
+        assertTrue(m.state.value.links.single().account)
+        assertEquals(1, api.created, "a new one is still asked for: an automatic slot brings the paused one back")
+        assertEquals(BotAccountManager.PAUSED_NOTE, m.state.value.connectionNote)
         assertFalse(m.state.value.preparing, "not waiting for a connection that is not coming")
+    }
+
+    @Test
+    fun aResumedConnectionNeedsNothingElse() = runTest {
+        val (m, c, api) = env()
+        api.sessions += BotSessionItem("s1", "paused", tokenA)
+        api.links[tokenA] = BotConnection("Slot 2", link("x", "ab".repeat(32)))
+        m.completeLogin(session)
+        api.sessions[0] = BotSessionItem("s1", "running", tokenA) // resumed in the bot
+        m.refresh()
+        assertNull(m.state.value.connectionNote)
+        assertEquals(1, c.profiles.profiles.value.size, "the same profile, not another")
     }
 
     @Test
@@ -275,7 +290,7 @@ class BotConnectionTest {
     }
 
     @Test
-    fun theConnectionInUseIsKeptWhenTheListChangesOrder() = runTest {
+    fun everyConnectionOfTheAccountIsAProfileAndTheOneInUseStays() = runTest {
         val (m, c, api) = env()
         api.sessions += BotSessionItem("s1", "running", tokenA)
         api.links[tokenA] = BotConnection("OpenFlux #4", link("x", "ab".repeat(32)))
@@ -288,9 +303,23 @@ class BotConnectionTest {
         api.sessions.reverse() // the service lists the other one first now
         m.refresh()
 
-        assertEquals(first, c.profiles.profiles.value.single().id, "the profile in use stays")
-        assertEquals(tokenA, m.state.value.links.single().token)
+        assertEquals(setOf("OpenFlux #4", "OpenFlux #5"), c.profiles.profiles.value.map { it.name }.toSet(), "both connections are here")
+        assertTrue(c.profiles.profiles.value.any { it.id == first }, "the profile in use stays")
         assertTrue(c.connection.state.value is ConnectionState.Connected, "its tunnel keeps running")
+        assertEquals(0, api.created, "nothing is made while connections run")
+    }
+
+    @Test
+    fun aConnectionThatIsOnlyRestartingKeepsItsProfile() = runTest {
+        val (m, c, api) = env()
+        api.sessions += BotSessionItem("s1", "running", tokenA)
+        api.links[tokenA] = BotConnection("OpenFlux #4", link("x", "ab".repeat(32)))
+        m.completeLogin(session)
+        c.connection.connect(c.profiles.profiles.value.single(), ConnectionMode.Client)
+        api.sessions[0] = BotSessionItem("s1", "provisioning", tokenA) // restarting: not a reason to cut the tunnel
+        m.refresh()
+        assertEquals(1, c.profiles.profiles.value.size)
+        assertTrue(c.connection.state.value is ConnectionState.Connected)
     }
 
     @Test
