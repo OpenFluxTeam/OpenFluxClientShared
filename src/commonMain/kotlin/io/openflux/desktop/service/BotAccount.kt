@@ -10,6 +10,7 @@ import io.openflux.desktop.model.OpenFluxBot
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.ShareLinkCodec
+import io.openflux.desktop.model.ShareLinkException
 import io.openflux.desktop.model.isActive
 import io.openflux.desktop.model.profile
 import kotlinx.coroutines.CancellationException
@@ -167,7 +168,7 @@ class BotAccountManager(
                     throw e
                 } catch (e: Exception) {
                     // A link the core cannot read, an answer of a shape we do not know: said to the person, never a crash.
-                    repo.save(repo.state.value.copy(preparing = false, lastError = UNREADABLE))
+                    repo.save(repo.state.value.copy(preparing = false, lastError = unreadable(e)))
                 }
             }
         } finally {
@@ -193,6 +194,10 @@ class BotAccountManager(
                     error = e.message
                     link
                 }
+            } catch (e: ShareLinkException) {
+                // One link this app's core cannot read must not stop the others: the reason is said, the rest go on.
+                error = unreadable(e)
+                link
             }
         }
         var s = repo.state.value.copy(links = links)
@@ -228,8 +233,10 @@ class BotAccountManager(
         val ready = items.firstOrNull { it.ready && it.connectToken == held } ?: items.firstOrNull { it.ready }
         val item = when {
             ready != null -> ready
-            // Something is being made, or is up but without its link yet: never make another over it.
-            items.any { it.status !in ENDED } -> null
+            // Something is being made, or is up but without its link yet: never make another over it. A paused
+            // connection is neither: it holds a slot and does not run, so a new one is asked for (an automatic
+            // slot brings it back; otherwise the service says why not).
+            items.any { it.status !in ENDED && it.status != PAUSED } -> null
             else -> try {
                 api.createSession(session.token)
             } catch (e: CancellationException) {
@@ -251,6 +258,8 @@ class BotAccountManager(
                 throw e
             } catch (e: BotException) {
                 return ensureFailed(e)
+            } catch (e: ShareLinkException) {
+                return repo.save(repo.state.value.copy(preparing = false, lastError = unreadable(e)))
             }
         }
         repo.save(repo.state.value.copy(preparing = false, connectionNote = null))
@@ -261,7 +270,8 @@ class BotAccountManager(
         repo.save(
             when {
                 e.unauthorized -> s.copy(session = null, subscription = null, preparing = false)
-                e.forbidden -> s.copy(preparing = false, connectionNote = NO_SLOT)
+                // The service's own words (why there is no slot) when it gave them, else the usual sentence.
+                e.forbidden -> s.copy(preparing = false, connectionNote = e.message?.takeIf { it.isNotBlank() && it != HttpForbidden } ?: NO_SLOT)
                 e.notFound -> s.copy(preparing = true, connectionNote = null) // the link is not ready yet
                 else -> s.copy(preparing = false, lastError = e.message)
             },
@@ -294,7 +304,14 @@ class BotAccountManager(
 
     private fun saveLinks(links: List<BotLink>) = repo.save(repo.state.value.copy(links = links))
 
+    /** What the person is told when a connection of the bot cannot be read: the reason when the core gave one. */
+    private fun unreadable(e: Exception): String =
+        if (e is ShareLinkException) "Не удалось прочитать подключение от бота: ${e.message}" else UNREADABLE
+
     companion object {
+        /** The words an HTTP 403 carries when the service said nothing of its own; not shown as a reason. */
+        const val HttpForbidden = "Нет доступа: подписка не действует или нет свободного места"
+        private const val PAUSED = "paused"
         const val GONE = "Бот больше не обслуживает это подключение: подписка закончилась или подключение заменили. Возьмите новую ссылку в @${OpenFluxBot.USERNAME}"
         const val UNREADABLE = "Не удалось прочитать подключение от бота: обновите приложение"
         /** A connection in one of these statuses is over; any other (running, creating, starting…) is still the account's. */

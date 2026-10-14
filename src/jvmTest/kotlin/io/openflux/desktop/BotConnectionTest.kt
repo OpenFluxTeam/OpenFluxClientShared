@@ -29,7 +29,7 @@ class BotConnectionTest {
 
     private class Bot : BotApi {
         var sessions = mutableListOf<BotSessionItem>()
-        var create: () -> BotSessionItem = { throw BotException("forbidden", "Нет доступа") }
+        var create: () -> BotSessionItem = { throw BotException("forbidden", BotAccountManager.HttpForbidden) }
         var created = 0
         val links = mutableMapOf<String, BotConnection>()
         var sessionsError: BotException? = null
@@ -231,6 +231,47 @@ class BotConnectionTest {
         assertTrue(m.state.value.lastError != null, "the person is told")
         assertFalse(m.state.value.preparing)
         assertTrue(c.profiles.profiles.value.isEmpty())
+    }
+
+    private class RefusingCodec(private val reason: Throwable) : io.openflux.desktop.model.ShareLinkCodec {
+        override suspend fun encode(config: ShareConfig): String = throw reason
+        override suspend fun decode(link: String): ShareConfig = throw reason
+    }
+
+    @Test
+    fun aLinkTheCoreDoesNotKnowIsSaidWithItsReasonNotJustUpdate() = runTest {
+        val api = Bot()
+        val c = testContainer()
+        val accounts = testAccounts(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined))
+        val reason = io.openflux.desktop.model.ShareLinkException("unknown_transport", "avito")
+        val m = BotAccountManager(api, InMemoryBotRepository(), c.profiles, RefusingCodec(reason), c.platform, c.connection, accounts)
+        api.sessions += BotSessionItem("s1", "running", tokenA)
+        api.links[tokenA] = BotConnection("Slot 2", "openflux://v1/anything")
+        m.completeLogin(session)
+        val said = m.state.value.lastError.orEmpty()
+        assertTrue(said.contains("avito"), "it names the transport the core does not know: $said")
+        assertTrue(said.startsWith("Не удалось прочитать подключение от бота:"), said)
+        assertEquals(session, m.state.value.session, "still signed in")
+        assertFalse(m.state.value.preparing)
+    }
+
+    @Test
+    fun aPausedConnectionDoesNotMakeTheAppWaitForever() = runTest {
+        val (m, _, api) = env()
+        api.sessions += BotSessionItem("s1", "paused", tokenA)
+        m.completeLogin(session)
+        assertEquals(1, api.created, "a new connection is asked for: an automatic slot brings the paused one back")
+        assertEquals(BotAccountManager.NO_SLOT, m.state.value.connectionNote)
+        assertFalse(m.state.value.preparing, "not waiting for a connection that is not coming")
+    }
+
+    @Test
+    fun theServicesOwnReasonForNoSlotIsShown() = runTest {
+        val (m, _, api) = env()
+        val words = "Все ваши оплаченные подключения (2 из 2) уже активны. Место занимает приостановленное подключение."
+        api.create = { throw BotException("forbidden", words) }
+        m.completeLogin(session)
+        assertEquals(words, m.state.value.connectionNote)
     }
 
     @Test

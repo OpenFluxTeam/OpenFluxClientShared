@@ -5,6 +5,7 @@ import io.openflux.desktop.model.BotSession
 import io.openflux.desktop.model.BotSessionItem
 import io.openflux.desktop.model.BotSubscription
 import io.openflux.desktop.model.OpenFluxBot
+import io.openflux.desktop.service.BotAccountManager
 import io.openflux.desktop.service.BotApi
 import io.openflux.desktop.service.BotConnection
 import kotlinx.coroutines.Dispatchers
@@ -120,7 +121,7 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
                 val text = stream?.use { it.readNBytes(MAX_BYTES).toString(Charsets.UTF_8) }.orEmpty()
                 when {
                     code == 401 -> throw BotException("unauthorized", "Войдите заново")
-                    code == 403 -> throw BotException("forbidden", "Нет доступа: подписка не действует или нет свободного места")
+                    code == 403 -> throw BotException("forbidden", serverWords(text) ?: BotAccountManager.HttpForbidden)
                     code == 404 -> throw BotException("not_found", "Не найдено")
                     code == 429 -> throw BotException("rate_limited", "Слишком много запросов к боту, подождите минуту")
                     code >= 300 -> throw BotException("http_$code", "Бот ответил ошибкой $code")
@@ -136,6 +137,21 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
                 conn.disconnect()
             }
         }
+
+    /**
+     * What the service said in its own words (gRPC-gateway: {"code":7,"message":"…"}), made fit to show: the
+     * bot's HTML and emoji out, the technical prefix and line breaks out. Null when it said nothing usable.
+     */
+    private fun serverWords(body: String): String? {
+        val message = runCatching { (json.parseToJsonElement(body) as? JsonObject)?.str("message") }.getOrNull().orEmpty()
+        val clean = message
+            .replace(Regex("<[^>]+>"), "")
+            .removePrefix("session creation blocked:")
+            .filterNot { it.isSurrogate() || it == '⚠' || it == '☁' || it == '️' }
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        return clean.takeIf { it.isNotEmpty() }?.take(400)
+    }
 
     private companion object {
         const val MAX_BYTES = 1 shl 20
