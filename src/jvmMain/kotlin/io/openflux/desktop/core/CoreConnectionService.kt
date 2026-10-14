@@ -12,6 +12,7 @@ import io.openflux.desktop.platform.WindowsCoreElevation
 import io.openflux.desktop.platform.WindowsElevation
 import io.openflux.desktop.web.BrowserLog
 import io.openflux.desktop.model.ConnectionMode
+import io.openflux.desktop.model.ConnectionNarrative
 import io.openflux.desktop.model.ExitBackend
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.CoreConfig
@@ -361,6 +362,8 @@ class CoreConnectionService(
     private fun onCoreLine(run: Run, line: String) {
         val level = levelOf(line)
         log(level, line)
+        // Next to the core's own words, the same thing said plainly for a person.
+        ConnectionNarrative.readCoreLine(line)?.let { log(it.level, it.text) }
         friendlyProblem(line)?.let { run.lastProblem = it }
         if (!run.stopping) SHARE_LINK.find(line)?.let { _exitShareLink.value = it.value }
         // Without a Session's IPC status (classic profiles) the core's start
@@ -431,7 +434,7 @@ class CoreConnectionService(
         run.logJobs.forEach { it.join() }
         cleanup(run)
         if (run.stopping) return
-        val message = run.lastProblem ?: "Ядро остановилось (код $code)"
+        val message = run.lastProblem ?: "Ядро остановилось (код $code). Причина в последних строках журнала выше"
         log(LogLevel.Error, message)
         _state.value = ConnectionState.Failed(run.profile, message)
     }
@@ -443,7 +446,7 @@ class CoreConnectionService(
         val current = _state.value
         if (current !is ConnectionState.Connected) {
             _state.value = ConnectionState.Connected(run.profile, run.settings.mode, run.connectedSince)
-            if (first) log(LogLevel.Success, if (run.settings.mode == ConnectionMode.Exit) "Нода запущена" else "Подключено к ноде")
+            if (first) ConnectionNarrative.linkUp(run.settings.mode, _traffic.value.activeCarriers).let { log(it.level, it.text) }
             applySystemProxy()
             if (run.settings.mode == ConnectionMode.Client) refreshExitAddress()
             if (first && ownsExit(run)) scope.launch {
@@ -559,6 +562,7 @@ class CoreConnectionService(
         if (proxy == null && !checked.settings.fullTunnel) return
         _exitAddress.value = ExitAddress.Checking
         scope.launch {
+            val startedAt = System.currentTimeMillis()
             val result = runCatching {
                 val builder = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20))
                 if (proxy != null) {
@@ -574,7 +578,15 @@ class CoreConnectionService(
                 ExitAddress.Known(body)
             }.getOrElse { ExitAddress.Unavailable(it.message ?: "нет ответа") }
             // A disconnect during the check leaves the address unknown.
-            if (synchronized(lock) { run } === checked) _exitAddress.value = result
+            if (synchronized(lock) { run } === checked) {
+                _exitAddress.value = result
+                // The journal says whether the node is proven, not only that a link is up.
+                when (result) {
+                    is ExitAddress.Known -> ConnectionNarrative.nodeConfirmed(result.ip, System.currentTimeMillis() - startedAt).let { log(it.level, it.text) }
+                    is ExitAddress.Unavailable -> ConnectionNarrative.nodeNotConfirmed(result.reason).forEach { log(it.level, it.text) }
+                    else -> Unit
+                }
+            }
         }
     }
 
@@ -727,6 +739,7 @@ class CoreConnectionService(
                 lower.contains("setup utun") || lower.contains("open utun") -> "Не удалось поднять интерфейс utun: ${line.substringAfter("utun").trim(':', ' ').take(160)}"
                 lower.contains("--config:") -> "Ядро не приняло конфигурацию: ${line.substringAfter("--config:").trim()}"
                 lower.contains("failed to start transport") -> "Транспорт не запустился: ${line.substringAfter("transport:").trim().take(160)}"
+                ConnectionNarrative.explainFatal(line) != null -> ConnectionNarrative.explainFatal(line)
                 lower.contains("fatal") || lower.contains("log.fatal") -> line.substringAfter(": ").take(200)
                 else -> null
             }
