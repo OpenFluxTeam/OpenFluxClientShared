@@ -5,7 +5,7 @@ import io.openflux.app.add.AddKeyScreen
 import io.openflux.app.add.GiveScreen
 import io.openflux.app.add.ShareRoot
 import io.openflux.app.account.AccountScreen
-import io.openflux.app.account.AuthScreen
+import io.openflux.app.account.TelegramLoginScreen
 import io.openflux.app.home.HomeRoot
 import io.openflux.app.settings.JournalScreen
 import io.openflux.app.settings.ScriptsScreen
@@ -44,7 +44,7 @@ fun appEntry(dest: Dest, navigator: AppNavigator): NavEntry<Dest> = when (dest) 
     Dest.NewHosting -> destEntry(dest) { NewHostingScreen() }
     is Dest.Hosting -> destEntry(dest, ListDetail.detail(Section.Servers)) { HostingScreen(dest) }
     Dest.ThisDevice -> destEntry(dest, ListDetail.detail(Section.Servers)) { ThisDeviceScreen() }
-    Dest.Auth -> destEntry(dest) { AuthScreen() }
+    Dest.Auth -> destEntry(dest) { TelegramLoginScreen() }
     Dest.Account -> destEntry(dest, ListDetail.detail(Section.Settings)) { AccountScreen() }
     Dest.Settings -> destEntry(dest, ListDetail.list(Section.Settings)) { SettingsRoot(selected = navigator.stack(Section.Settings).last()) }
     is Dest.SettingsPage -> destEntry(dest, ListDetail.detail(Section.Settings)) { SettingsPageScreen(dest) }

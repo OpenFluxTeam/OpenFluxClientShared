@@ -118,6 +118,7 @@ fun AccountScreen() {
     val m = rememberScreenModel { SubscriptionModel(container, it) }
     val state by container.subscription.state.collectAsState()
     val preparing by container.subscription.preparing.collectAsState()
+    val bot by container.bot.state.collectAsState()
     var passwordOpen by remember { mutableStateOf(false) }
     var deleteOpen by remember { mutableStateOf(false) }
     var signOutAsk by remember { mutableStateOf(false) }
@@ -126,9 +127,9 @@ fun AccountScreen() {
         val s = state
         if (s == null) {
             Text("На этом устройстве нет подписки.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
-            PrimaryButton("Войти или создать аккаунт", { navigator.replaceTop(Dest.Auth) }, Modifier.fillMaxWidth())
+            if (bot.session == null) PrimaryButton("Войти через Telegram", { navigator.replaceTop(Dest.Auth) }, Modifier.fillMaxWidth())
             SecondaryButton("У меня ключ подписки", { navigator.replaceTop(Dest.AddKey) }, Modifier.fillMaxWidth())
-            BotSection(m)
+            BotSection(m, signInRow = false)
             m.busy?.let { ProgressLine(it) }
             m.error?.let { Banner(it, Tone.Danger) }
             return@ScreenScaffold
@@ -236,7 +237,7 @@ private fun DeleteSheet(m: SubscriptionModel, onClose: () -> Unit) {
  * sign-in (which also registers) shows the subscription bought in it. Buying itself stays in the bot for now.
  */
 @Composable
-private fun BotSection(m: SubscriptionModel) {
+private fun BotSection(m: SubscriptionModel, signInRow: Boolean = true) {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
     val bot by container.bot.state.collectAsState()
@@ -245,7 +246,7 @@ private fun BotSection(m: SubscriptionModel) {
     Section("Бот OpenFlux в Telegram") {
         val session = bot.session
         if (session == null) {
-            RowItem("Войти через Telegram", subtitle = "Регистрация и вход через @${OpenFluxBot.USERNAME}: здесь будет видна подписка из бота", onClick = m::botSignIn.takeIf { idle })
+            if (signInRow) RowItem("Войти через Telegram", subtitle = "Подписка и подключение появятся сами", onClick = { navigator.open(Dest.Auth) })
         } else {
             ValueRow("Telegram", if (session.username.isNotBlank()) "@${session.username}" else "id ${session.userId}")
             val sub = bot.subscription
@@ -259,6 +260,8 @@ private fun BotSection(m: SubscriptionModel) {
                 }
             }
         }
+        if (session != null && bot.preparing) ProgressLine("Готовлю подключение…")
+        bot.connectionNote?.let { Banner(it, Tone.Warning) }
         RowItem(if (bot.subscription?.isActive == true) "Продлить в боте" else "Купить в боте", subtitle = "Оплата в @${OpenFluxBot.USERNAME}", onClick = m::openBot)
         RowItem("Добавить ссылку из бота", subtitle = "link.openflux.dev/…: подключение появится здесь и будет обновляться само", onClick = { navigator.open(Dest.AddKey) })
         for (link in bot.links) {

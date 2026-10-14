@@ -116,12 +116,13 @@ fun HomeRoot() {
     val state by container.connection.state.collectAsState()
     val subscription by container.subscription.state.collectAsState()
     val preparing by container.subscription.preparing.collectAsState()
+    val bot by container.bot.state.collectAsState()
     var drawer by rememberSaveable { mutableStateOf(false) }
     val chosen = m.selected(profiles)
     ScreenScaffold(null, scroll = false) {
         if (profiles.isEmpty()) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.l)) {
-                StartPanel(hasSubscription = subscription != null, preparing = preparing)
+                StartPanel(hasSubscription = subscription != null, preparing = preparing || bot.preparing)
             }
             return@ScreenScaffold
         }
@@ -172,8 +173,7 @@ private fun StartPanel(hasSubscription: Boolean, preparing: Boolean) {
     Text("Приступим", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
     Text("Все способы — под кнопкой ＋", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
     Section(null) {
-        RowItem("Бот OpenFlux в Telegram", subtitle = "Купить в @${io.openflux.desktop.model.OpenFluxBot.USERNAME}, войти через Telegram, ссылки из бота", onClick = { navigator.open(Dest.Account) })
-        RowItem("Аккаунт OpenFlux", subtitle = "Войти или создать: локации появятся сами", onClick = { navigator.open(Dest.Auth) })
+        RowItem("Войти через Telegram", subtitle = "Подписка и подключение появятся сами", onClick = { navigator.open(Dest.Auth) })
         RowItem("Ключ или ссылка", subtitle = "От друга или из сервиса", onClick = { navigator.open(Dest.AddKey) })
         RowItem("Свой сервер", subtitle = "VDS по SSH: нода поставится сама", onClick = { navigator.open(Dest.AddServer) })
     }

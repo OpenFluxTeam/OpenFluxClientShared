@@ -22,23 +22,6 @@ import kotlin.test.assertNotNull
 @OptIn(ExperimentalTestApi::class)
 class SettingsScreensTest {
     @Test
-    fun signingUpShowsTheRecoveryKeyThenTheSubscription() = runComposeUiTest {
-        val c = testContainer(subscriptions = FakeSubApi())
-        c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.Auth) }.snapshot().encode()) }
-        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
-        onNodeWithText("Регистрация").performClick()
-        onNode(hasSetTextAction() and hasText("Логин")).performTextInput("ivan")
-        onNode(hasSetTextAction() and hasText("Пароль")).performTextInput("longenough1")
-        onNode(hasSetTextAction() and hasText("Пароль ещё раз")).performTextInput("longenough1")
-        onNodeWithText("Создать аккаунт").performClick()
-        waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Я сохранил ключ в надёжном месте")).fetchSemanticsNodes().isNotEmpty() }
-        onNodeWithText("Я сохранил ключ в надёжном месте").performClick()
-        onNodeWithText("Продолжить").performClick()
-        waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Подписка")).fetchSemanticsNodes().isNotEmpty() }
-        assertNotNull(c.subscription.state.value)
-    }
-
-    @Test
     fun theJournalFiltersAndCopiesWhatItShows() = runComposeUiTest {
         val c = testContainer()
         (c.connection as TestConnection).logs.value = listOf(
