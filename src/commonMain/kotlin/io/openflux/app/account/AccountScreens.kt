@@ -41,69 +41,6 @@ import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.SubscriptionKind
 import io.openflux.desktop.service.LocalAppContainer
 
-/** Signing in to the OpenFlux account (spec 8.1). */
-@Composable
-fun AuthScreen() {
-    val container = LocalAppContainer.current
-    val navigator = LocalNavigator.current
-    val toaster = LocalToaster.current
-    val m = rememberScreenModel { AuthModel(container, it) }
-    val sub by container.subscription.state.collectAsState()
-    LaunchedEffect(m.done) { if (m.done) navigator.replaceTop(Dest.Account) }
-    LaunchedEffect(Unit) { if (sub?.signedIn == true && m.recoveryKey == null) navigator.replaceTop(Dest.Account) }
-    ScreenScaffold("Аккаунт OpenFlux", onBack = { navigator.back() }) {
-        val key = m.recoveryKey
-        if (key != null) {
-            var saved by rememberSaveable { mutableStateOf(false) }
-            Banner("Аккаунт готов. Сохраните ключ восстановления: без него забытый пароль не вернуть", Tone.Success)
-            Section(null) {
-                ValueRow("Ключ", key.chunked(4).joinToString(" "), mono = true, onCopy = { m.copyRecoveryKey(); toaster.show("Ключ скопирован") })
-            }
-            Section(null) { Toggle("Я сохранил ключ в надёжном месте", saved, { saved = it }) }
-            PrimaryButton("Продолжить", m::recoveryKeySaved, Modifier.fillMaxWidth(), enabled = saved)
-            return@ScreenScaffold
-        }
-        when (m.step) {
-            AuthStep.Devices -> {
-                Text("На аккаунте уже все устройства. Замените одно из них этим.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
-                Section(null) {
-                    for (d in m.devices) {
-                        RowItem(
-                            d.name.ifBlank { "Устройство" },
-                            subtitle = if (d.lastSeen > 0) "было в сети ${Fmt.ago(container.platform.now() - d.lastSeen * 1000)}" else null,
-                            trailing = { TextAction("Заменить", { m.signIn(replaceDeviceId = d.id) }, enabled = m.busy == null) },
-                        )
-                    }
-                }
-                TextAction("Назад ко входу", { m.go(AuthStep.Login) })
-            }
-            AuthStep.Recover -> {
-                Text("Восстановление доступа по ключу, выданному при регистрации.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
-                Field(m.login, { m.login = it }, "Логин")
-                Field(m.recoveryInput, { m.recoveryInput = it }, "Ключ восстановления", mono = true)
-                SecretField(m.password, { m.password = it }, "Новый пароль")
-                SecretField(m.password2, { m.password2 = it }, "Новый пароль ещё раз")
-                Submit(m.busy, "Задать новый пароль", m::recover)
-                TextAction("Назад ко входу", { m.go(AuthStep.Login) })
-            }
-            else -> {
-                Segmented(listOf(AuthStep.Login, AuthStep.Register), m.step, m::go, label = { if (it == AuthStep.Login) "Вход" else "Регистрация" })
-                Field(m.login, { m.login = it }, "Логин", placeholder = "Почта или имя")
-                SecretField(m.password, { m.password = it }, "Пароль")
-                if (m.step == AuthStep.Register) {
-                    SecretField(m.password2, { m.password2 = it }, "Пароль ещё раз")
-                    Text("Не короче $MIN_PASSWORD символов", style = AppTheme.type.bodySmall, color = AppTheme.colors.textMuted)
-                    Submit(m.busy, "Создать аккаунт", m::register)
-                } else {
-                    Submit(m.busy, "Войти") { m.signIn() }
-                    TextAction("Забыли пароль?", { m.go(AuthStep.Recover) })
-                }
-            }
-        }
-        m.error?.let { Banner(it, Tone.Danger) }
-    }
-}
-
 @Composable
 private fun Submit(busy: String?, label: String, onClick: () -> Unit) {
     if (busy != null) ProgressLine(busy) else PrimaryButton(label, onClick, Modifier.fillMaxWidth())

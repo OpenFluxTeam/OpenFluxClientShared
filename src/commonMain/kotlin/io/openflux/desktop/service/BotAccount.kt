@@ -12,7 +12,6 @@ import io.openflux.desktop.model.OpenFluxBot
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.ShareLinkCodec
-import io.openflux.desktop.model.TelegramUser
 import io.openflux.desktop.model.isActive
 import io.openflux.desktop.model.profile
 import kotlinx.coroutines.CancellationException
@@ -32,8 +31,6 @@ data class BotConnection(val name: String, val link: String) {
 
 /** The bot's API (api.openflux.dev). Every call fails with [BotException]. */
 interface BotApi {
-    /** Signs in with a user Telegram signed for the bot; registers them on first use. */
-    suspend fun signIn(user: TelegramUser): BotSession
     suspend fun subscription(token: String): BotSubscription
     suspend fun signOut(token: String)
     /** The connection behind a short link; not_found once it ended or was replaced. */
@@ -50,7 +47,6 @@ interface BotApi {
 
 object NoBotApi : BotApi {
     private fun unsupported(): Nothing = throw BotException("unsupported", "Бот OpenFlux здесь не поддерживается")
-    override suspend fun signIn(user: TelegramUser) = unsupported()
     override suspend fun subscription(token: String) = unsupported()
     override suspend fun signOut(token: String) = unsupported()
     override suspend fun resolve(connectToken: String) = unsupported()
@@ -89,15 +85,6 @@ class BotAccountManager(
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
 
     // ---- signing in ----
-
-    /** Telegram's sign-in for the bot in the built-in browser, then the bot's session. Registers on first use. */
-    suspend fun signIn(): BotSession {
-        val user = accounts.telegramSignIn(OpenFluxBot.signInUrl, OpenFluxBot.RETURN_TO) { OpenFluxBot.authResult(it) }
-        val session = api.signIn(user)
-        lock.withLock { repo.save(repo.state.value.copy(session = session, lastError = null)) }
-        refresh()
-        return session
-    }
 
     suspend fun startLogin(): LoginStart = api.startLogin()
 

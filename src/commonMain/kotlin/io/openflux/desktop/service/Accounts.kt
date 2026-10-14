@@ -232,34 +232,6 @@ class Accounts(
     /** Closes the open page; the running sign-in or document then fails as cancelled. */
     fun cancel() = browser.close()
 
-    /**
-     * Telegram's sign-in for a bot in the built-in browser: opens [url] and waits until the browser has been sent
-     * to [returnTo] with what [parse] reads from that address (the signed user Telegram puts in its fragment).
-     * The address is taken from the browser's history, so a page that clears it at once does not lose it.
-     */
-    suspend fun <T : Any> telegramSignIn(url: String, returnTo: String, parse: (String) -> T?): T {
-        val kind = AccountKind.Telegram
-        set(kind, AuthStatus.Busy("Войдите в Telegram и подтвердите вход для бота"))
-        _signingIn.value = kind
-        try {
-            browser.open(kind, url, emptyMap()) { set(kind, AuthStatus.Busy(it)) }
-            val deadline = now() + YandexDisk.SIGN_IN_TIMEOUT_MS
-            while (true) {
-                if (browser.closed) throw AccountException("Вход через Telegram отменён", cancelled = true)
-                if (now() > deadline) throw AccountException("Время на вход через Telegram вышло")
-                val back = browser.history.lastOrNull { it.startsWith(returnTo) }
-                if (back != null) {
-                    return parse(back) ?: throw AccountException("Telegram не подтвердил вход: попробуйте ещё раз")
-                }
-                delay(300)
-            }
-        } finally {
-            set(kind, AuthStatus.SignedOut)
-            _signingIn.value = null
-            browser.close()
-        }
-    }
-
     companion object {
         const val RECHECK_MS = 30 * 60 * 1000L
         private const val DISK_TIMEOUT_MS = 2 * 60 * 1000L

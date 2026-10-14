@@ -17,7 +17,6 @@ import io.openflux.desktop.model.BotSessionItem
 import io.openflux.desktop.model.BotSubscription
 import io.openflux.desktop.model.LoginPoll
 import io.openflux.desktop.model.LoginStart
-import io.openflux.desktop.model.TelegramUser
 import io.openflux.desktop.service.BotApi
 import io.openflux.desktop.service.BotConnection
 import kotlin.test.Test
@@ -28,7 +27,6 @@ import kotlin.test.assertNull
 @OptIn(ExperimentalTestApi::class)
 class TelegramLoginScreenTest {
     private class Bot(val answer: LoginPoll) : BotApi {
-        override suspend fun signIn(user: TelegramUser): BotSession = throw BotException("unsupported", "not used")
         override suspend fun startLogin() = LoginStart("n1", "https://t.me/openflux_bot?start=auth_n1", System.currentTimeMillis() / 1000 + 300)
         override suspend fun pollLogin(nonce: String) = answer
         override suspend fun subscription(token: String) = BotSubscription()

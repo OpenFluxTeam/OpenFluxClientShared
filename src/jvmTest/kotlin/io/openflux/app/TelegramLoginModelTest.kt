@@ -8,7 +8,6 @@ import io.openflux.desktop.model.BotSessionItem
 import io.openflux.desktop.model.BotSubscription
 import io.openflux.desktop.model.LoginPoll
 import io.openflux.desktop.model.LoginStart
-import io.openflux.desktop.model.TelegramUser
 import io.openflux.desktop.service.AppContainer
 import io.openflux.desktop.service.BotApi
 import io.openflux.desktop.service.BotConnection
@@ -29,7 +28,6 @@ class TelegramLoginModelTest {
     /** Polls answer from [script] in order: a [LoginPoll] is returned, a [BotException] thrown. */
     private class Scripted(val script: ArrayDeque<Any>, val startError: BotException? = null) : BotApi {
         var starts = 0
-        override suspend fun signIn(user: TelegramUser): BotSession = throw BotException("unsupported", "not used")
         override suspend fun startLogin(): LoginStart {
             starts++
             startError?.let { throw it }

@@ -13,7 +13,6 @@ import io.openflux.desktop.model.OpenFluxBot
 import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.ShareConfig
 import io.openflux.desktop.model.ShareTransport
-import io.openflux.desktop.model.TelegramUser
 import io.openflux.desktop.model.managed
 import io.openflux.desktop.service.AccountException
 import io.openflux.desktop.service.BotAccountManager
@@ -25,7 +24,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.util.Base64
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -50,36 +48,12 @@ class BotAccountTest {
         }
     }
 
-    @Test
-    fun theSignInPageIsTheBots() {
-        val u = OpenFluxBot.signInUrl
-        assertTrue(u.startsWith("https://oauth.telegram.org/auth?bot_id=8950210830&origin=https%3A%2F%2Fopenflux.dev"), u)
-        assertTrue("return_to=https%3A%2F%2Fopenflux.dev%2Fapp-login" in u, u)
-    }
-
-    private val userJson = """{"id":123456789,"first_name":"Иван","username":"ivan","photo_url":"https://t.me/i/u.jpg","auth_date":1800000000,"hash":"abc123"}"""
-
-    @Test
-    fun telegramsAnswerIsReadInEveryBase64() {
-        val std = Base64.getEncoder().encodeToString(userJson.toByteArray())
-        val url = Base64.getUrlEncoder().withoutPadding().encodeToString(userJson.toByteArray())
-        for (enc in listOf(std, url, std.replace("=", "%3D"))) {
-            val u = assertNotNull(OpenFluxBot.authResult("${OpenFluxBot.RETURN_TO}#tgAuthResult=$enc"), enc)
-            assertEquals(TelegramUser(123456789, "Иван", "", "ivan", "https://t.me/i/u.jpg", 1800000000, "abc123"), u)
-        }
-        assertNull(OpenFluxBot.authResult("${OpenFluxBot.RETURN_TO}#tgAuthResult=false"), "refused")
-        assertNull(OpenFluxBot.authResult(OpenFluxBot.RETURN_TO), "nothing")
-        assertNull(OpenFluxBot.authResult("${OpenFluxBot.RETURN_TO}#tgAuthResult=" + Base64.getEncoder().encodeToString("""{"id":1}""".toByteArray())), "unsigned")
-    }
-
     // ---- the manager ----
 
     private class FakeBot : BotApi {
         val links = mutableMapOf<String, BotConnection>()
         var subscription = BotSubscription(planId = "own30", planName = "Start", status = "active", expiresAt = 1_900_000_000, daysLeft = 20, isActive = true)
-        val signedIn = mutableListOf<TelegramUser>()
         var signedOut = 0
-        override suspend fun signIn(user: TelegramUser): BotSession { signedIn += user; return BotSession("ofs_x", user.id, user.username, 1_900_000_000) }
         override suspend fun subscription(token: String) = if (token == "ofs_x") subscription else throw BotException("unauthorized", "Войдите")
         override suspend fun signOut(token: String) { signedOut++ }
         override suspend fun resolve(connectToken: String) = links[connectToken] ?: throw BotException("not_found", "Не найдено")
@@ -145,52 +119,6 @@ class BotAccountTest {
         assertTrue(c.profiles.profiles.value.isEmpty())
     }
 
-    @Test
-    fun signingInThroughTelegramRegistersAndShowsTheSubscription() = runTest {
-        val browser = FakeBrowser()
-        val enc = Base64.getUrlEncoder().withoutPadding().encodeToString(userJson.toByteArray())
-        // Telegram sends the browser back with the user in the fragment, and the page there clears it at once.
-        browser.onOpen = { url -> visited = mutableListOf(url, "${OpenFluxBot.RETURN_TO}#tgAuthResult=$enc", "https://t.me/openflux_bot"); this.url = "https://t.me/openflux_bot" }
-        val (m, _, api) = env(browser = browser)
-        val s = m.signIn()
-        assertEquals(123456789, s.userId)
-        assertEquals("ivan", api.signedIn.single().username)
-        assertEquals(OpenFluxBot.signInUrl, browser.opened.single().first)
-        assertTrue(browser.closed, "the browser closes after")
-        assertEquals("Start", m.state.value.subscription?.planName)
-
-        api.subscription = api.subscription.copy(planName = "Pro")
-        m.refresh()
-        assertEquals("Pro", m.state.value.subscription?.planName)
-        m.signOut()
-        assertNull(m.state.value.session)
-        assertEquals(1, api.signedOut)
-    }
-
-    @Test
-    fun aClosedSignInWindowCancels() = runTest {
-        val browser = FakeBrowser()
-        browser.onOpen = { close() }
-        val (m, _, api) = env(browser = browser)
-        assertTrue(assertFailsWith<AccountException> { m.signIn() }.cancelled)
-        assertTrue(api.signedIn.isEmpty())
-    }
-
-    @Test
-    fun anExpiredSessionSignsOutQuietly() = runTest {
-        val browser = FakeBrowser()
-        val enc = Base64.getUrlEncoder().withoutPadding().encodeToString(userJson.toByteArray())
-        browser.onOpen = { url = "${OpenFluxBot.RETURN_TO}#tgAuthResult=$enc" }
-        val api = object : BotApi by FakeBot() {
-            override suspend fun subscription(token: String): BotSubscription = throw BotException("unauthorized", "Войдите через Telegram заново")
-            override suspend fun signIn(user: TelegramUser) = BotSession("ofs_old", user.id)
-        }
-        val c = testContainer()
-        val m = BotAccountManager(api, InMemoryBotRepository(), c.profiles, c.shareCodec, c.platform, c.connection, testAccounts(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined), browser = browser))
-        m.signIn()
-        assertNull(m.state.value.session, "a session the bot no longer takes is dropped")
-    }
-
     // ---- the HTTP client ----
 
     private val servers = mutableListOf<HttpServer>()
@@ -225,11 +153,6 @@ class BotAccountTest {
     @Test
     fun theHttpClientSpeaksTheGatewaysJson() = runBlocking {
         val api = HttpBotApi(server())
-        val session = api.signIn(TelegramUser(123456789, "Иван", username = "ivan", authDate = 1800000000, hash = "abc"))
-        assertEquals(BotSession("ofs_tok", 123456789, "ivan", 1900000000), session)
-        val (_, headers, body) = seen.single { it.first == "/api/v1/auth/telegram" }
-        assertEquals("bearer", headers["X-session-transport"] ?: headers["X-Session-Transport"])
-        assertTrue(""""id":123456789""" in body && """"auth_date":1800000000""" in body && """"hash":"abc"""" in body, body)
 
         val sub = api.subscription("ofs_tok")
         assertEquals(1073741824, sub.trafficUsedBytes, "int64 as a string")

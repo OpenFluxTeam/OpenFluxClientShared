@@ -49,7 +49,6 @@ fun serviceUsage(kind: AccountKind, profiles: List<Profile>): String {
         AccountKind.Yandex -> "Документ и Доска Яндекса"
         AccountKind.Mailru -> "Документ Mail.ru"
         AccountKind.Max -> "MAX"
-        AccountKind.Telegram -> "бот OpenFlux"
     }
     return when (n) {
         0 -> what

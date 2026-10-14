@@ -18,118 +18,12 @@ import kotlinx.coroutines.launch
 
 const val MIN_PASSWORD = 10
 
-/** The screens of signing in (spec 8.1). */
-enum class AuthStep { Login, Register, Recover, Devices }
-
-private fun loginProblem(login: String): String? = when {
-    login.trim().length < 3 -> "Логин: не короче 3 символов (почта или имя)"
-    login.trim().any { it.isWhitespace() } -> "В логине не должно быть пробелов"
-    else -> null
-}
-
 /** What the service will also check, said before the request. */
 fun newPasswordProblem(login: String, p: String, again: String): String? = when {
     p.length < MIN_PASSWORD -> "Пароль: не короче $MIN_PASSWORD символов"
     p != again -> "Пароли не совпадают"
     p.equals(login.trim(), ignoreCase = true) -> "Пароль не должен совпадать с логином"
     else -> null
-}
-
-/**
- * Signing in to the OpenFlux account (spec 8.1): log in, register, recover with the recovery key, replace a device
- * when the account is full. After registering or recovering, the recovery key is shown once and the screen stays
- * until the person has saved it ([done] turns true then).
- */
-@Stable
-class AuthModel(private val container: AppContainer, private val scope: CoroutineScope) {
-    private val manager = container.subscription
-    var step by mutableStateOf(AuthStep.Login)
-    var login by mutableStateOf("")
-    var password by mutableStateOf("")
-    var password2 by mutableStateOf("")
-    var recoveryInput by mutableStateOf("")
-    var busy by mutableStateOf<String?>(null)
-        private set
-    var error by mutableStateOf<String?>(null)
-        private set
-    var recoveryKey by mutableStateOf<String?>(null)
-        private set
-    var devices by mutableStateOf<List<DeviceInfo>>(emptyList())
-        private set
-    var done by mutableStateOf(false)
-        private set
-
-    fun go(next: AuthStep) {
-        step = next
-        error = null
-        password = ""
-        password2 = ""
-        if (next != AuthStep.Recover) recoveryInput = ""
-    }
-
-    fun register() {
-        val problem = loginProblem(login) ?: newPasswordProblem(login, password, password2)
-        if (problem != null) { error = problem; return }
-        call("Создаю аккаунт…") {
-            val auth = manager.register(login, password)
-            finish(auth.recoveryKey)
-        }
-    }
-
-    fun signIn(replaceDeviceId: String? = null) {
-        if (login.isBlank() || password.isEmpty()) { error = "Введите логин и пароль"; return }
-        call("Вхожу…") {
-            manager.login(login, password, replaceDeviceId)
-            finish("")
-        }
-    }
-
-    fun recover() {
-        val problem = loginProblem(login) ?: (if (recoveryInput.isBlank()) "Введите ключ восстановления" else newPasswordProblem(login, password, password2))
-        if (problem != null) { error = problem; return }
-        call("Восстанавливаю доступ…") {
-            val auth = manager.recover(login, recoveryInput.trim(), password)
-            finish(auth.recoveryKey)
-        }
-    }
-
-    fun recoveryKeySaved() {
-        recoveryKey = null
-        done = true
-    }
-
-    fun copyRecoveryKey() {
-        recoveryKey?.let(container.platform::setClipboardText)
-    }
-
-    private fun finish(key: String) {
-        login = ""; password = ""; password2 = ""; recoveryInput = ""; devices = emptyList()
-        if (key.isNotEmpty()) recoveryKey = key else done = true
-    }
-
-    private fun call(label: String, block: suspend () -> Unit) {
-        if (busy != null) return
-        busy = label
-        error = null
-        scope.launch {
-            try {
-                block()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: SubscriptionException) {
-                if (e.code == "device_limit") {
-                    devices = e.devices
-                    step = AuthStep.Devices
-                } else {
-                    error = e.message
-                }
-            } catch (e: Exception) {
-                error = e.message ?: "Не получилось"
-            } finally {
-                busy = null
-            }
-        }
-    }
 }
 
 /**
@@ -179,15 +73,6 @@ class SubscriptionModel(private val container: AppContainer, private val scope: 
     }
 
     // ---- the OpenFlux bot ----
-
-    fun botSignIn() = call("Вход через Telegram…") {
-        try {
-            container.bot.signIn()
-            notice = "Вы вошли в бота OpenFlux"
-        } catch (e: io.openflux.desktop.service.AccountException) {
-            if (!e.cancelled) throw e
-        }
-    }
 
     fun botSignOut() = call("Выхожу из бота…") { container.bot.signOut() }
     fun botRefresh() = call("Обновляю данные бота…") { container.bot.refresh() }

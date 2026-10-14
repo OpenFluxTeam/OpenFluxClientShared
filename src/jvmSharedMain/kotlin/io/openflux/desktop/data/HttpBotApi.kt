@@ -7,7 +7,6 @@ import io.openflux.desktop.model.BotSubscription
 import io.openflux.desktop.model.LoginPoll
 import io.openflux.desktop.model.LoginStart
 import io.openflux.desktop.model.OpenFluxBot
-import io.openflux.desktop.model.TelegramUser
 import io.openflux.desktop.service.BotApi
 import io.openflux.desktop.service.BotConnection
 import kotlinx.coroutines.Dispatchers
@@ -28,24 +27,10 @@ import java.net.URL
 /**
  * The OpenFlux bot's API over HTTPS (the usual certificate checks: a real domain). Its JSON is gRPC-gateway's:
  * camelCase names, 64-bit numbers as strings, empty fields left out. A session goes as a bearer token
- * (X-Session-Transport: bearer at sign-in): the app keeps it, never a cookie.
+ * (the sign-in answers with it): the app keeps it, never a cookie.
  */
 class HttpBotApi(private val base: String = OpenFluxBot.API, private val appKey: String = "") : BotApi {
     private val json = Json { ignoreUnknownKeys = true }
-
-    override suspend fun signIn(user: TelegramUser): BotSession {
-        val body = JsonObject(
-            mapOf(
-                "id" to JsonPrimitive(user.id), "first_name" to JsonPrimitive(user.firstName), "last_name" to JsonPrimitive(user.lastName),
-                "username" to JsonPrimitive(user.username), "photo_url" to JsonPrimitive(user.photoUrl),
-                "auth_date" to JsonPrimitive(user.authDate), "hash" to JsonPrimitive(user.hash),
-            ),
-        )
-        val o = request("POST", "/api/v1/auth/telegram", null, body, mapOf("X-Session-Transport" to "bearer")).jsonObject
-        val token = o.str("token")
-        if (token.isEmpty()) throw BotException("bad_response", "Бот не выдал сессию: обновите приложение")
-        return BotSession(token, o.long("userId"), o.str("username"), o.long("expiresAt"))
-    }
 
     override suspend fun subscription(token: String): BotSubscription {
         val o = request("GET", "/api/v1/subscription", token, null).jsonObject

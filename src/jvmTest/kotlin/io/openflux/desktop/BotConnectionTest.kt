@@ -12,7 +12,6 @@ import io.openflux.desktop.model.LoginStart
 import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.ShareConfig
 import io.openflux.desktop.model.ShareTransport
-import io.openflux.desktop.model.TelegramUser
 import io.openflux.desktop.service.BotAccountManager
 import io.openflux.desktop.service.BotApi
 import io.openflux.desktop.service.BotConnection
@@ -35,7 +34,6 @@ class BotConnectionTest {
         val links = mutableMapOf<String, BotConnection>()
         var sessionsError: BotException? = null
         var signedOut = 0
-        override suspend fun signIn(user: TelegramUser): BotSession = throw BotException("unsupported", "not used")
         override suspend fun subscription(token: String) = BotSubscription(planId = "own30", planName = "Start", status = "active", isActive = true)
         override suspend fun signOut(token: String) { signedOut++ }
         override suspend fun resolve(connectToken: String) = links[connectToken] ?: throw BotException("not_found", "Не найдено")

@@ -1,13 +1,6 @@
 package io.openflux.desktop.model
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.longOrNull
-import kotlin.io.encoding.Base64
 
 /**
  * The OpenFlux Telegram bot (@openflux_bot) and its API at api.openflux.dev: people buy there, the bot gives each
@@ -19,18 +12,6 @@ object OpenFluxBot {
     const val CHAT_URL = "https://t.me/$USERNAME"
     const val API = "https://api.openflux.dev"
     const val LINK_HOST = "link.openflux.dev"
-
-    /** The bot's id and the domain its Telegram sign-in is bound to (BotFather /setdomain). */
-    const val BOT_ID = 8950210830L
-    const val ORIGIN = "https://openflux.dev"
-
-    /** Where Telegram sends the browser with the signed user in its fragment; the app stops there. */
-    const val RETURN_TO = "$ORIGIN/app-login"
-    const val AUTH_RESULT = "tgAuthResult="
-
-    /** The Telegram sign-in page for the bot, in redirect mode (no window opener to post the result to). */
-    val signInUrl: String = "https://oauth.telegram.org/auth?bot_id=$BOT_ID&origin=${percentEncode(ORIGIN)}" +
-        "&request_access=write&lang=ru&return_to=${percentEncode(RETURN_TO)}"
 
     private val TOKEN = Regex("^[A-Za-z0-9_-]{16,64}$")
 
@@ -45,44 +26,6 @@ object OpenFluxBot {
 
     /** The link of a token, as the bot shows it. */
     fun linkOf(token: String) = "https://$LINK_HOST/$token"
-
-    /**
-     * The signed Telegram user in an address Telegram sent the browser to: base64 JSON after `#tgAuthResult=`.
-     * Null when the address carries none (or a refusal: tgAuthResult=false).
-     */
-    fun authResult(url: String): TelegramUser? {
-        val raw = url.substringAfter("#", "").split('&').firstOrNull { it.startsWith(AUTH_RESULT) }?.removePrefix(AUTH_RESULT) ?: return null
-        val text = runCatching { percentDecode(raw) }.getOrDefault(raw).trim()
-        if (text.isEmpty() || text == "false") return null
-        val bytes = runCatching { Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL).decode(text.replace('+', '-').replace('/', '_')) }.getOrNull()
-            ?: return null
-        val obj = runCatching { Json.parseToJsonElement(bytes.decodeToString()) as JsonObject }.getOrNull() ?: return null
-        fun str(k: String) = (obj[k] as? JsonPrimitive)?.contentOrNull.orEmpty()
-        fun num(k: String) = (obj[k] as? JsonPrimitive)?.let { it.longOrNull ?: it.contentOrNull?.toLongOrNull() } ?: 0L
-        val user = TelegramUser(num("id"), str("first_name"), str("last_name"), str("username"), str("photo_url"), num("auth_date"), str("hash"))
-        return user.takeIf { it.id > 0 && it.hash.isNotEmpty() && it.authDate > 0 }
-    }
-
-    private fun percentEncode(s: String) = buildString {
-        for (b in s.encodeToByteArray()) {
-            val c = b.toInt().toChar()
-            if (c.isLetterOrDigit() && c.code < 128 || c in "-._~") append(c) else append('%').append((b.toInt() and 0xff).toString(16).uppercase().padStart(2, '0'))
-        }
-    }
-}
-
-/** What Telegram signs for the bot: the fields the API checks the hash over. */
-@Serializable
-data class TelegramUser(
-    val id: Long,
-    @SerialName("first_name") val firstName: String = "",
-    @SerialName("last_name") val lastName: String = "",
-    val username: String = "",
-    @SerialName("photo_url") val photoUrl: String = "",
-    @SerialName("auth_date") val authDate: Long = 0,
-    val hash: String = "",
-) {
-    override fun toString() = "TelegramUser($id)"
 }
 
 /** The bot API's session, from a Telegram sign-in: a bearer token good for up to 30 days. */
