@@ -93,6 +93,8 @@ data class BotState(
     val pendingInvoice: BotPendingInvoice? = null,
     /** What the app already told the person by a notification (the keys of [io.openflux.app.account.accountNotices]). */
     val noticed: List<String> = emptyList(),
+    /** The account's slots; null while not known (or the service has no GET /api/v1/slots). */
+    val slots: List<BotSlot>? = null,
 )
 
 /**
@@ -181,6 +183,52 @@ data class BotInvoice(
             return moneyText(minor)
         }
 }
+
+/**
+ * A paid slot of the account, as GET /api/v1/slots reports it (the bot's "Мои подключения" as data): what was bought,
+ * until when, and the connection it holds.
+ */
+@Serializable
+data class BotSlot(
+    val id: String,
+    /** The name the person gave the slot; empty for none. */
+    val alias: String = "",
+    val planName: String = "",
+    /** "auto" (the service makes the document) or "manual" (the person's own documents). */
+    val mode: String = "auto",
+    /** "running", "paused" or "free". */
+    val state: String = "free",
+    /** Unix seconds. */
+    val expiresAt: Long = 0,
+    /** The number the bot shows as "#19"; 0 for a free slot. */
+    val connectionNo: Long = 0,
+    val canStart: Boolean = false,
+    val canStop: Boolean = false,
+    /** A free slot of a manual plan: documents first, then [io.openflux.desktop.service.BotApi.connectSlot]. */
+    val needsSetup: Boolean = false,
+    /** The slot's connection: its id and the token of its short link; empty for a free slot. */
+    val sessionId: String = "",
+    val connectToken: String = "",
+) {
+    val manual: Boolean get() = mode == "manual"
+    override fun toString() = "BotSlot($id, $state)"
+}
+
+/** One of the person's own documents of a manual slot. The link itself is never returned. */
+@Serializable
+data class BotDocument(
+    val id: String,
+    /** "yandex", "mailru", "telemost", "boards", "cups". */
+    val kind: String = "",
+    /** The provider and the last characters of the link, enough to tell them apart. */
+    val label: String = "",
+    /** "ok", or "unknown" (could not be checked; the first start shows). */
+    val status: String = "",
+)
+
+/** A way to pay (GET /api/v1/payment-methods): [id] goes back as the invoice's `gateway`. */
+@Serializable
+data class BotPaymentMethod(val id: String, val name: String = "")
 
 /** A banner of the service (GET /api/v1/banners): what the bot shows everyone right now. */
 @Serializable

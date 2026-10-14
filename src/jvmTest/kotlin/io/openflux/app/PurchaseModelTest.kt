@@ -41,7 +41,7 @@ class PurchaseModelTest {
         override suspend fun sessions(token: String): List<BotSessionItem> = emptyList()
         override suspend fun createSession(token: String): BotSessionItem = throw BotException("forbidden", "x")
         override suspend fun plans(token: String?) = plans()
-        override suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String) = create()
+        override suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String, gateway: String) = create()
         override suspend fun invoice(token: String, id: String) = status().also { if (it.paid) bought++ }
     }
 

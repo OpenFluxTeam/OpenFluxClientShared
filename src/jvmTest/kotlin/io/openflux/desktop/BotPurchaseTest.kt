@@ -45,7 +45,7 @@ class BotPurchaseTest {
         var createCalls = 0
         override suspend fun createSession(token: String): BotSessionItem { createCalls++; throw BotException("forbidden", BotAccountManager.HttpForbidden) }
         override suspend fun plans(token: String?): List<BotPlan> { plansToken = token; return plansOnSale }
-        override suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String): BotInvoice {
+        override suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String, gateway: String): BotInvoice {
             invoiceCalls += Triple(token, termCode, idempotencyKey)
             return create(termCode)
         }

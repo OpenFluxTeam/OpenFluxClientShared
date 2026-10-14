@@ -1,13 +1,16 @@
 package io.openflux.desktop.service
 
 import io.openflux.desktop.model.BotBanner
+import io.openflux.desktop.model.BotDocument
 import io.openflux.desktop.model.BotException
 import io.openflux.desktop.model.BotInvoice
 import io.openflux.desktop.model.BotLink
+import io.openflux.desktop.model.BotPaymentMethod
 import io.openflux.desktop.model.BotPendingInvoice
 import io.openflux.desktop.model.BotPlan
 import io.openflux.desktop.model.BotSession
 import io.openflux.desktop.model.BotSessionItem
+import io.openflux.desktop.model.BotSlot
 import io.openflux.desktop.model.BotState
 import io.openflux.desktop.model.BotSubscription
 import io.openflux.desktop.model.OpenFluxBot
@@ -56,8 +59,24 @@ interface BotApi {
      * An invoice for a NEW slot on the term [termCode]. A repeat with the same [idempotencyKey] (8–64 of `A-Z a-z 0-9 - _`)
      * returns the same invoice, so a call lost on the way is repeated with the key it had.
      */
-    suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String): BotInvoice =
+    suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String, gateway: String = ""): BotInvoice =
         throw BotException("unsupported", "Покупка здесь не поддерживается")
+    /** The ways the person may pay now, in the service's order (the first is the default). */
+    suspend fun paymentMethods(token: String): List<BotPaymentMethod> = emptyList()
+
+    /** The account's slots; not_found from a service that has no slots API yet. */
+    suspend fun slots(token: String): List<BotSlot> = throw BotException("not_found", "Не найдено")
+    /** The Start button of a slot: its paused connection comes back, a free automatic slot gets one. */
+    suspend fun startSlot(token: String, slotId: String): BotSlot = throw BotException("unsupported", "Здесь не поддерживается")
+    /** The Stop button of a slot: its connection pauses, the slot keeps it (key and document) for Start. */
+    suspend fun stopSlot(token: String, slotId: String): BotSlot = throw BotException("unsupported", "Здесь не поддерживается")
+    /** The person's own documents of a manual slot. */
+    suspend fun documents(token: String, slotId: String): List<BotDocument> = throw BotException("unsupported", "Здесь не поддерживается")
+    suspend fun addDocument(token: String, slotId: String, url: String): BotDocument = throw BotException("unsupported", "Здесь не поддерживается")
+    suspend fun deleteDocument(token: String, slotId: String, documentId: String): Unit = throw BotException("unsupported", "Здесь не поддерживается")
+    suspend fun checkDocument(token: String, slotId: String, documentId: String): BotDocument = throw BotException("unsupported", "Здесь не поддерживается")
+    /** The connection of a free manual slot from its documents, in the order given (the first is tried first). */
+    suspend fun connectSlot(token: String, slotId: String, documentIds: List<String>): BotSlot = throw BotException("unsupported", "Здесь не поддерживается")
     /** One of the person's own invoices; not_found for anyone else's. */
     suspend fun invoice(token: String, id: String): BotInvoice = throw BotException("unsupported", "Покупка здесь не поддерживается")
     /** The service's banners for everyone. */

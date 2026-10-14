@@ -1,6 +1,9 @@
 package io.openflux.desktop.data
 
 import io.openflux.desktop.model.BotBanner
+import io.openflux.desktop.model.BotDocument
+import io.openflux.desktop.model.BotPaymentMethod
+import io.openflux.desktop.model.BotSlot
 import io.openflux.desktop.model.BotException
 import io.openflux.desktop.model.BotInvoice
 import io.openflux.desktop.model.BotPlan
@@ -100,9 +103,116 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
         }
     }
 
-    override suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String): BotInvoice {
+    override suspend fun paymentMethods(token: String): List<BotPaymentMethod> {
+        val e = try {
+            request("GET", "/api/v1/payment-methods", token, null)
+        } catch (e: BotException) {
+            if (e.notFound) return emptyList() else throw e // a service without the list: it picks the way itself
+        }
+        val array = e as? JsonArray ?: (e as? JsonObject)?.get("methods") as? JsonArray ?: return emptyList()
+        return array.mapNotNull { (it as? JsonObject)?.let { o -> BotPaymentMethod(o.str("id"), o.str("name")).takeIf { m -> m.id.isNotEmpty() } } }
+    }
+
+    override suspend fun slots(token: String): List<BotSlot> {
+        val e = request("GET", "/api/v1/slots", token, null)
+        val array = e as? JsonArray ?: (e as? JsonObject)?.get("slots") as? JsonArray ?: return emptyList()
+        return array.mapNotNull { (it as? JsonObject)?.let(::slotOf) }
+    }
+
+    override suspend fun startSlot(token: String, slotId: String): BotSlot = slotAction(token, slotId, "start")
+    override suspend fun stopSlot(token: String, slotId: String): BotSlot = slotAction(token, slotId, "stop")
+
+    private suspend fun slotAction(token: String, slotId: String, action: String): BotSlot {
+        if (!INVOICE_ID.matches(slotId)) throw BotException("bad_request", BAD_REQUEST)
+        val o = request("POST", "/api/v1/slots/$slotId/$action", token, JsonObject(emptyMap()), refuse = ::slotRefusal) as? JsonObject
+        return (o?.get("slot") as? JsonObject)?.let(::slotOf) ?: throw BotException("bad_response", BAD_RESPONSE)
+    }
+
+    override suspend fun documents(token: String, slotId: String): List<BotDocument> {
+        if (!INVOICE_ID.matches(slotId)) throw BotException("bad_request", BAD_REQUEST)
+        val e = request("GET", "/api/v1/slots/$slotId/documents", token, null, refuse = ::documentRefusal)
+        val array = e as? JsonArray ?: (e as? JsonObject)?.get("documents") as? JsonArray ?: return emptyList()
+        return array.mapNotNull { (it as? JsonObject)?.let(::documentOf) }
+    }
+
+    override suspend fun addDocument(token: String, slotId: String, url: String): BotDocument {
+        if (!INVOICE_ID.matches(slotId)) throw BotException("bad_request", BAD_REQUEST)
+        val body = JsonObject(mapOf("url" to JsonPrimitive(url.trim())))
+        val o = request("POST", "/api/v1/slots/$slotId/documents", token, body, refuse = ::documentRefusal) as? JsonObject
+        return o?.let(::documentOf) ?: throw BotException("bad_response", BAD_RESPONSE)
+    }
+
+    override suspend fun deleteDocument(token: String, slotId: String, documentId: String) {
+        if (!INVOICE_ID.matches(slotId) || !DOCUMENT_ID.matches(documentId)) throw BotException("bad_request", BAD_REQUEST)
+        request("DELETE", "/api/v1/slots/$slotId/documents/$documentId", token, null, refuse = ::documentRefusal)
+    }
+
+    override suspend fun checkDocument(token: String, slotId: String, documentId: String): BotDocument {
+        if (!INVOICE_ID.matches(slotId) || !DOCUMENT_ID.matches(documentId)) throw BotException("bad_request", BAD_REQUEST)
+        val o = request("POST", "/api/v1/slots/$slotId/documents/$documentId/check", token, JsonObject(emptyMap()), refuse = ::documentRefusal) as? JsonObject
+        return o?.let(::documentOf) ?: throw BotException("bad_response", BAD_RESPONSE)
+    }
+
+    override suspend fun connectSlot(token: String, slotId: String, documentIds: List<String>): BotSlot {
+        if (!INVOICE_ID.matches(slotId) || documentIds.any { !DOCUMENT_ID.matches(it) }) throw BotException("bad_request", BAD_REQUEST)
+        val body = JsonObject(mapOf("document_ids" to JsonArray(documentIds.map(::JsonPrimitive))))
+        val o = request("POST", "/api/v1/slots/$slotId/connect", token, body, refuse = ::documentRefusal) as? JsonObject
+        return (o?.get("slot") as? JsonObject)?.let(::slotOf) ?: throw BotException("bad_response", BAD_RESPONSE)
+    }
+
+    private fun slotOf(o: JsonObject): BotSlot? {
+        val id = o.str("slotId").ifEmpty { return null }
+        val session = o["session"] as? JsonObject
+        return BotSlot(
+            id = id, alias = o.str("alias"), planName = o.str("planName"), mode = o.str("mode").ifEmpty { "auto" },
+            state = o.str("state").ifEmpty { "free" }, expiresAt = o.long("expiresAt"), connectionNo = o.long("connectionNo"),
+            canStart = o.bool("canStart"), canStop = o.bool("canStop"), needsSetup = o.bool("needsSetup"),
+            sessionId = session?.str("sessionId").orEmpty(), connectToken = session?.str("connectToken").orEmpty(),
+        )
+    }
+
+    private fun documentOf(o: JsonObject): BotDocument? =
+        BotDocument(o.str("id"), o.str("kind"), o.str("label"), o.str("status")).takeIf { it.id.isNotEmpty() }
+
+    /** Why a Start or Stop was refused, in the person's words (the service's are English). */
+    private fun slotRefusal(status: Int, said: String): BotException? = when (status) {
+        404 -> BotException("slot_gone", "Этого места больше нет. Обновите список")
+        409 -> BotException("slot_changed", "Место уже в другом состоянии. Обновите список")
+        403 -> BotException(
+            "slot_refused",
+            when {
+                "manual" in said -> "Это место настраивается из своих документов, а не запускается"
+                "traffic" in said -> "Трафик этого места исчерпан"
+                "expired" in said || "ended" in said -> "Срок этого места закончился"
+                "blocked" in said -> "Этот аккаунт заблокирован. Напишите в поддержку"
+                else -> "Сервис не разрешил это действие с местом"
+            },
+        )
+        400 -> BotException("connection_lost", "Подключение не удалось восстановить, место снова свободно: запустите его ещё раз")
+        503 -> BotException("no_room", "Сейчас нет свободной мощности, попробуйте через пару минут")
+        in 500..599 -> BotException("http_$status", "Сервис OpenFlux не смог выполнить действие с местом. Попробуйте позже")
+        else -> null
+    }
+
+    /** Why a document (or the connection from documents) was refused, in the person's words. */
+    private fun documentRefusal(status: Int, said: String): BotException? = when (status) {
+        400 -> when {
+            "not a supported document link" in said -> BotException("bad_link", "Это не ссылка на поддерживаемый документ: Яндекс Диск, Облако Mail.ru, Телемост, Доски или Cups")
+            "cannot be used" in said -> BotException("doc_unusable", "Документ не подходит: он не открыт на редактирование по ссылке, это не docx или xlsx, или его нет")
+            "pick one to five" in said -> BotException("doc_pick", "Выберите от одного до пяти документов разных видов")
+            else -> BotException("bad_request", "Документы этого места сейчас менять нельзя: место занято подключением или закончилось")
+        }
+        404 -> BotException("not_found", "Документ или место не найдены. Обновите список")
+        409 -> BotException("doc_taken", "Эта ссылка уже добавлена")
+        429 -> if ("limit is reached" in said) BotException("doc_limit", "Документов больше добавить нельзя: достигнут предел") else BotException("rate_limited", "Слишком много проверок документов, подождите минуту")
+        503 -> BotException("docs_off", "Свои документы сейчас недоступны")
+        in 500..599 -> BotException("http_$status", "Сервис OpenFlux не смог изменить документ. Попробуйте позже")
+        else -> null
+    }
+
+    override suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String, gateway: String): BotInvoice {
         if (!IDEMPOTENCY_KEY.matches(idempotencyKey)) throw BotException("bad_request", BAD_REQUEST)
-        val body = JsonObject(mapOf("plan_id" to JsonPrimitive(termCode)))
+        val body = JsonObject(buildMap { put("plan_id", JsonPrimitive(termCode)); if (gateway.isNotEmpty()) put("gateway", JsonPrimitive(gateway)) })
         val headers = mapOf("Idempotency-Key" to idempotencyKey)
         val o = try {
             request("POST", "/api/v1/subscription/invoice", token, body, headers, ::invoiceRefusal)
@@ -141,7 +251,9 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
 
     /** Why an invoice was refused, in the person's words; the service's own are English and technical. */
     private fun invoiceRefusal(status: Int, said: String): BotException? = when (status) {
-        400 -> if ("slot limit" in said) {
+        400 -> if ("payment method" in said) {
+            BotException("method_gone", "Этот способ оплаты сейчас недоступен. Выберите другой")
+        } else if ("slot limit" in said) {
             BotException("slot_limit", "Больше мест на этом аккаунте взять нельзя. Освободите одно или напишите в поддержку в @${OpenFluxBot.USERNAME}")
         } else {
             BotException("bad_request", BAD_REQUEST)
@@ -168,6 +280,7 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
     }
 
     private fun JsonObject.str(k: String) = (this[k] as? JsonPrimitive)?.contentOrNull.orEmpty()
+    private fun JsonObject.bool(k: String) = (this[k] as? JsonPrimitive)?.booleanOrNull ?: false
     private fun JsonObject.long(k: String) = (this[k] as? JsonPrimitive)?.let { it.longOrNull ?: it.contentOrNull?.toLongOrNull() } ?: 0L
 
     /**
@@ -251,6 +364,8 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
         val IDEMPOTENCY_KEY = Regex("^[A-Za-z0-9_-]{8,64}$")
         /** Our invoice ids are UUIDs: nothing else is put into a path. */
         val INVOICE_ID = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+        /** A document id of the service: nothing else is put into a path. */
+        val DOCUMENT_ID = Regex("^[A-Za-z0-9_-]{1,64}$")
         const val BAD_REQUEST = "Приложение отправило неверный запрос: обновите приложение"
         const val BAD_RESPONSE = "Сервис OpenFlux ответил непонятно: обновите приложение"
     }

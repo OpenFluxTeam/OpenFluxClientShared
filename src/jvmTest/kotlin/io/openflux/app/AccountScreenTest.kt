@@ -42,7 +42,7 @@ class AccountScreenTest {
         override suspend fun sessions(token: String) = emptyList<BotSessionItem>()
         override suspend fun createSession(token: String): BotSessionItem = throw BotException("forbidden", "x")
         override suspend fun plans(token: String?) = listOf(BotPlan("own30", "Start", 30, 32212254720, "OpenFlux — подключение для одного устройства", 3000))
-        override suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String) =
+        override suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String, gateway: String) =
             BotInvoice("0b7c3c3e-5a39-4e43-9c8e-0d7d0d6c1a11", "https://pay.example/x", "30.00", "active", 1_800_000_000, 1_800_086_400)
         override suspend fun invoice(token: String, id: String) =
             BotInvoice("0b7c3c3e-5a39-4e43-9c8e-0d7d0d6c1a11", "https://pay.example/x", "30.00", "active", 1_800_000_000, 1_800_086_400)
