@@ -13,7 +13,7 @@ import kotlin.test.Test
  * Serves the sign-in page and the API on 127.0.0.1:8099 for a hand run of the desktop app (STUB_SERVE=1; stops when
  * <tmp>/stub-stop exists). The page signs the person in at once and sends the browser back to the app. Not a test of
  * anything: without STUB_SERVE it returns at once. Run the app against it with
- * OPENFLUX_API_BASE=http://127.0.0.1:8099 OPENFLUX_ID_ISSUER=http://127.0.0.1:8099/realms/openflux and a key built in.
+ * OPENFLUX_API_BASE=http://127.0.0.1:8099 OPENFLUX_ID_ISSUER=http://127.0.0.1:8099/realms/openflux and an app id built in.
  */
 class StubServiceServe {
     @Test

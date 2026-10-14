@@ -5,21 +5,21 @@ import io.openflux.desktop.model.OpenFluxId
 import java.net.URI
 
 /**
- * What the build says about itself to the OpenFlux service: its key (X-App-Key; an identifier and a switch for the
+ * What the build says about itself to the OpenFlux service: its app id (X-App-Id; an identifier and a switch for the
  * service, not a secret) and, for development, a local stand-in for the service's address.
  */
-object AppKeys {
-    private const val RESOURCE = "/openflux-appkey.txt"
-    private val SHAPE = Regex("^ofk_[A-Za-z0-9_-]{8,128}$")
+object AppIds {
+    private const val RESOURCE = "/openflux-appid.txt"
+    private val SHAPE = Regex("^ofa_[A-Za-z0-9_-]{8,128}$")
 
-    /** The key if [text] has a key's shape, else blank. */
+    /** The app id if [text] has its shape, else blank. */
     fun valid(text: String?): String = text?.trim()?.takeIf(SHAPE::matches).orEmpty()
 
-    /** The desktop build's key: -Dopenflux.appKey, then OPENFLUX_APP_KEY, then the resource the build wrote; blank when none. */
+    /** The desktop build's app id: -Dopenflux.appId, then OPENFLUX_APP_ID, then the resource the build wrote; blank when none. */
     fun desktop(): String =
-        valid(System.getProperty("openflux.appKey"))
-            .ifEmpty { valid(System.getenv("OPENFLUX_APP_KEY")) }
-            .ifEmpty { valid(AppKeys::class.java.getResourceAsStream(RESOURCE)?.use { it.readBytes().decodeToString() }) }
+        valid(System.getProperty("openflux.appId"))
+            .ifEmpty { valid(System.getenv("OPENFLUX_APP_ID")) }
+            .ifEmpty { valid(AppIds::class.java.getResourceAsStream(RESOURCE)?.use { it.readBytes().decodeToString() }) }
 
     /** The service's address; OPENFLUX_API_BASE moves it, but only to this machine (a stand-in for tests). */
     fun apiBase(): String = pickBase(System.getenv("OPENFLUX_API_BASE"))

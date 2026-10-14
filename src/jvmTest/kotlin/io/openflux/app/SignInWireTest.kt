@@ -44,7 +44,7 @@ class SignInWireTest {
 
     @Test
     fun signingInOnThePageBringsTheConnection() = runBlocking {
-        val key = "ofk_wiretestwiretest"
+        val appId = "ofa_wiretestwiretest"
         val link = FakeShareLinkCodec().encode(
             ShareConfig(
                 name = "Заглушка #1", negotiate = true, secret = "ab".repeat(32), context = "https://example.com/doc",
@@ -80,7 +80,7 @@ class SignInWireTest {
             }
         })
         try {
-            val c = testContainer(bot = HttpBotApi("http://127.0.0.1:${server.address.port}", key), signIn = browser)
+            val c = testContainer(bot = HttpBotApi("http://127.0.0.1:${server.address.port}", appId), signIn = browser)
             val m = SignInModel(c, this)
             m.start()
             withTimeout(15_000) { while (m.ui != SignInUi.Done) { check(m.ui !is SignInUi.Failed) { m.ui.toString() }; delay(20) } }
@@ -93,7 +93,7 @@ class SignInWireTest {
             val calls = synchronized(seen) { seen.toList() }
             val ex = calls.first()
             assertEquals("/api/v1/auth/app/exchange", ex.path)
-            assertEquals(key, ex.header("X-App-Key"))
+            assertEquals(appId, ex.header("X-App-Id"))
             val body = Json.parseToJsonElement(ex.body).jsonObject
             assertEquals("wirecode", body["code"]!!.jsonPrimitive.content)
             assertEquals("http://127.0.0.1:$port/callback", body["redirect_uri"]!!.jsonPrimitive.content)

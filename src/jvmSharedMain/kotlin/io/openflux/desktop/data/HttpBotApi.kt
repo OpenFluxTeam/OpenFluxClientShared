@@ -27,7 +27,7 @@ import java.net.URL
  * camelCase names, 64-bit numbers as strings, empty fields left out. A session goes as a bearer token
  * (the sign-in answers with it): the app keeps it, never a cookie.
  */
-class HttpBotApi(private val base: String = OpenFluxBot.API, private val appKey: String = "") : BotApi {
+class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: String = "") : BotApi {
     private val json = Json { ignoreUnknownKeys = true }
 
     override suspend fun subscription(token: String): BotSubscription {
@@ -52,12 +52,12 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appKey:
     }
 
     override suspend fun exchange(code: String, verifier: String, redirectUri: String): BotSession {
-        if (appKey.isEmpty()) throw BotException("no_app_key", "Вход в этой сборке выключен: в ней нет ключа приложения")
+        if (appId.isEmpty()) throw BotException("no_app_id", "Вход в этой сборке выключен: в ней нет идентификатора приложения")
         val body = JsonObject(
             mapOf("code" to JsonPrimitive(code), "code_verifier" to JsonPrimitive(verifier), "redirect_uri" to JsonPrimitive(redirectUri)),
         )
         val o = try {
-            request("POST", "/api/v1/auth/app/exchange", null, body, mapOf("X-App-Key" to appKey)) as? JsonObject
+            request("POST", "/api/v1/auth/app/exchange", null, body, mapOf("X-App-Id" to appId)) as? JsonObject
         } catch (e: BotException) {
             throw signInError(e)
         }
@@ -82,7 +82,7 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appKey:
 
     private fun sessionItem(o: JsonObject) = BotSessionItem(o.str("sessionId"), o.str("status"), o.str("connectToken"))
 
-    /** The service answers every failed sign-in alike (401): wrong or used code, unconfirmed email, foreign address, bad key. */
+    /** The service answers every failed sign-in alike (401): wrong or used code, unconfirmed email, foreign address, unknown app id. */
     private fun signInError(e: BotException): BotException = when (e.code) {
         "unauthorized" -> BotException("sign_in_failed", "Не получилось войти. Если входили по почте, подтвердите адрес по ссылке из письма и попробуйте снова")
         "forbidden" -> BotException("blocked", "Этот аккаунт заблокирован. Напишите в поддержку в @${OpenFluxBot.USERNAME}")

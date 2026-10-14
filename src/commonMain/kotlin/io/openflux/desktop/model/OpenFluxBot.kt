@@ -86,7 +86,7 @@ data class BotState(
     val connectionNote: String? = null,
 )
 
-/** A failed API call; [code] is "network", "unauthorized", "forbidden", "not_found", "rate_limited" or "http_<n>", and for a sign-in "no_app_key", "sign_in_failed", "blocked", "not_ready", "unavailable" or "bad_request". */
+/** A failed API call; [code] is "network", "unauthorized", "forbidden", "not_found", "rate_limited" or "http_<n>", and for a sign-in "no_app_id", "sign_in_failed", "blocked", "not_ready", "unavailable" or "bad_request". */
 class BotException(val code: String, message: String) : Exception(message) {
     val unauthorized: Boolean get() = code == "unauthorized"
     val forbidden: Boolean get() = code == "forbidden"
