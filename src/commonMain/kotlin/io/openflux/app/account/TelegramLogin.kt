@@ -104,10 +104,11 @@ class TelegramLoginModel(
         login = begun
         container.platform.openUrl(begun.deepLink)
         ui = LoginUi.Waiting()
-        val deadline = begun.expiresAt * 1000
+        // The service's five minutes, counted on this device's clock from now: its own clock may be minutes off.
+        val deadline = container.platform.now() + SIGN_IN_MS
         while (true) {
             withTimeoutOrNull(pollMs) { wake.receive() }
-            if (deadline > 0 && container.platform.now() >= deadline) {
+            if (container.platform.now() >= deadline) {
                 ui = LoginUi.Expired
                 return
             }
@@ -139,6 +140,8 @@ class TelegramLoginModel(
 
     private companion object {
         const val POLL_MS = 2_000L
+        /** A sign-in lives five minutes on the service; a little slack, the service's own "expired" decides first. */
+        const val SIGN_IN_MS = 5 * 60 * 1000L + 15_000L
         const val GENERIC = "Не получилось войти"
     }
 }

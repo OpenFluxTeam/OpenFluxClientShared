@@ -122,7 +122,7 @@ fun HomeRoot() {
     ScreenScaffold(null, scroll = false) {
         if (profiles.isEmpty()) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.l)) {
-                StartPanel(hasSubscription = subscription != null, preparing = preparing || bot.preparing)
+                StartPanel(hasSubscription = subscription != null, preparing = preparing || bot.preparing, botSignedIn = bot.session != null, botNote = bot.connectionNote)
             }
             return@ScreenScaffold
         }
@@ -159,11 +159,20 @@ fun HomeRoot() {
 
 /** No connections yet (spec 6): the three ways to start. */
 @Composable
-private fun StartPanel(hasSubscription: Boolean, preparing: Boolean) {
+private fun StartPanel(hasSubscription: Boolean, preparing: Boolean, botSignedIn: Boolean = false, botNote: String? = null) {
     val navigator = LocalNavigator.current
     if (preparing) {
         Text("Готовим вашу локацию", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
         ProgressLine("Обычно это минута-две, она появится здесь сама")
+        return
+    }
+    // Signed in through Telegram but nothing to connect to: say why, instead of offering to sign in again.
+    if (botNote != null) {
+        Banner(botNote, Tone.Warning, action = "Открыть подписку", onAction = { navigator.open(Dest.Account) })
+        return
+    }
+    if (botSignedIn) {
+        Banner("Вы вошли, подключения пока нет", Tone.Info, action = "Открыть подписку", onAction = { navigator.open(Dest.Account) })
         return
     }
     if (hasSubscription) {

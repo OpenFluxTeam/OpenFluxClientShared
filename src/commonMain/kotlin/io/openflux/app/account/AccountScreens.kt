@@ -64,7 +64,7 @@ fun AccountScreen() {
         val s = state
         if (s == null) {
             Text("На этом устройстве нет подписки.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
-            if (bot.session == null) PrimaryButton("Войти через Telegram", { navigator.replaceTop(Dest.Auth) }, Modifier.fillMaxWidth())
+            if (bot.session == null) PrimaryButton("Войти через Telegram", { navigator.open(Dest.Auth) }, Modifier.fillMaxWidth())
             SecondaryButton("У меня ключ подписки", { navigator.replaceTop(Dest.AddKey) }, Modifier.fillMaxWidth())
             BotSection(m, signInRow = false)
             m.busy?.let { ProgressLine(it) }

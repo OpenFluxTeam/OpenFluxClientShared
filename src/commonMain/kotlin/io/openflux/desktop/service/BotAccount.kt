@@ -16,11 +16,12 @@ import io.openflux.desktop.model.isActive
 import io.openflux.desktop.model.profile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -81,6 +82,9 @@ class BotAccountManager(
     val state: StateFlow<BotState> get() = repo.state
     private val lock = Mutex()
 
+    /** Asks the background loop to look again now (a sign-in just finished). */
+    private val wake = Channel<Unit>(Channel.CONFLATED)
+
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
 
@@ -93,7 +97,12 @@ class BotAccountManager(
     /** Keeps the session a finished Telegram sign-in gave, then brings the account's subscription and connection in. */
     suspend fun completeLogin(session: BotSession) {
         lock.withLock { repo.save(repo.state.value.copy(session = session, lastError = null, connectionNote = null)) }
-        refresh()
+        try {
+            refresh()
+        } finally {
+            // The background loop may be asleep for hours (signed out when it began): wake it, also when this was cancelled.
+            wake.trySend(Unit)
+        }
     }
 
     /** Signs out of this device: the account's connection goes with it, links added by hand stay. */
@@ -154,7 +163,16 @@ class BotAccountManager(
     suspend fun refresh() {
         _refreshing.value = true
         try {
-            lock.withLock { refreshLocked() }
+            lock.withLock {
+                try {
+                    refreshLocked()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // A link the core cannot read, an answer of a shape we do not know: said to the person, never a crash.
+                    repo.save(repo.state.value.copy(preparing = false, lastError = UNREADABLE))
+                }
+            }
         } finally {
             _refreshing.value = false
         }
@@ -208,10 +226,13 @@ class BotAccountManager(
         } catch (e: BotException) {
             return ensureFailed(e)
         }
-        val ready = items.firstOrNull { it.ready }
+        // The connection already held wins over another ready one, so a reordered list never cuts a live tunnel.
+        val held = repo.state.value.links.firstOrNull { it.account }?.token
+        val ready = items.firstOrNull { it.ready && it.connectToken == held } ?: items.firstOrNull { it.ready }
         val item = when {
             ready != null -> ready
-            items.any { it.status == "creating" } -> null
+            // Something is being made, or is up but without its link yet: never make another over it.
+            items.any { it.status !in ENDED } -> null
             else -> try {
                 api.createSession(session.token)
             } catch (e: CancellationException) {
@@ -256,7 +277,8 @@ class BotAccountManager(
             while (true) {
                 val s = repo.state.value
                 if (s.session != null || s.links.isNotEmpty()) refresh()
-                delay(if (repo.state.value.preparing) PREPARE_MS else REFRESH_MS)
+                wake.tryReceive() // a wake-up that came while refreshing is answered by that refresh
+                withTimeoutOrNull(if (repo.state.value.preparing) PREPARE_MS else REFRESH_MS) { wake.receive() }
             }
         }
     }
@@ -277,7 +299,10 @@ class BotAccountManager(
 
     companion object {
         const val GONE = "Бот больше не обслуживает это подключение: подписка закончилась или подключение заменили. Возьмите новую ссылку в @${OpenFluxBot.USERNAME}"
-        const val NO_SLOT = "Подключения нет: подписка не действует или все места заняты. Продлите подписку в @${OpenFluxBot.USERNAME}"
+        const val UNREADABLE = "Не удалось прочитать подключение от бота: обновите приложение"
+        /** A connection in one of these statuses is over; any other (running, creating, starting…) is still the account's. */
+        private val ENDED = setOf("stopped", "failed", "error", "deleted", "expired")
+        const val NO_SLOT ="Подключения нет: подписка не действует или все места заняты. Продлите подписку в @${OpenFluxBot.USERNAME}"
         private const val PREPARE_MS = 15 * 1000L
         private const val REFRESH_MS = 3 * 60 * 60 * 1000L
     }

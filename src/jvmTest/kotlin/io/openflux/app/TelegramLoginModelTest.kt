@@ -106,13 +106,27 @@ class TelegramLoginModelTest {
     }
 
     @Test
-    fun theLocalDeadlineEndsTheWaitWithoutAsking() = runTest {
-        val platform = TestPlatform().apply { clock = 3_000_000L } // the sign-in ran out at 2_000 s = 2_000_000 ms
-        val (c, api, _) = world(LoginPoll.Pending, platform = platform)
+    fun theFiveMinutesRunOutOnTheLocalClock() = runTest {
+        val platform = TestPlatform()
+        val (c, api, _) = world(LoginPoll.Pending, LoginPoll.Pending, platform = platform)
+        val m = TelegramLoginModel(c, this)
+        m.start(); runCurrent()
+        advanceTimeBy(2_001); runCurrent()
+        assertEquals(1, api.script.size, "the first question was asked")
+        platform.clock += 400_000L // more than the five minutes a sign-in lives
+        advanceTimeBy(2_000); runCurrent()
+        assertEquals(LoginUi.Expired, m.ui)
+        assertEquals(1, api.script.size, "nobody was asked after the time ran out")
+    }
+
+    @Test
+    fun aFastClockDoesNotEndTheSignIn() = runTest {
+        // The service says the sign-in ends at 2_000 s; this device thinks it is already 3_000 s.
+        val platform = TestPlatform().apply { clock = 3_000_000L }
+        val (c, _, _) = world(approved, platform = platform)
         val m = TelegramLoginModel(c, this)
         m.start(); advanceUntilIdle()
-        assertEquals(LoginUi.Expired, m.ui)
-        assertEquals(1, api.script.size, "nobody was asked")
+        assertEquals(LoginUi.Done, m.ui)
     }
 
     @Test

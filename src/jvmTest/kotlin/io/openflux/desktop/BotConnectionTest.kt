@@ -17,6 +17,8 @@ import io.openflux.desktop.service.BotApi
 import io.openflux.desktop.service.BotConnection
 import io.openflux.desktop.service.InMemoryBotRepository
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -204,5 +206,65 @@ class BotConnectionTest {
         val m = BotAccountManager(api, InMemoryBotRepository(), c.profiles, c.shareCodec, c.platform, c.connection, testAccounts(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined)))
         assertEquals("n", m.startLogin().nonce)
         assertEquals(LoginPoll.Pending, m.pollLogin("n"))
+    }
+
+    // ---- fixes from the whole-branch review ----
+
+    @Test
+    fun aConnectionBeingMadeIsAskedAboutAgainWithoutAnyoneRefreshing() = runTest {
+        val (m, c, api) = env()
+        m.start(backgroundScope) // the app's loop begins signed out and would sleep for hours
+        runCurrent()
+        api.create = { BotSessionItem("s1", "creating", "") }
+        m.completeLogin(session)
+        assertTrue(m.state.value.preparing)
+        api.sessions[0] = BotSessionItem("s1", "running", tokenA)
+        api.links[tokenA] = BotConnection("OpenFlux #9", link("x", "12".repeat(32)))
+        advanceTimeBy(16_000); runCurrent()
+        assertEquals("OpenFlux #9", c.profiles.profiles.value.single().name)
+        assertFalse(m.state.value.preparing)
+    }
+
+    @Test
+    fun aLinkTheCoreCannotReadDoesNotCrashTheSignIn() = runTest {
+        val (m, c, api) = env()
+        api.sessions += BotSessionItem("s1", "running", tokenA)
+        api.links[tokenA] = BotConnection("Битая", "not-a-share-link")
+        m.completeLogin(session) // must not throw
+        assertEquals(session, m.state.value.session)
+        assertTrue(m.state.value.lastError != null, "the person is told")
+        assertFalse(m.state.value.preparing)
+        assertTrue(c.profiles.profiles.value.isEmpty())
+    }
+
+    @Test
+    fun theConnectionInUseIsKeptWhenTheListChangesOrder() = runTest {
+        val (m, c, api) = env()
+        api.sessions += BotSessionItem("s1", "running", tokenA)
+        api.links[tokenA] = BotConnection("OpenFlux #4", link("x", "ab".repeat(32)))
+        m.completeLogin(session)
+        val first = c.profiles.profiles.value.single().id
+        c.connection.connect(c.profiles.profiles.value.single(), ConnectionMode.Client)
+
+        api.sessions += BotSessionItem("s2", "running", tokenB)
+        api.links[tokenB] = BotConnection("OpenFlux #5", link("x", "cd".repeat(32)))
+        api.sessions.reverse() // the service lists the other one first now
+        m.refresh()
+
+        assertEquals(first, c.profiles.profiles.value.single().id, "the profile in use stays")
+        assertEquals(tokenA, m.state.value.links.single().token)
+        assertTrue(c.connection.state.value is ConnectionState.Connected, "its tunnel keeps running")
+    }
+
+    @Test
+    fun noSecondConnectionIsMadeWhileAnotherIsNotReady() = runTest {
+        for (st in listOf(BotSessionItem("s1", "running", ""), BotSessionItem("s1", "starting", ""))) {
+            val (m, c, api) = env()
+            api.sessions += st
+            m.completeLogin(session)
+            assertEquals(0, api.created, "no connection is made over ${st.status} without a token")
+            assertTrue(m.state.value.preparing)
+            assertTrue(c.profiles.profiles.value.isEmpty())
+        }
     }
 }
