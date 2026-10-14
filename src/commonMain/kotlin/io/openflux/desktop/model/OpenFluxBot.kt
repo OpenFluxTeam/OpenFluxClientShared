@@ -140,13 +140,15 @@ data class BotPlan(
     val currency: String = "RUB",
 ) {
     /** The price as people read it: "30 ₽", "30,50 ₽", "1 250 ₽". */
-    val priceText: String
-        get() {
-            val whole = (price / 100).toString().reversed().chunked(3).joinToString(" ").reversed()
-            val cents = price % 100
-            val amount = if (cents == 0L) whole else "$whole," + cents.toString().padStart(2, '0')
-            return "$amount ${if (currency == "RUB") "₽" else currency}"
-        }
+    val priceText: String get() = moneyText(price, currency)
+}
+
+/** An amount in minor units as people read it: "30 ₽", "30,50 ₽", "1 250 ₽". */
+fun moneyText(minor: Long, currency: String = "RUB"): String {
+    val whole = (minor / 100).toString().reversed().chunked(3).joinToString(" ").reversed()
+    val cents = minor % 100
+    val amount = if (cents == 0L) whole else "$whole," + cents.toString().padStart(2, '0')
+    return "$amount ${if (currency == "RUB") "₽" else currency}"
 }
 
 /** An invoice of a purchase, as the service reports it; [id] is ours (GET /api/v1/subscription/invoices/{id}). */
@@ -166,6 +168,14 @@ data class BotInvoice(
 ) {
     val paid: Boolean get() = status == "paid"
     val expired: Boolean get() = status == "expired"
+
+    /** The amount as people read it ("30.00" → "30 ₽"); null when the service gave none or one this cannot read. */
+    val amountText: String?
+        get() {
+            val m = Regex("""^(\d{1,9})(?:[.,](\d{1,2}))?$""").matchEntire(amount.trim()) ?: return null
+            val minor = m.groupValues[1].toLong() * 100 + m.groupValues[2].padEnd(2, '0').toLong()
+            return moneyText(minor)
+        }
 }
 
 /** A banner of the service (GET /api/v1/banners): what the bot shows everyone right now. */

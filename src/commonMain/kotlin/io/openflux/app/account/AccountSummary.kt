@@ -2,7 +2,6 @@ package io.openflux.app.account
 
 import io.openflux.app.text.Fmt
 import io.openflux.desktop.model.BotState
-import io.openflux.desktop.model.accountLabel
 
 enum class SummaryTone { Ok, Attention, Unknown }
 
@@ -12,7 +11,7 @@ enum class SummaryTone { Ok, Attention, Unknown }
  * several slots they are said as such. Pure, so it is tested and drawn in shots.
  */
 data class AccountSummary(
-    /** How the person signed in: "Telegram, @ivan", "по почте, № …". */
+    /** How the person signed in: "Telegram, @ivan", "Telegram", "по почте". */
     val signIn: String,
     /** One line: "Действует", "Заканчивается: осталось 2 дня", "Нет действующей подписки", "Обновляю…". */
     val state: String,
@@ -37,7 +36,11 @@ fun daysLeft(expiresAt: Long, nowMillis: Long): Int {
 /** The summary of the signed-in account, or null when nobody is signed in. */
 fun accountSummary(s: BotState, nowMillis: Long, offsetSeconds: Int): AccountSummary? {
     val session = s.session ?: return null
-    val signIn = if (session.username.isNotBlank()) "Telegram, @${session.username}" else session.accountLabel()
+    val signIn = when {
+        !session.viaTelegram -> "по почте"
+        session.username.isNotBlank() -> "Telegram, @${session.username}"
+        else -> "Telegram"
+    }
     val sub = s.subscription
     if (sub == null || !sub.isActive) {
         return AccountSummary(

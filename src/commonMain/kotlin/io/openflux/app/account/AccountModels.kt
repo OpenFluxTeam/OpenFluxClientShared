@@ -62,6 +62,13 @@ class SubscriptionModel(private val container: AppContainer, private val scope: 
     fun clearDialogError() { dialogError = null }
 
     fun refresh() = call("Обновляю…") { manager.refresh() }
+
+    /** The window's "Обновить": the OpenFlux account (and the links from the bot), and a subscription by key if there is one. */
+    fun refreshAll() = call("Обновляю…") {
+        val bot = container.bot.state.value
+        if (bot.session != null || bot.links.isNotEmpty()) container.bot.refresh()
+        if (manager.state.value != null) manager.refresh()
+    }
     fun startTrial() = call("Включаю пробный период…") { manager.startTrial() }
     fun signOut() = call("Выхожу…") { manager.signOut() }
     fun removeDevice(id: String) = call("Убираю устройство…") { manager.removeDevice(id) }

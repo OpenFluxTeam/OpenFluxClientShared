@@ -94,7 +94,7 @@ class AccountSummaryTest {
         assertFalse(mail.renewInBot, "an email account has no bot")
         assertTrue(mail.note!!.contains("Продлить"), mail.note)
         assertFalse(mail.note!!.contains("бот"))
-        assertEquals("по почте, № 10000000000000001", mail.signIn)
+        assertEquals("по почте", mail.signIn, "the account number means nothing to the person")
         val far = accountSummary(BotState(session = email, subscription = sub(20.0)), now, 0)!!
         assertNull(far.note, "nothing to say while the end is far")
     }

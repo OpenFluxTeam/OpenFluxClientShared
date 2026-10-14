@@ -23,7 +23,10 @@ class ScopedModel<T : Any>(make: (CoroutineScope) -> T) : ViewModel() {
     }
 }
 
-/** The model of the screen being shown, made once per entry (Navigation 3 scopes the store to the entry). */
+/**
+ * The model of the screen being shown, made once per entry (Navigation 3 scopes the store to the entry). Keyed by the
+ * model's type: every ScopedModel is one class to the store, so a screen with two models would get the first twice.
+ */
 @Composable
 inline fun <reified T : Any> rememberScreenModel(noinline make: (CoroutineScope) -> T): T =
-    viewModel<ScopedModel<T>>(initializer = { ScopedModel(make) }).value
+    viewModel<ScopedModel<T>>(key = "screen-model:" + (T::class.qualifiedName ?: T::class.simpleName), initializer = { ScopedModel(make) }).value

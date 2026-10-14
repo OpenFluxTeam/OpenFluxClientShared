@@ -509,12 +509,12 @@ class BotAccountManager(
         const val HttpForbidden = "Нет доступа: подписка не действует или нет свободного места"
         private const val RUNNING = "running"
         private const val PAUSED = "paused"
-        const val PAUSED_NOTE = "Подключения приостановлены в боте и заняли все места. Они уже добавлены здесь: возобновите одно в боте, в «☁️ Мои подключения», и оно заработает само"
+        const val PAUSED_NOTE = "Подключения приостановлены и заняли все места. Возобновите одно в @${OpenFluxBot.USERNAME}, в «Мои подключения»: оно заработает само"
         /** An account by email has no bot: a paused connection cannot be resumed from here yet (the REST API has no way). */
-        const val PAUSED_NOTE_EMAIL = "Подключение приостановлено и занимает место. Возобновить его из приложения пока нельзя: купите ещё одно место в разделе «Подписка»"
+        const val PAUSED_NOTE_EMAIL = "Подключение приостановлено и держит место, из приложения его не возобновить. Купите ещё одно в разделе «Подписка»"
         const val NO_SUBSCRIPTION = "Подключения нет: подписка не действует. Купите её в разделе «Подписка»"
         /** The subscription holds, yet no automatic slot is free: all are taken, or a slot is a manual one (own documents). */
-        const val NO_FREE_SLOT = "Подключения нет: все места подписки заняты или место настраивается вручную (свои документы). Купите ещё одно место в разделе «Подписка»"
+        const val NO_FREE_SLOT = "Подключения нет: все места заняты или место для своих документов. Купите ещё одно в разделе «Подписка»"
         const val NO_FREE_SLOT_TG = "$NO_FREE_SLOT или освободите место в @${OpenFluxBot.USERNAME}"
         const val GONE = "Бот больше не обслуживает это подключение: подписка закончилась или подключение заменили. Возьмите новую ссылку в @${OpenFluxBot.USERNAME}"
         const val UNREADABLE = "Не удалось прочитать подключение от бота: обновите приложение"

@@ -85,6 +85,14 @@ class BotPurchaseApiTest {
     }
 
     @Test
+    fun anInvoicesAmountIsReadAsRoubles() {
+        assertEquals("30 ₽", BotInvoice("i", amount = "30.00").amountText)
+        assertEquals("30,50 ₽", BotInvoice("i", amount = "30.5").amountText)
+        assertEquals("1 250 ₽", BotInvoice("i", amount = "1250").amountText)
+        for (bad in listOf("", "abc", "-3.00", "1e5", "30.001")) assertEquals(null, BotInvoice("i", amount = bad).amountText, bad)
+    }
+
+    @Test
     fun anInvoiceGoesWithItsTermAndTheIdempotencyKey() = runBlocking {
         val api = HttpBotApi(
             server { _, _ ->
