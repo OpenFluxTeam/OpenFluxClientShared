@@ -7,6 +7,12 @@ import kotlin.test.assertEquals
 
 class AppIdsTest {
     @Test
+    fun anIdTheServiceIssuedWithTheOldPrefixStillCounts() {
+        assertEquals("ofk_TVWKnezaWBmmemdTTQLyWdILskWO58OYgH4jXL9sMCQ".replace("TVWK", "AAAA"), AppIds.valid("ofk_AAAAnezaWBmmemdTTQLyWdILskWO58OYgH4jXL9sMCQ"))
+        assertEquals("", AppIds.valid("ofx_abcdefgh12345678"))
+    }
+
+    @Test
     fun onlyAnAppIdOfTheRightShapeCounts() {
         assertEquals("ofa_abcdefgh12345678", AppIds.valid("  ofa_abcdefgh12345678\n"))
         for (bad in listOf(null, "", "ofa_", "ofa_short", "abc_abcdefgh12345678", "ofa_abcdefgh 12345678", "ofa_" + "a".repeat(129))) {

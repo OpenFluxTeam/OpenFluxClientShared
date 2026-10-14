@@ -10,7 +10,8 @@ import java.net.URI
  */
 object AppIds {
     private const val RESOURCE = "/openflux-appid.txt"
-    private val SHAPE = Regex("^ofa_[A-Za-z0-9_-]{8,128}$")
+    /** ofa_ is the name now; the service has issued ids as ofk_ so far and may keep doing so until it renames them. */
+    private val SHAPE = Regex("^of[ak]_[A-Za-z0-9_-]{8,128}$")
 
     /** The app id if [text] has its shape, else blank. */
     fun valid(text: String?): String = text?.trim()?.takeIf(SHAPE::matches).orEmpty()
