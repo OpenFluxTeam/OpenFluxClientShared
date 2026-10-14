@@ -40,12 +40,14 @@ fun testContainer(
     connection: ConnectionService = TestConnection(),
     hosting: PhpHostingService = PhpHostingService(),
     subscriptions: SubscriptionApi = io.openflux.desktop.service.NoSubscriptionApi,
+    bot: io.openflux.desktop.service.BotApi = io.openflux.desktop.service.NoBotApi,
     scripts: io.openflux.desktop.service.ScriptRepository = io.openflux.desktop.service.InMemoryScriptRepository(),
 ): AppContainer = AppContainer(
     TestProfiles(), TestSettings(), connection, platform, FakeShareLinkCodec(), node,
     testAccounts(CoroutineScope(Dispatchers.Unconfined)),
     phpHosting = hosting,
     subscriptionApi = subscriptions,
+    botApi = bot,
     scripts = scripts,
 )
 
@@ -96,7 +98,9 @@ class TestPlatform : PlatformServices {
     override suspend fun pickFile(title: String, extensions: List<String>): String? = null
     override fun readTextFile(path: String, maxBytes: Int): String? = null
     override fun qrMatrix(text: String): List<BooleanArray> = emptyList()
-    override fun openUrl(url: String) = Unit
+    /** The addresses opened for the person, in order. */
+    val opened = mutableListOf<String>()
+    override fun openUrl(url: String) { opened += url }
     /** The clock; tests move it. */
     var clock = 1_000_000L
     var clipboard: String? = null
