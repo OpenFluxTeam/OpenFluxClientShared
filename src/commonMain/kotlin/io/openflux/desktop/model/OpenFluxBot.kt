@@ -39,6 +39,9 @@ data class BotSession(
     /** Unix seconds: the session's ceiling (an idle week may end it sooner). */
     val expiresAt: Long = 0,
 ) {
+    /** Signed in through Telegram (the account the bot knows); else by email, an account the bot never sees. */
+    val viaTelegram: Boolean get() = userId in 1 until OpenFluxBot.EMAIL_ACCOUNT_IDS
+
     override fun toString() = "BotSession($userId)"
 }
 
@@ -180,4 +183,4 @@ data class BotBanner(
 
 /** How the person signed in, for the account screen: a number below [OpenFluxBot.EMAIL_ACCOUNT_IDS] is a Telegram id. */
 fun BotSession.accountLabel(): String =
-    if (userId in 1 until OpenFluxBot.EMAIL_ACCOUNT_IDS) "Telegram, id $userId" else "по почте, № $userId"
+    if (viaTelegram) "Telegram, id $userId" else "по почте, № $userId"

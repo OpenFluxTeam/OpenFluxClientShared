@@ -52,7 +52,7 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
     override suspend fun resolve(connectToken: String): BotConnection {
         val o = request("POST", "/api/v1/connect/resolve", null, JsonObject(mapOf("token" to JsonPrimitive(connectToken)))).jsonObject
         val link = o.str("link")
-        if (!link.startsWith("openflux://")) throw BotException("bad_response", "Бот ответил непонятно: обновите приложение")
+        if (!link.startsWith("openflux://")) throw BotException("bad_response", BAD_RESPONSE)
         return BotConnection(o.str("name"), link)
     }
 
@@ -186,7 +186,7 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
             val conn = try {
                 URL(base.trimEnd('/') + path).openConnection() as HttpURLConnection
             } catch (e: IOException) {
-                throw BotException("network", "Бот OpenFlux не отвечает. Проверьте сеть.")
+                throw BotException("network", "Сервис OpenFlux не отвечает. Проверьте сеть.")
             }
             try {
                 conn.requestMethod = method
@@ -215,10 +215,10 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
                 try {
                     json.parseToJsonElement(text.ifBlank { "{}" })
                 } catch (e: Exception) {
-                    throw BotException("bad_response", "Бот ответил непонятно: обновите приложение")
+                    throw BotException("bad_response", BAD_RESPONSE)
                 }
             } catch (e: IOException) {
-                throw BotException("network", "Бот OpenFlux не отвечает. Проверьте сеть.")
+                throw BotException("network", "Сервис OpenFlux не отвечает. Проверьте сеть.")
             } finally {
                 conn.disconnect()
             }

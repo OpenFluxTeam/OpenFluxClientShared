@@ -18,9 +18,9 @@ class HomeBotNoteTest {
     @Test
     fun signedInWithoutAConnectionSaysWhy() = runComposeUiTest {
         val c = testContainer()
-        c.botRepo.save(BotState(session = BotSession("ofs_x", 7, "ivan"), connectionNote = BotAccountManager.NO_SLOT))
+        c.botRepo.save(BotState(session = BotSession("ofs_x", 7, "ivan"), connectionNote = BotAccountManager.NO_FREE_SLOT_TG))
         setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
-        onNodeWithText(BotAccountManager.NO_SLOT).assertIsDisplayed()
+        onNodeWithText(BotAccountManager.NO_FREE_SLOT_TG).assertIsDisplayed()
         onNodeWithText("Открыть подписку").assertIsDisplayed()
     }
 

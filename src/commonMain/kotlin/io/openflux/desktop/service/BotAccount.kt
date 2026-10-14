@@ -418,7 +418,8 @@ class BotAccountManager(
                 refusedAt = platform.now()
             }
             if (paused && e.forbidden) {
-                return repo.save(repo.state.value.copy(preparing = false, connectionNote = PAUSED_NOTE, lastError = unreadable ?: repo.state.value.lastError))
+                val note = if (session.viaTelegram) PAUSED_NOTE else PAUSED_NOTE_EMAIL
+                return repo.save(repo.state.value.copy(preparing = false, connectionNote = note, lastError = unreadable ?: repo.state.value.lastError))
             }
             return ensureFailed(e)
         }
@@ -440,13 +441,23 @@ class BotAccountManager(
         }
         repo.save(repo.state.value.copy(preparing = false, connectionNote = null))
     }
+    /**
+     * Why the service refused a connection, in words for this account. Its own words speak of the bot, so only a
+     * Telegram account gets them; an account by email has no bot and is never sent there.
+     */
+    private fun refusalNote(s: BotState, e: BotException): String {
+        if (s.subscription?.isActive == false) return NO_SUBSCRIPTION
+        if (s.session?.viaTelegram != true) return NO_FREE_SLOT
+        return e.message?.takeIf { it.isNotBlank() && it != HttpForbidden } ?: NO_FREE_SLOT_TG
+    }
+
     private fun ensureFailed(e: BotException) {
         val s = repo.state.value
         repo.save(
             when {
                 e.unauthorized -> s.copy(session = null, subscription = null, preparing = false, pendingInvoice = null)
                 // The service's own words (why there is no slot) when it gave them, else the usual sentence.
-                e.forbidden -> s.copy(preparing = false, connectionNote = e.message?.takeIf { it.isNotBlank() && it != HttpForbidden } ?: NO_SLOT)
+                e.forbidden -> s.copy(preparing = false, connectionNote = refusalNote(s, e))
                 e.notFound -> s.copy(preparing = true, connectionNote = null) // the link is not ready yet
                 else -> s.copy(preparing = false, lastError = e.message)
             },
@@ -499,11 +510,16 @@ class BotAccountManager(
         private const val RUNNING = "running"
         private const val PAUSED = "paused"
         const val PAUSED_NOTE = "Подключения приостановлены в боте и заняли все места. Они уже добавлены здесь: возобновите одно в боте, в «☁️ Мои подключения», и оно заработает само"
+        /** An account by email has no bot: a paused connection cannot be resumed from here yet (the REST API has no way). */
+        const val PAUSED_NOTE_EMAIL = "Подключение приостановлено и занимает место. Возобновить его из приложения пока нельзя: купите ещё одно место в разделе «Подписка»"
+        const val NO_SUBSCRIPTION = "Подключения нет: подписка не действует. Купите её в разделе «Подписка»"
+        /** The subscription holds, yet no automatic slot is free: all are taken, or a slot is a manual one (own documents). */
+        const val NO_FREE_SLOT = "Подключения нет: все места подписки заняты или место настраивается вручную (свои документы). Купите ещё одно место в разделе «Подписка»"
+        const val NO_FREE_SLOT_TG = "$NO_FREE_SLOT или освободите место в @${OpenFluxBot.USERNAME}"
         const val GONE = "Бот больше не обслуживает это подключение: подписка закончилась или подключение заменили. Возьмите новую ссылку в @${OpenFluxBot.USERNAME}"
         const val UNREADABLE = "Не удалось прочитать подключение от бота: обновите приложение"
         /** A connection in one of these statuses is over; any other (running, creating, starting…) is still the account's. */
         private val ENDED = setOf("stopped", "failed", "error", "deleted", "expired")
-        const val NO_SLOT ="Подключения нет: подписка не действует или все места заняты. Продлите подписку в @${OpenFluxBot.USERNAME}"
         private const val PREPARE_MS = 15 * 1000L
         private const val WATCH_MS = 20 * 1000L
         private const val PAYMENT_MS = 30 * 1000L

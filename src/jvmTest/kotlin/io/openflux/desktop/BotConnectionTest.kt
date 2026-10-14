@@ -34,7 +34,8 @@ class BotConnectionTest {
         val links = mutableMapOf<String, BotConnection>()
         var sessionsError: BotException? = null
         var signedOut = 0
-        override suspend fun subscription(token: String) = BotSubscription(planId = "own30", planName = "Start", status = "active", isActive = true)
+        var subscription = BotSubscription(planId = "own30", planName = "Start", status = "active", isActive = true)
+        override suspend fun subscription(token: String) = subscription
         override suspend fun signOut(token: String) { signedOut++ }
         override suspend fun resolve(connectToken: String) = links[connectToken] ?: throw BotException("not_found", "Не найдено")
         override suspend fun sessions(token: String): List<BotSessionItem> = sessionsError?.let { throw it } ?: sessions.toList()
@@ -120,7 +121,7 @@ class BotConnectionTest {
     fun noFreeSlotSaysSo() = runTest {
         val (m, c, api) = env()
         m.completeLogin(session)
-        assertEquals(BotAccountManager.NO_SLOT, m.state.value.connectionNote)
+        assertEquals(BotAccountManager.NO_FREE_SLOT_TG, m.state.value.connectionNote)
         assertFalse(m.state.value.preparing)
         assertNull(m.state.value.lastError)
         assertEquals(session, m.state.value.session, "still signed in")
@@ -263,9 +264,61 @@ class BotConnectionTest {
         m.completeLogin(session)
         assertEquals("Slot 2", c.profiles.profiles.value.single().name, "the paused connection is added: it works once resumed")
         assertTrue(m.state.value.links.single().account)
-        assertEquals(1, api.created, "a new one is still asked for: an automatic slot brings the paused one back")
+        assertEquals(1, api.created, "a new one is still asked for: a free automatic slot may be there")
         assertEquals(BotAccountManager.PAUSED_NOTE, m.state.value.connectionNote)
         assertFalse(m.state.value.preparing, "not waiting for a connection that is not coming")
+    }
+
+    // ---- the words, by how the person signed in ----
+
+    private val byEmail = BotSession("ofs_e", 10_000_000_000_000_001, "", 1_900_000_000)
+
+    @Test
+    fun withoutASubscriptionTheNoteSaysToBuyHere() = runTest {
+        val (m, _, api) = env()
+        api.subscription = BotSubscription(planId = "none", status = "inactive", isActive = false)
+        m.completeLogin(byEmail)
+        assertEquals(BotAccountManager.NO_SUBSCRIPTION, m.state.value.connectionNote)
+        m.signOut()
+        m.completeLogin(session)
+        assertEquals(BotAccountManager.NO_SUBSCRIPTION, m.state.value.connectionNote, "the same for Telegram: buying is here now")
+    }
+
+    @Test
+    fun anEmailAccountIsNeverSentToTheBot() = runTest {
+        val (m, _, api) = env()
+        m.completeLogin(byEmail)
+        assertEquals(BotAccountManager.NO_FREE_SLOT, m.state.value.connectionNote)
+        assertFalse("@" in m.state.value.connectionNote!! || "бот" in m.state.value.connectionNote!!, "an email account has no bot")
+
+        // The service's own words speak of the bot: not for an email account.
+        api.create = { throw BotException("forbidden", "Место занимает приостановленное подключение: освободите его в боте, в «Мои подключения».") }
+        m.refresh()
+        assertEquals(BotAccountManager.NO_FREE_SLOT, m.state.value.connectionNote)
+    }
+
+    @Test
+    fun aPausedConnectionOfAnEmailAccountIsNotSentToTheBot() = runTest {
+        val (m, _, api) = env()
+        api.sessions += BotSessionItem("s1", "paused", tokenA)
+        api.links[tokenA] = BotConnection("Slot 2", link("x", "ab".repeat(32)))
+        m.completeLogin(byEmail)
+        assertEquals(BotAccountManager.PAUSED_NOTE_EMAIL, m.state.value.connectionNote)
+        assertFalse("бот" in BotAccountManager.PAUSED_NOTE_EMAIL)
+    }
+
+    @Test
+    fun theWordsSayWhatToDoHere() {
+        for (note in listOf(BotAccountManager.NO_SUBSCRIPTION, BotAccountManager.NO_FREE_SLOT, BotAccountManager.NO_FREE_SLOT_TG, BotAccountManager.PAUSED_NOTE_EMAIL)) {
+            assertTrue("«Подписка»" in note, note)
+            assertFalse("Продлите подписку в" in note, "renewing is not the only reason: $note")
+        }
+    }
+
+    @Test
+    fun theSignInWayIsKnownFromTheAccountNumber() {
+        assertTrue(session.viaTelegram)
+        assertFalse(byEmail.viaTelegram)
     }
 
     @Test
