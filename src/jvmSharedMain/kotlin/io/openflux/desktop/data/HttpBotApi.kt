@@ -4,8 +4,6 @@ import io.openflux.desktop.model.BotException
 import io.openflux.desktop.model.BotSession
 import io.openflux.desktop.model.BotSessionItem
 import io.openflux.desktop.model.BotSubscription
-import io.openflux.desktop.model.LoginPoll
-import io.openflux.desktop.model.LoginStart
 import io.openflux.desktop.model.OpenFluxBot
 import io.openflux.desktop.service.BotApi
 import io.openflux.desktop.service.BotConnection
@@ -53,28 +51,21 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appKey:
         return BotConnection(o.str("name"), link)
     }
 
-    override suspend fun startLogin(): LoginStart {
-        val o = appRequest("/api/v1/auth/app/start", JsonObject(emptyMap())).jsonObject
-        val nonce = o.str("nonce")
-        val link = o.str("deepLink")
-        if (nonce.isEmpty() || !link.startsWith("https://t.me/")) throw BotException("bad_response", "Бот ответил непонятно: обновите приложение")
-        return LoginStart(nonce, link, o.long("expiresAt"))
-    }
-
-    override suspend fun pollLogin(nonce: String): LoginPoll {
-        val o = appRequest("/api/v1/auth/app/poll", JsonObject(mapOf("nonce" to JsonPrimitive(nonce)))).jsonObject
-        return when (o.str("status")) {
-            "pending" -> LoginPoll.Pending
-            "denied" -> LoginPoll.Denied
-            "expired", "unknown" -> LoginPoll.Expired
-            "approved" -> {
-                val auth = o["auth"] as? JsonObject
-                val token = auth?.str("token").orEmpty()
-                if (auth == null || token.isEmpty()) throw BotException("bad_response", "Бот не выдал сессию: обновите приложение")
-                LoginPoll.Approved(BotSession(token, auth.long("userId"), auth.str("username"), auth.long("expiresAt")))
-            }
-            else -> throw BotException("bad_response", "Бот ответил непонятно: обновите приложение")
+    override suspend fun exchange(code: String, verifier: String, redirectUri: String): BotSession {
+        if (appKey.isEmpty()) throw BotException("no_app_key", "Вход в этой сборке выключен: в ней нет ключа приложения")
+        val body = JsonObject(
+            mapOf("code" to JsonPrimitive(code), "code_verifier" to JsonPrimitive(verifier), "redirect_uri" to JsonPrimitive(redirectUri)),
+        )
+        val o = try {
+            request("POST", "/api/v1/auth/app/exchange", null, body, mapOf("X-App-Key" to appKey)).jsonObject
+        } catch (e: BotException) {
+            throw signInError(e)
         }
+        val token = o.str("token")
+        if (token.isEmpty()) throw BotException("bad_response", "Сервис не выдал сессию: обновите приложение")
+        val userId = o.long("userId").takeIf { it > 0 } ?: o.long("user_id")
+        val expiresAt = o.long("expiresAt").takeIf { it > 0 } ?: o.long("expires_at")
+        return BotSession(token, userId, "", expiresAt)
     }
 
     override suspend fun sessions(token: String): List<BotSessionItem> {
@@ -90,15 +81,14 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appKey:
 
     private fun sessionItem(o: JsonObject) = BotSessionItem(o.str("sessionId"), o.str("status"), o.str("connectToken"))
 
-    /** A sign-in call: the app's key goes in X-App-Key; a key the service refuses means this build may no longer sign in. */
-    private suspend fun appRequest(path: String, body: JsonObject): JsonElement {
-        if (appKey.isEmpty()) throw BotException("no_app_key", "Вход через Telegram в этой сборке выключен: в ней нет ключа приложения")
-        return try {
-            request("POST", path, null, body, mapOf("X-App-Key" to appKey))
-        } catch (e: BotException) {
-            if (e.unauthorized || e.forbidden) throw BotException("app_disabled", "Эта версия приложения больше не может войти. Обновите приложение")
-            throw e
-        }
+    /** The service answers every failed sign-in alike (401): wrong or used code, unconfirmed email, foreign address, bad key. */
+    private fun signInError(e: BotException): BotException = when (e.code) {
+        "unauthorized" -> BotException("sign_in_failed", "Не получилось войти. Если входили по почте, подтвердите адрес по ссылке из письма и попробуйте снова")
+        "forbidden" -> BotException("blocked", "Этот аккаунт заблокирован. Напишите в поддержку в @${OpenFluxBot.USERNAME}")
+        "not_found" -> BotException("not_ready", "Сервис пока не принимает вход из приложения. Попробуйте позже")
+        "http_503" -> BotException("unavailable", "Вход временно недоступен, попробуйте через пару минут")
+        "http_400" -> BotException("bad_request", "Приложение отправило неверный запрос входа: обновите приложение")
+        else -> e
     }
 
     private fun JsonObject.str(k: String) = (this[k] as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -128,7 +118,7 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appKey:
                 val stream = if (code >= 400) conn.errorStream else conn.inputStream
                 val text = stream?.use { it.readNBytes(MAX_BYTES).toString(Charsets.UTF_8) }.orEmpty()
                 when {
-                    code == 401 -> throw BotException("unauthorized", "Войдите через Telegram заново")
+                    code == 401 -> throw BotException("unauthorized", "Войдите заново")
                     code == 403 -> throw BotException("forbidden", "Нет доступа: подписка не действует или нет свободного места")
                     code == 404 -> throw BotException("not_found", "Не найдено")
                     code == 429 -> throw BotException("rate_limited", "Слишком много запросов к боту, подождите минуту")

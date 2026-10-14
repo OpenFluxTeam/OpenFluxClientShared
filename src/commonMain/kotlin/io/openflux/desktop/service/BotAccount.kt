@@ -6,8 +6,6 @@ import io.openflux.desktop.model.BotSession
 import io.openflux.desktop.model.BotSessionItem
 import io.openflux.desktop.model.BotState
 import io.openflux.desktop.model.BotSubscription
-import io.openflux.desktop.model.LoginPoll
-import io.openflux.desktop.model.LoginStart
 import io.openflux.desktop.model.OpenFluxBot
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ProfileSource
@@ -37,9 +35,9 @@ interface BotApi {
     /** The connection behind a short link; not_found once it ended or was replaced. */
     suspend fun resolve(connectToken: String): BotConnection
 
-    /** Begins a Telegram sign-in: the link that opens the bot, and the nonce to ask about. */
-    suspend fun startLogin(): LoginStart = throw BotException("unsupported", "Бот OpenFlux здесь не поддерживается")
-    suspend fun pollLogin(nonce: String): LoginPoll = throw BotException("unsupported", "Бот OpenFlux здесь не поддерживается")
+    /** Trades the sign-in page's one-time code for our session (POST /api/v1/auth/app/exchange). */
+    suspend fun exchange(code: String, verifier: String, redirectUri: String): BotSession =
+        throw BotException("unsupported", "Вход здесь не поддерживается")
     /** The account's connections. */
     suspend fun sessions(token: String): List<BotSessionItem> = throw BotException("unsupported", "Бот OpenFlux здесь не поддерживается")
     /** Makes a connection in a free automatic slot; "forbidden" when there is none. */
@@ -68,7 +66,7 @@ class InMemoryBotRepository : BotRepository {
  * The OpenFlux bot on this device, until its API takes apps directly: people buy in the bot, which gives each
  * connection a short link. The app turns such a link into a profile ([ProfileSource.Bot], read-only like a
  * subscription's), keeps it current and says when the bot no longer serves it (the subscription ended, or the
- * connection was replaced: the bot then gives a new link). A Telegram sign-in shows the subscription itself.
+ * connection was replaced: the bot then gives a new link). A sign-in (email or Telegram, on the OpenFlux page) shows the subscription itself.
  */
 class BotAccountManager(
     private val api: BotApi,
@@ -90,9 +88,8 @@ class BotAccountManager(
 
     // ---- signing in ----
 
-    suspend fun startLogin(): LoginStart = api.startLogin()
-
-    suspend fun pollLogin(nonce: String): LoginPoll = api.pollLogin(nonce)
+    /** The session for a code the sign-in page gave; [completeLogin] then keeps it. */
+    suspend fun exchange(code: String, verifier: String, redirectUri: String): BotSession = api.exchange(code, verifier, redirectUri)
 
     /** Keeps the session a finished Telegram sign-in gave, then brings the account's subscription and connection in. */
     suspend fun completeLogin(session: BotSession) {

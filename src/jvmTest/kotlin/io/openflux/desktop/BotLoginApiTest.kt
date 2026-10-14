@@ -5,9 +5,10 @@ import io.openflux.desktop.data.HttpBotApi
 import io.openflux.desktop.model.BotException
 import io.openflux.desktop.model.BotSession
 import io.openflux.desktop.model.BotSessionItem
-import io.openflux.desktop.model.LoginPoll
-import io.openflux.desktop.model.LoginStart
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import kotlin.test.AfterTest
@@ -46,62 +47,60 @@ class BotLoginApiTest {
     private val key = "ofk_testtesttesttest"
 
     @Test
-    fun startLoginSendsTheKeyAndReadsTheLink() = runBlocking {
-        val api = HttpBotApi(server { _, _ -> 200 to """{"nonce":"n123","deepLink":"https://t.me/openflux_bot?start=auth_n123","expiresAt":"1900000000"}""" }, key)
-        val s = api.startLogin()
-        assertEquals(LoginStart("n123", "https://t.me/openflux_bot?start=auth_n123", 1900000000), s)
+    fun exchangeSendsTheCodeVerifierAndAddressWithTheKey() = runBlocking {
+        val api = HttpBotApi(server { _, _ -> 200 to """{"userId":"7","role":"user","token":"ofs_tok","expiresAt":"1900000000","sessionId":"s1"}""" }, key)
+        val s = api.exchange("c0de", "v".repeat(43), "http://127.0.0.1:47621/callback")
+        assertEquals(BotSession("ofs_tok", 7, "", 1900000000), s)
         val r = seen.single()
-        assertEquals("/api/v1/auth/app/start", r.path)
+        assertEquals("/api/v1/auth/app/exchange", r.path)
         assertEquals(key, r.header("X-App-Key"))
+        assertEquals(null, r.header("Authorization"))
+        val body = Json.parseToJsonElement(r.body).jsonObject
+        assertEquals("c0de", body["code"]!!.jsonPrimitive.content)
+        assertEquals("v".repeat(43), body["code_verifier"]!!.jsonPrimitive.content)
+        assertEquals("http://127.0.0.1:47621/callback", body["redirect_uri"]!!.jsonPrimitive.content)
     }
 
     @Test
-    fun aLinkThatIsNotTelegramsIsRefused() = runBlocking {
-        val api = HttpBotApi(server { _, _ -> 200 to """{"nonce":"n1","deepLink":"https://evil.example/x","expiresAt":"1"}""" }, key)
-        assertEquals("bad_response", assertFailsWith<BotException> { api.startLogin() }.code)
+    fun snakeCaseAnswersAreReadToo() = runBlocking {
+        val api = HttpBotApi(server { _, _ -> 200 to """{"user_id":"10000000000000001","token":"ofs_t","expires_at":"1900000000"}""" }, key)
+        assertEquals(BotSession("ofs_t", 10000000000000001, "", 1900000000), api.exchange("c", "v".repeat(43), "x:/y"))
     }
 
     @Test
-    fun pollReadsEveryStatus() = runBlocking {
-        val answers = ArrayDeque(
-            listOf(
-                """{"status":"pending"}""",
-                """{"status":"approved","auth":{"token":"ofs_tok","userId":"7","username":"ivan","role":"user","expiresAt":"1900000000","sessionId":"s1"}}""",
-                """{"status":"denied"}""",
-                """{"status":"expired"}""",
-                """{"status":"unknown"}""",
-            ),
-        )
-        val api = HttpBotApi(server { _, _ -> 200 to answers.removeFirst() }, key)
-        assertEquals(LoginPoll.Pending, api.pollLogin("n"))
-        assertEquals(LoginPoll.Approved(BotSession("ofs_tok", 7, "ivan", 1900000000)), api.pollLogin("n"))
-        assertEquals(LoginPoll.Denied, api.pollLogin("n"))
-        assertEquals(LoginPoll.Expired, api.pollLogin("n"))
-        assertEquals(LoginPoll.Expired, api.pollLogin("n"), "an unknown nonce is as good as an expired one")
-        assertTrue(seen.all { it.path == "/api/v1/auth/app/poll" && it.header("X-App-Key") == key && """"nonce":"n"""" in it.body })
+    fun exchangeWithoutAKeyNeverCallsTheService() = runBlocking {
+        val api = HttpBotApi(server { _, _ -> 200 to "{}" }, "")
+        assertEquals("no_app_key", assertFailsWith<BotException> { api.exchange("c", "v".repeat(43), "x:/y") }.code)
+        assertTrue(seen.isEmpty(), "nothing leaves the device without a key")
     }
 
     @Test
-    fun anApprovedAnswerWithoutATokenIsBroken() = runBlocking {
-        val api = HttpBotApi(server { _, _ -> 200 to """{"status":"approved","auth":{"userId":"7"}}""" }, key)
-        assertEquals("bad_response", assertFailsWith<BotException> { api.pollLogin("n") }.code)
+    fun anAnswerWithoutATokenIsRefused() = runBlocking {
+        val api = HttpBotApi(server { _, _ -> 200 to """{"userId":"7"}""" }, key)
+        assertEquals("bad_response", assertFailsWith<BotException> { api.exchange("c", "v".repeat(43), "x:/y") }.code)
     }
 
     @Test
-    fun aDisabledAppIsNamed() = runBlocking {
-        for (code in listOf(401, 403)) {
-            val api = HttpBotApi(server { _, _ -> code to """{"code":16,"message":"app disabled"}""" }, key)
-            assertEquals("app_disabled", assertFailsWith<BotException> { api.startLogin() }.code, "start $code")
-            assertEquals("app_disabled", assertFailsWith<BotException> { api.pollLogin("n") }.code, "poll $code")
+    fun everyRefusalOfTheServiceHasItsOwnCode() = runBlocking {
+        val cases = mapOf(400 to "bad_request", 401 to "sign_in_failed", 403 to "blocked", 404 to "not_ready", 429 to "rate_limited", 503 to "unavailable")
+        for ((status, code) in cases) {
+            val api = HttpBotApi(server { _, _ -> status to """{"code":16,"message":"sign-in failed"}""" }, key)
+            assertEquals(code, assertFailsWith<BotException> { api.exchange("c", "v".repeat(43), "x:/y") }.code, "HTTP $status")
         }
     }
 
     @Test
-    fun noKeyNoLogin() = runBlocking {
-        val api = HttpBotApi(server { _, _ -> 200 to "{}" }, "")
-        assertEquals("no_app_key", assertFailsWith<BotException> { api.startLogin() }.code)
-        assertEquals("no_app_key", assertFailsWith<BotException> { api.pollLogin("n") }.code)
-        assertTrue(seen.isEmpty(), "nothing leaves the device without a key")
+    fun aFailedSignInMentionsTheEmailConfirmation() = runBlocking {
+        val api = HttpBotApi(server { _, _ -> 401 to "{}" }, key)
+        val e = assertFailsWith<BotException> { api.exchange("c", "v".repeat(43), "x:/y") }
+        assertTrue(e.message!!.contains("подтвердите"), e.message)
+    }
+
+    @Test
+    fun theCodeAndVerifierNeverReachAnErrorMessage() = runBlocking {
+        val api = HttpBotApi(server { _, _ -> 500 to "{}" }, key)
+        val e = assertFailsWith<BotException> { api.exchange("SECRETCODE", "SECRETVERIFIER".padEnd(43, 'x'), "x:/y") }
+        assertFalse(e.message!!.contains("SECRET"))
     }
 
     @Test
@@ -125,7 +124,6 @@ class BotLoginApiTest {
 
     @Test
     fun secretsStayOutOfToString() {
-        val s = LoginStart("secretnonce", "https://t.me/openflux_bot?start=auth_secretnonce", 5)
-        assertFalse("secretnonce" in s.toString())
+        assertFalse("ofs_secret" in BotSession("ofs_secret", 7).toString())
     }
 }

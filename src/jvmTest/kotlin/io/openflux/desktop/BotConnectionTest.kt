@@ -7,8 +7,6 @@ import io.openflux.desktop.model.BotSessionItem
 import io.openflux.desktop.model.BotSubscription
 import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
-import io.openflux.desktop.model.LoginPoll
-import io.openflux.desktop.model.LoginStart
 import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.ShareConfig
 import io.openflux.desktop.model.ShareTransport
@@ -180,7 +178,7 @@ class BotConnectionTest {
         api.sessions += BotSessionItem("s1", "running", tokenA)
         api.links[tokenA] = BotConnection("Аккаунт", link("x", "22".repeat(32)))
         m.completeLogin(session)
-        api.sessionsError = BotException("unauthorized", "Войдите через Telegram заново")
+        api.sessionsError = BotException("unauthorized", "Войдите заново")
         m.refresh()
         assertNull(m.state.value.session)
         assertEquals(1, c.profiles.profiles.value.size, "the connection keeps working until the bot ends it")
@@ -197,15 +195,13 @@ class BotConnectionTest {
     }
 
     @Test
-    fun loginCallsGoToTheApi() = runTest {
+    fun theExchangeGoesToTheApi() = runTest {
         val api = object : BotApi by Bot() {
-            override suspend fun startLogin() = LoginStart("n", "https://t.me/openflux_bot?start=auth_n", 5)
-            override suspend fun pollLogin(nonce: String) = LoginPoll.Pending
+            override suspend fun exchange(code: String, verifier: String, redirectUri: String) = session
         }
         val c = testContainer()
         val m = BotAccountManager(api, InMemoryBotRepository(), c.profiles, c.shareCodec, c.platform, c.connection, testAccounts(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined)))
-        assertEquals("n", m.startLogin().nonce)
-        assertEquals(LoginPoll.Pending, m.pollLogin("n"))
+        assertEquals(session, m.exchange("c", "v".repeat(43), "x:/y"))
     }
 
     // ---- fixes from the whole-branch review ----

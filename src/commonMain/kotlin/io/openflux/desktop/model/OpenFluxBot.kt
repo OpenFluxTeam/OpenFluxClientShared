@@ -12,6 +12,8 @@ object OpenFluxBot {
     const val CHAT_URL = "https://t.me/$USERNAME"
     const val API = "https://api.openflux.dev"
     const val LINK_HOST = "link.openflux.dev"
+    /** Accounts made by an email sign-in get numbers from here up; below it the number is the person's Telegram id. */
+    const val EMAIL_ACCOUNT_IDS = 10_000_000_000_000_000L
 
     private val TOKEN = Regex("^[A-Za-z0-9_-]{16,64}$")
 
@@ -84,24 +86,11 @@ data class BotState(
     val connectionNote: String? = null,
 )
 
-/** A failed bot API call; [code] is "network", "unauthorized", "forbidden", "not_found" or "http_<n>", and for a sign-in "no_app_key" or "app_disabled". */
+/** A failed API call; [code] is "network", "unauthorized", "forbidden", "not_found", "rate_limited" or "http_<n>", and for a sign-in "no_app_key", "sign_in_failed", "blocked", "not_ready", "unavailable" or "bad_request". */
 class BotException(val code: String, message: String) : Exception(message) {
     val unauthorized: Boolean get() = code == "unauthorized"
     val forbidden: Boolean get() = code == "forbidden"
     val notFound: Boolean get() = code == "not_found"
-}
-
-/** A Telegram sign-in the app began: [nonce] is its secret, [deepLink] opens the bot with it; [expiresAt] is unix seconds. */
-data class LoginStart(val nonce: String, val deepLink: String, val expiresAt: Long) {
-    override fun toString() = "LoginStart(expiresAt=$expiresAt)"
-}
-
-/** The bot's answer to "did the person approve?". [Approved] carries the session once. */
-sealed interface LoginPoll {
-    data object Pending : LoginPoll
-    data class Approved(val session: BotSession) : LoginPoll
-    data object Denied : LoginPoll
-    data object Expired : LoginPoll
 }
 
 /** One of the account's connections as GET /api/v1/sessions reports it: [connectToken] resolves to its `openflux://` link. */
