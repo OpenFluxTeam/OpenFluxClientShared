@@ -4,6 +4,7 @@ import io.openflux.desktop.model.BotBanner
 import io.openflux.desktop.model.BotException
 import io.openflux.desktop.model.BotInvoice
 import io.openflux.desktop.model.BotLink
+import io.openflux.desktop.model.BotPendingInvoice
 import io.openflux.desktop.model.BotPlan
 import io.openflux.desktop.model.BotSession
 import io.openflux.desktop.model.BotSessionItem
@@ -22,7 +23,9 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -93,15 +96,116 @@ class BotAccountManager(
     private val platform: PlatformServices,
     private val connection: ConnectionService,
     private val accounts: Accounts,
+    /** A new Idempotency-Key for a purchase. */
+    private val newIdempotencyKey: () -> String = ::randomIdempotencyKey,
 ) {
     val state: StateFlow<BotState> get() = repo.state
     private val lock = Mutex()
 
-    /** Asks the background loop to look again now (a sign-in just finished). */
+    /** Asks the background loop to look again now (a sign-in just finished, a window opened). */
     private val wake = Channel<Unit>(Channel.CONFLATED)
 
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+
+    /** How many windows show the account now: while any does, the loop asks every [WATCH_MS]. */
+    private val watchers = MutableStateFlow(0)
+
+    /** The subscription a connection was last refused for, and when: not asked again for it every few seconds. */
+    private var refusedFor: BotSubscription? = null
+    private var refusedAt = 0L
+
+    // ---- following the bot ----
+
+    /**
+     * A window that shows the account opened: the service has no way to tell the app of a change made in the bot
+     * (a renewal, a paused connection, a payment), so the app asks at once and then every [WATCH_MS] until the
+     * window [AutoCloseable.close]s what this returns. Closing twice is harmless.
+     */
+    fun watch(): AutoCloseable {
+        watchers.update { it + 1 }
+        wake.trySend(Unit)
+        var closed = false
+        return AutoCloseable {
+            if (!closed) {
+                closed = true
+                watchers.update { it - 1 }
+            }
+        }
+    }
+
+    // ---- buying ----
+
+    /** The terms on sale: the account's own when signed in, else what anybody may buy. */
+    suspend fun plans(): List<BotPlan> = api.plans(repo.state.value.session?.token)
+
+    /**
+     * An invoice for a new slot on [termCode], kept as [BotState.pendingInvoice]. The same term while its invoice waits
+     * gives that invoice back; a call lost on the way (or one the service is still handling) is repeated with the key
+     * it had, so it never makes a second invoice. An invoice paid at once (the free tier) brings the subscription in.
+     */
+    suspend fun checkout(termCode: String): BotInvoice {
+        val inv = lock.withLock {
+            val token = repo.state.value.session?.token ?: throw BotException("unauthorized", "Войдите в аккаунт OpenFlux")
+            val old = repo.state.value.pendingInvoice
+            if (old != null && old.termCode == termCode && old.invoice != null && old.waiting) return old.invoice
+            val pending = if (old != null && old.termCode == termCode && old.invoice == null) old else BotPendingInvoice(termCode, newIdempotencyKey())
+            savePending(pending) // before the call: the key must outlive a call lost on the way
+            val inv = try {
+                api.createInvoice(token, termCode, pending.key)
+            } catch (e: BotException) {
+                // Lost on the way, or still being handled: the service may hold an invoice under this key. Else it holds none.
+                if (e.code != "network" && e.code != "busy") savePending(null)
+                throw e
+            }
+            savePending(pending.copy(invoice = inv))
+            inv
+        }
+        if (inv.paid) afterPayment()
+        return inv
+    }
+
+    /**
+     * Asks about the invoice that waits: paid or expired, it stays as it is until [dismissInvoice] (the window says
+     * so); one the service does not know is forgotten. A payment brings the subscription and the connection in.
+     */
+    suspend fun checkInvoice(): BotInvoice? {
+        val (inv, paidNow) = lock.withLock {
+            val token = repo.state.value.session?.token ?: return repo.state.value.pendingInvoice?.invoice
+            val wasPaid = repo.state.value.pendingInvoice?.invoice?.paid == true
+            val inv = askInvoiceLocked(token)
+            inv to (inv?.paid == true && !wasPaid)
+        }
+        if (paidNow) afterPayment()
+        return inv
+    }
+
+    /** Forgets the purchase (the person saw it paid or ended, or gave it up: an unpaid invoice then just ends). */
+    suspend fun dismissInvoice() = lock.withLock { savePending(null) }
+
+    private suspend fun askInvoiceLocked(token: String): BotInvoice? {
+        val p = repo.state.value.pendingInvoice ?: return null
+        val before = p.invoice ?: return null
+        if (!p.waiting) return before
+        val inv = try {
+            api.invoice(token, before.id)
+        } catch (e: BotException) {
+            if (e.notFound) {
+                savePending(null)
+                return null
+            }
+            throw e
+        }
+        savePending(p.copy(invoice = inv))
+        return inv
+    }
+
+    private suspend fun afterPayment() {
+        refresh()
+        wake.trySend(Unit)
+    }
+
+    private fun savePending(p: BotPendingInvoice?) = repo.save(repo.state.value.copy(pendingInvoice = p))
 
     // ---- signing in ----
 
@@ -129,7 +233,7 @@ class BotAccountManager(
             mine.forEach { profiles.delete(it.profileId) }
             repo.save(
                 repo.state.value.copy(
-                    session = null, subscription = null, links = repo.state.value.links.filterNot { it.account },
+                    session = null, subscription = null, links = repo.state.value.links.filterNot { it.account }, pendingInvoice = null,
                     preparing = false, connectionNote = null,
                 ),
             )
@@ -174,12 +278,15 @@ class BotAccountManager(
     // ---- keeping it current ----
 
     /** Asks about every connection and, signed in, the subscription. Failures stay on the state, not thrown. */
-    suspend fun refresh() {
+    suspend fun refresh() = refresh(fromLoop = false)
+
+    /** [fromLoop]: the background loop asks, not the person; a connection just refused is not asked for again. */
+    private suspend fun refresh(fromLoop: Boolean) {
         _refreshing.value = true
         try {
             lock.withLock {
                 try {
-                    refreshLocked()
+                    refreshLocked(fromLoop)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -192,7 +299,16 @@ class BotAccountManager(
         }
     }
 
-    private suspend fun refreshLocked() {
+    private suspend fun refreshLocked(fromLoop: Boolean) {
+        // A payment first: the subscription asked below then already has the slot it bought.
+        val signedIn = repo.state.value.session
+        if (signedIn != null && repo.state.value.pendingInvoice?.waiting == true) {
+            try {
+                askInvoiceLocked(signedIn.token)
+            } catch (e: BotException) {
+                // Asked again on the next round; the subscription below says whether the session still holds.
+            }
+        }
         var error: String? = null
         val links = repo.state.value.links.map { link ->
             try {
@@ -224,11 +340,11 @@ class BotAccountManager(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: BotException) {
-                if (e.unauthorized) s.copy(session = null, subscription = null) else s.also { error = e.message }
+                if (e.unauthorized) s.copy(session = null, subscription = null, pendingInvoice = null) else s.also { error = e.message }
             }
         }
         repo.save(s.copy(lastError = error))
-        ensureConnectionLocked()
+        ensureConnectionLocked(fromLoop)
     }
 
     /**
@@ -236,7 +352,7 @@ class BotAccountManager(
      * profile (a paused connection keeps its slot, key and carriers, and works again the moment it is resumed in
      * the bot); a new one is asked for only when none runs and none is being made.
      */
-    private suspend fun ensureConnectionLocked() {
+    private suspend fun ensureConnectionLocked(fromLoop: Boolean) {
         val session = repo.state.value.session ?: return
         // A connection the bot ended or replaced goes; below asks for the current ones.
         for (l in repo.state.value.links.filter { it.account && it.gone }) removeLinkLocked(l.token)
@@ -286,18 +402,27 @@ class BotAccountManager(
                 return
             }
         }
-        // Nothing runs and nothing is being made: a new connection is asked for (an automatic slot brings a paused
-        // one back; otherwise the service says why not).
+        // Nothing runs and nothing is being made: a new connection is asked for in a free automatic slot. The REST API
+        // never brings a paused one back (unlike the bot's "New connection"): it refuses and says why.
+        val sub = repo.state.value.subscription
+        // Refused for this very subscription a moment ago: the loop (every 20 seconds while a window is open) does not
+        // ask again until the subscription changes or a while passed. The person's own refresh always asks.
+        if (fromLoop && repo.state.value.connectionNote != null && refusedFor == sub && platform.now() - refusedAt < RETRY_REFUSED_MS) return
         val made = try {
             api.createSession(session.token)
         } catch (e: CancellationException) {
             throw e
         } catch (e: BotException) {
+            if (e.forbidden) {
+                refusedFor = sub
+                refusedAt = platform.now()
+            }
             if (paused && e.forbidden) {
                 return repo.save(repo.state.value.copy(preparing = false, connectionNote = PAUSED_NOTE, lastError = unreadable ?: repo.state.value.lastError))
             }
             return ensureFailed(e)
         }
+        refusedFor = null
         if (!made.ready) {
             repo.save(repo.state.value.copy(preparing = true, connectionNote = null))
             return
@@ -319,7 +444,7 @@ class BotAccountManager(
         val s = repo.state.value
         repo.save(
             when {
-                e.unauthorized -> s.copy(session = null, subscription = null, preparing = false)
+                e.unauthorized -> s.copy(session = null, subscription = null, preparing = false, pendingInvoice = null)
                 // The service's own words (why there is no slot) when it gave them, else the usual sentence.
                 e.forbidden -> s.copy(preparing = false, connectionNote = e.message?.takeIf { it.isNotBlank() && it != HttpForbidden } ?: NO_SLOT)
                 e.notFound -> s.copy(preparing = true, connectionNote = null) // the link is not ready yet
@@ -328,16 +453,26 @@ class BotAccountManager(
         )
     }
 
-    /** Refreshes when the app starts and then every few hours (every few seconds while the connection is being made). */
+    /**
+     * Refreshes when the app starts and then every quarter of an hour; more often while the connection is being made,
+     * while a window shows the account ([watch]) and while an invoice waits for its payment.
+     */
     fun start(scope: CoroutineScope) {
         scope.launch {
             while (true) {
                 val s = repo.state.value
-                if (s.session != null || s.links.isNotEmpty()) refresh()
+                if (s.session != null || s.links.isNotEmpty()) refresh(fromLoop = true)
                 wake.tryReceive() // a wake-up that came while refreshing is answered by that refresh
-                withTimeoutOrNull(if (repo.state.value.preparing) PREPARE_MS else REFRESH_MS) { wake.receive() }
+                withTimeoutOrNull(nextRoundMs(repo.state.value)) { wake.receive() }
             }
         }
+    }
+
+    private fun nextRoundMs(s: BotState): Long = when {
+        s.preparing -> PREPARE_MS
+        watchers.value > 0 -> WATCH_MS
+        s.session != null && s.pendingInvoice?.invoice != null && s.pendingInvoice.waiting -> PAYMENT_MS
+        else -> REFRESH_MS
     }
 
     private suspend fun profileOf(conn: BotConnection, id: String, link: BotLink?, old: Profile? = null): Profile {
@@ -370,6 +505,16 @@ class BotAccountManager(
         private val ENDED = setOf("stopped", "failed", "error", "deleted", "expired")
         const val NO_SLOT ="Подключения нет: подписка не действует или все места заняты. Продлите подписку в @${OpenFluxBot.USERNAME}"
         private const val PREPARE_MS = 15 * 1000L
-        private const val REFRESH_MS = 3 * 60 * 60 * 1000L
+        private const val WATCH_MS = 20 * 1000L
+        private const val PAYMENT_MS = 30 * 1000L
+        private const val REFRESH_MS = 15 * 60 * 1000L
+        /** A connection refused for the same subscription is asked for by the loop again only after this. */
+        private const val RETRY_REFUSED_MS = 5 * 60 * 1000L
     }
+}
+
+/** 32 letters and digits: unique enough for one person's purchases (the key is not a secret). */
+fun randomIdempotencyKey(): String {
+    val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    return (1..32).map { alphabet[Random.nextInt(alphabet.length)] }.joinToString("")
 }

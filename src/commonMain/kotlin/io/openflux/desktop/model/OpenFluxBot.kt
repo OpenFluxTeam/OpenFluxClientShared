@@ -84,7 +84,24 @@ data class BotState(
     val preparing: Boolean = false,
     /** Why the signed-in account has no connection (no free slot, subscription ended), in words for the person. */
     val connectionNote: String? = null,
+    /** The purchase made from the app last: waiting for its payment, or paid/expired until the person has seen it. */
+    val pendingInvoice: BotPendingInvoice? = null,
 )
+
+/**
+ * A purchase of a slot on the term [termCode]. [key] is its Idempotency-Key, kept from before the call: a call lost on
+ * the way is repeated with it and gets the same invoice, never a second one. [invoice] is null until the service answered.
+ */
+@Serializable
+data class BotPendingInvoice(
+    val termCode: String,
+    val key: String,
+    val invoice: BotInvoice? = null,
+) {
+    /** Still to be paid (or not known yet): asked about until it is paid or ends. */
+    val waiting: Boolean get() = invoice == null || (!invoice.paid && !invoice.expired)
+    override fun toString() = "BotPendingInvoice($termCode, ${invoice?.status})"
+}
 
 /**
  * A failed API call; [code] is "network", "unauthorized", "forbidden", "not_found", "rate_limited" or "http_<n>", for a
