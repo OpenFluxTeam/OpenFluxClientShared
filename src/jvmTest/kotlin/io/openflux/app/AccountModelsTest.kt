@@ -2,6 +2,7 @@ package io.openflux.app
 
 import io.openflux.app.account.SubscriptionModel
 import io.openflux.desktop.model.PlansResult
+import io.openflux.desktop.model.accountLabel
 import io.openflux.desktop.model.SubPlan
 import io.openflux.desktop.model.SubStatus
 import io.openflux.desktop.model.SubscriptionDocument
@@ -65,5 +66,11 @@ class AccountModelsTest {
         val s = SubscriptionModel(c, this)
         s.startTrial(); advanceUntilIdle()
         assertNull(s.error)
+    }
+
+    @Test
+    fun anAccountSaysHowItSignsIn() {
+        assertEquals("Telegram, id 7", io.openflux.desktop.model.BotSession("t", 7).accountLabel())
+        assertEquals("по почте, № 10000000000000001", io.openflux.desktop.model.BotSession("t", 10000000000000001).accountLabel())
     }
 }

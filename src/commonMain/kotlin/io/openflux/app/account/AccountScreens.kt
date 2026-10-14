@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import io.openflux.desktop.model.OpenFluxBot
+import io.openflux.desktop.model.accountLabel
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -64,7 +65,7 @@ fun AccountScreen() {
         val s = state
         if (s == null) {
             Text("На этом устройстве нет подписки.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
-            if (bot.session == null) PrimaryButton("Войти через Telegram", { navigator.open(Dest.Auth) }, Modifier.fillMaxWidth())
+            if (bot.session == null) PrimaryButton("Войти в аккаунт OpenFlux", { navigator.open(Dest.Auth) }, Modifier.fillMaxWidth())
             SecondaryButton("У меня ключ подписки", { navigator.replaceTop(Dest.AddKey) }, Modifier.fillMaxWidth())
             BotSection(m, signInRow = false)
             m.busy?.let { ProgressLine(it) }
@@ -180,12 +181,12 @@ private fun BotSection(m: SubscriptionModel, signInRow: Boolean = true) {
     val bot by container.bot.state.collectAsState()
     val platform = container.platform
     val idle = m.busy == null
-    Section("Бот OpenFlux в Telegram") {
+    Section("Аккаунт OpenFlux") {
         val session = bot.session
         if (session == null) {
-            if (signInRow) RowItem("Войти через Telegram", subtitle = "Подписка и подключение появятся сами", onClick = { navigator.open(Dest.Auth) })
+            if (signInRow) RowItem("Войти в аккаунт OpenFlux", subtitle = "По почте или через Telegram; подписка и подключение появятся сами", onClick = { navigator.open(Dest.Auth) })
         } else {
-            ValueRow("Telegram", if (session.username.isNotBlank()) "@${session.username}" else "id ${session.userId}")
+            ValueRow("Вход", if (session.username.isNotBlank()) "Telegram, @${session.username}" else session.accountLabel())
             val sub = bot.subscription
             when {
                 sub == null -> ValueRow("Подписка", "обновляю…")

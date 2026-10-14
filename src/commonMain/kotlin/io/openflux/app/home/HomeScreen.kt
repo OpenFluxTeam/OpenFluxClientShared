@@ -182,7 +182,7 @@ private fun StartPanel(hasSubscription: Boolean, preparing: Boolean, botSignedIn
     Text("Приступим", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
     Text("Все способы — под кнопкой ＋", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
     Section(null) {
-        RowItem("Войти через Telegram", subtitle = "Подписка и подключение появятся сами", onClick = { navigator.open(Dest.Auth) })
+        RowItem("Войти в аккаунт OpenFlux", subtitle = "По почте или через Telegram; подписка и подключение появятся сами", onClick = { navigator.open(Dest.Auth) })
         RowItem("Ключ или ссылка", subtitle = "От друга или из сервиса", onClick = { navigator.open(Dest.AddKey) })
         RowItem("Свой сервер", subtitle = "VDS по SSH: нода поставится сама", onClick = { navigator.open(Dest.AddServer) })
     }
