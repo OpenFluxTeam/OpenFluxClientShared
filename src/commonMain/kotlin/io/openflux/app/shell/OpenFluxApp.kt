@@ -115,7 +115,10 @@ internal fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortc
                             AddChoice.Manual -> navigator.open(Dest.ProfileEdit())
                             AddChoice.Key -> navigator.open(Dest.AddKey)
                             AddChoice.Scan -> navigator.open(Dest.Scan)
-                            AddChoice.Account -> navigator.open(Dest.Auth)
+                            AddChoice.Account -> {
+                                val signedIn = container.bot.state.value.session != null
+                                navigator.open(if (signedIn) Dest.Account else Dest.Auth)
+                            }
                         }
                     },
                     onDismiss = { addOpen = false },

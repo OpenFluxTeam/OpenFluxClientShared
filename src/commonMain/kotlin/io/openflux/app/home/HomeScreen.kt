@@ -2,15 +2,12 @@ package io.openflux.app.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -35,7 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import io.openflux.app.components.Banner
 import io.openflux.app.components.Chip
 import io.openflux.app.components.Collapsible
@@ -109,7 +105,6 @@ private fun ConnectionState.title(): String = statusLine(this)
 @Composable
 fun HomeRoot() {
     val container = LocalAppContainer.current
-    val navigator = LocalNavigator.current
     val m = remember(container) { HomeModel(container) }
     val profiles by container.profiles.profiles.collectAsState()
     val settings by container.settings.settings.collectAsState()
@@ -117,7 +112,7 @@ fun HomeRoot() {
     val subscription by container.subscription.state.collectAsState()
     val preparing by container.subscription.preparing.collectAsState()
     val bot by container.bot.state.collectAsState()
-    var drawer by rememberSaveable { mutableStateOf(false) }
+    var picker by rememberSaveable { mutableStateOf(false) }
     val chosen = m.selected(profiles)
     ScreenScaffold(null, scroll = false) {
         if (profiles.isEmpty()) {
@@ -126,32 +121,18 @@ fun HomeRoot() {
             }
             return@ScreenScaffold
         }
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val wide = maxWidth >= 840.dp
-            Row(Modifier.fillMaxSize()) {
-                Column(
-                    Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(vertical = AppTheme.spacing.s),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.l),
-                ) {
-                    Main(m, chosen, state, onPick = { drawer = true }, pickable = !wide)
-                }
-                if (wide) {
-                    Box(Modifier.width(1.dp).fillMaxHeight())
-                    Column(
-                        Modifier.width(360.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(start = AppTheme.spacing.l, top = AppTheme.spacing.s),
-                        verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m),
-                    ) {
-                        ConnectionList(m, profiles, chosen, onChosen = {})
-                    }
-                }
-            }
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = AppTheme.spacing.s),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.l),
+        ) {
+            Main(m, chosen, state, onPick = { picker = true })
         }
     }
-    if (drawer) {
-        Sheet(onDismiss = { drawer = false }, title = "Подключение") {
+    if (picker) {
+        Sheet(onDismiss = { picker = false }, title = "Выбрать подключение") {
             Column(Modifier.padding(horizontal = AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
-                ConnectionList(m, profiles, chosen, onChosen = { drawer = false })
+                ConnectionList(m, profiles, chosen, onChosen = { picker = false })
             }
         }
     }
@@ -189,7 +170,7 @@ private fun StartPanel(hasSubscription: Boolean, preparing: Boolean, botSignedIn
 }
 
 @Composable
-private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick: () -> Unit, pickable: Boolean) {
+private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick: () -> Unit) {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
     val toaster = LocalToaster.current
@@ -230,13 +211,13 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         }
     }
     if (chosen != null) {
-        Section(null) {
+        Section("Подключение") {
             RowItem(
                 chosen.name,
                 subtitle = profileLine(chosen),
                 leading = { StatusDot(profileDot(state, chosen.id)) },
-                trailing = if (pickable) ({ Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = AppTheme.colors.textSecondary) }) else null,
-                onClick = if (pickable) onPick else null,
+                trailing = { Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = AppTheme.colors.textSecondary) },
+                onClick = onPick,
             )
         }
     }
@@ -362,7 +343,7 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
                 }
             }
             for (p in list) {
-                ProfileRow(p, selected = p.id == chosen?.id, dot = profileDot(state, p.id), touch = touch, onChoose = { m.choose(p); onChosen() }, onChosen = onChosen)
+                ProfileRow(p, selected = p.id == chosen?.id, dot = profileDot(state, p.id), touch = touch, onChoose = { m.choose(p); onChosen() })
             }
         }
     }
@@ -370,7 +351,7 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
 }
 
 @Composable
-private fun ProfileRow(p: Profile, selected: Boolean, dot: Status, touch: Boolean, onChoose: () -> Unit, onChosen: () -> Unit) {
+private fun ProfileRow(p: Profile, selected: Boolean, dot: Status, touch: Boolean, onChoose: () -> Unit) {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
     val toaster = LocalToaster.current
@@ -384,13 +365,12 @@ private fun ProfileRow(p: Profile, selected: Boolean, dot: Status, touch: Boolea
         leading = { StatusDot(dot) },
         selected = selected,
         onClick = onChoose,
-        onDoubleClick = if (touch) null else ({ actions.connect(p); onChosen() }),
         onLongClick = if (touch) ({ menu = true }) else null,
         trailing = {
             Box {
                 IconAction(Icons.Rounded.MoreVert, "Действия", { menu = true })
                 DropdownMenu(menu, { menu = false }) {
-                    fun go(d: Dest) { menu = false; onChosen(); navigator.open(d) }
+                    fun go(d: Dest) { menu = false; navigator.open(d) }
                     DropdownMenuItem({ Text("Сведения") }, { go(Dest.Profile(p.id)) })
                     if (!p.managed) DropdownMenuItem({ Text("Изменить") }, { go(Dest.ProfileEdit(p.id)) })
                     if (actions.canShare(p)) DropdownMenuItem({ Text("Поделиться") }, { go(Dest.Give(p.id)) })

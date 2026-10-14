@@ -20,6 +20,7 @@ import io.openflux.app.platform.NoScrollbars
 import io.openflux.app.platform.Shortcuts
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 fun homeWorld(conn: ScriptedConnection = ScriptedConnection()): AppContainer {
     val c = testContainer(connection = conn)
@@ -61,5 +62,32 @@ class HomeScreenTest {
         onNodeWithText("Сведения").performClick()
         onNodeWithText("Шифрование").assertIsDisplayed()
         onNodeWithText("AES-256-GCM").assertIsDisplayed()
+    }
+
+    @Test
+    fun theChosenConnectionOpensThePicker() = runComposeUiTest {
+        val c = homeWorld()
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
+        // No side panel and no picker: another connection is not on screen until the row is tapped.
+        assertTrue(onAllNodes(hasText("Франкфурт")).fetchSemanticsNodes().isEmpty(), "no side panel any more")
+        assertTrue(onAllNodes(hasText("Выбрать подключение")).fetchSemanticsNodes().isEmpty(), "the picker is closed")
+        onAllNodes(hasText("Амстердам"))[0].performClick()
+        waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Выбрать подключение")).fetchSemanticsNodes().isNotEmpty() }
+        onNodeWithText("Франкфурт").assertIsDisplayed()
+    }
+
+    @Test
+    fun pickingDoesNotConnectOnlyTheButtonDoes() = runComposeUiTest {
+        val conn = ScriptedConnection()
+        val c = homeWorld(conn)
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
+        onAllNodes(hasText("Амстердам"))[0].performClick()
+        waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Франкфурт")).fetchSemanticsNodes().isNotEmpty() }
+        onNodeWithText("Франкфурт").performClick()
+        waitForIdle()
+        assertEquals("b", c.settings.settings.value.selectedProfileId, "picking chooses")
+        assertEquals(ConnectionState.Idle, conn.state.value, "picking never connects")
+        onNodeWithContentDescription("Подключить").performClick()
+        assertEquals("b", (conn.state.value as ConnectionState.Connected).profile.id, "the button connects the chosen one")
     }
 }
