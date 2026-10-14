@@ -96,13 +96,12 @@
 
 ### 5. Удаляется
 
-- Парольный вход, регистрация, ключ восстановления, смена пароля, удаление аккаунта по паролю: `AuthModel`,
-  `AuthStep`, соответствующие части `SubscriptionModel` и экранов;
-- клиент `opensub` (`HttpSubscriptionApi`, `SubscriptionManager`, `ServiceDefaults` и закреплённый сертификат 141:8443),
-  если он больше нигде не нужен: перед удалением проверить использования; сохранённые сессии `opensub` при обновлении
-  тихо сбрасываются;
-- Login Widget: `Accounts.telegramSignIn`, `OpenFluxBot.signInUrl/RETURN_TO/authResult`, `TelegramUser`, и
-  `BotApi.signIn`, но только после того, как новый вход проверен на эмуляторе.
+- Парольный вход, регистрация и ключ восстановления: `AuthModel`, `AuthStep`, `AuthScreen`. Удалены.
+- Login Widget: `Accounts.telegramSignIn`, `AccountKind.Telegram`, `OpenFluxBot.signInUrl/RETURN_TO/authResult`,
+  `TelegramUser`, `BotApi.signIn`. Удалены вместе с проверкой нового входа.
+- **Остаётся** (решение при реализации): клиент `opensub` (`SubscriptionManager`, `HttpSubscriptionApi`) нужен для ключей-
+  подписок `/sub/…` (`AddKey`), а уже выполненный вход в `opensub` сохраняет управление (смена пароля, устройства,
+  удаление аккаунта) до отдельного решения об отключении сервиса.
 
 Сам сервис `opensub` на 141 не трогаем: он продолжает работать для старых клиентов; решение о его отключении отдельное.
 
@@ -128,8 +127,9 @@
   сессия остановлена).
 - Скриншоты экранов через `SHOTS=<dir> ./gradlew :shared:jvmTest --tests '*Shots*'`: ожидание, отказ, истекло,
   «Готовим локацию», подписка после входа.
-- Эмулятор `OpenFlux_Test`: сквозной проход против локальной заглушки API (HTTP-сервер, имитирующий `start/poll`,
-  `sessions`, `connect/resolve`). С настоящим сервером — после того, как владелец выкатит часть A и выдаст ключ.
+- Сквозной тест по настоящему HTTP (`TelegramLoginWireTest`): реальный `HttpBotApi` и автомат против заглушки, имитирующей `start/poll`,
+  `sessions`, `connect/resolve`. Android и десктоп на настоящем сервере — после того, как владелец выкатит часть A и
+  выдаст ключ; для ручного прохода десктопа есть `StubServiceServe` (`STUB_SERVE=1`, `OPENFLUX_API_BASE`).
 
 ## Порядок работ
 
