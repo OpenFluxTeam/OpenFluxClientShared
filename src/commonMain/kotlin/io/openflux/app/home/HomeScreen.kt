@@ -240,6 +240,9 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
             )
         }
     }
+    if (chosen != null && !exitMode && state.isActive && state.profile?.id != chosen.id) {
+        SecondaryButton("Переключиться на «${chosen.name}»", { m.switchTo(chosen) })
+    }
     if (!exitMode && (platform.fullTunnelSupported || (platform.systemProxySupported && !settings.fullTunnel))) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s, Alignment.CenterHorizontally), modifier = Modifier.fillMaxWidth()) {
             if (platform.fullTunnelSupported) {

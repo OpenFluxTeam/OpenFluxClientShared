@@ -62,10 +62,13 @@ class HomeModel(private val container: AppContainer) {
     fun selected(list: List<Profile> = container.profiles.profiles.value): Profile? =
         list.firstOrNull { it.id == settings.settings.value.selectedProfileId } ?: list.firstOrNull()
 
-    /** Chooses [profile]; while connected, switches to it. */
+    /** Chooses [profile] and nothing more: a running connection switches only on [switchTo]. */
     fun choose(profile: Profile) {
         settings.update { it.copy(selectedProfileId = profile.id) }
-        // A running exit node stays itself: choosing on Home is about what the device connects to as a client.
+    }
+
+    /** Moves a running client connection to [profile]. A running exit node stays itself. */
+    fun switchTo(profile: Profile) {
         if (connection.state.value.isActive && settings.settings.value.mode == ConnectionMode.Client) connection.connect(profile, ConnectionMode.Client)
     }
 

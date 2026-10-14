@@ -93,11 +93,13 @@ class HomeModelTest {
     }
 
     @Test
-    fun choosingWhileConnectedSwitches() {
+    fun choosingWhileConnectedOnlyChoosesUntilSwitched() {
         listOf(a, b).forEach(c.profiles::upsert)
         m.toggle()
         assertEquals("a", (conn.state.value as ConnectionState.Connected).profile.id)
         m.choose(b)
+        assertEquals("a", (conn.state.value as ConnectionState.Connected).profile.id)
+        m.switchTo(b)
         assertEquals("b", (conn.state.value as ConnectionState.Connected).profile.id)
         m.toggle()
         assertEquals(ConnectionState.Idle, conn.state.value)
