@@ -39,6 +39,8 @@ import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.BotState
 import io.openflux.desktop.model.OpenFluxBot
 import io.openflux.desktop.model.SubscriptionKind
+import io.openflux.desktop.model.isActive
+import io.openflux.desktop.model.profile
 import io.openflux.desktop.service.LocalAppContainer
 
 @Composable
@@ -61,6 +63,9 @@ fun AccountScreen() {
     val state by container.subscription.state.collectAsState()
     val bot by container.bot.state.collectAsState()
     var botSignOutAsk by remember { mutableStateOf(false) }
+    var openConnection by remember { mutableStateOf<String?>(null) }
+    val connectionState by container.connection.state.collectAsState()
+    val connectedProfileId = connectionState.profile?.id?.takeIf { connectionState.isActive }
     DisposableEffect(Unit) {
         val watch = container.bot.watch()
         onDispose { watch.close() }
@@ -85,7 +90,9 @@ fun AccountScreen() {
                 onAddLink = { navigator.open(Dest.AddKey) },
                 onRemoveLink = m::removeBotLink,
                 onSignOut = { botSignOutAsk = true },
+                onOpenConnection = { openConnection = it },
             ),
+            connectedProfileId = connectedProfileId,
         )
         Collapsible("Подписка по ключу", initiallyOpen = state != null && bot.session == null) {
             Column(Modifier.fillMaxWidth().padding(vertical = AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
@@ -101,6 +108,25 @@ fun AccountScreen() {
             onConfirm = { botSignOutAsk = false; m.botSignOut() },
             onDismiss = { botSignOutAsk = false },
         )
+    }
+    val shown = openConnection?.let { t -> bot.links.firstOrNull { it.token == t } }
+    if (shown != null) {
+        Sheet(onDismiss = { openConnection = null }, title = shown.name.ifBlank { "Подключение" }) {
+            AccountConnectionContent(
+                shown,
+                viaTelegram = bot.session?.viaTelegram == true,
+                connected = shown.profileId == connectedProfileId,
+                platform = platform,
+                onConnect = {
+                    container.profiles.profiles.value.firstOrNull { it.id == shown.profileId }?.let { p ->
+                        io.openflux.app.shell.connectAsClient(container, p)
+                        toaster.show("Подключаюсь через «${p.name}»")
+                    }
+                    openConnection = null
+                },
+                onOpenBot = m::openBot,
+            )
+        }
     }
     if (buy.isOpen) {
         Sheet(onDismiss = buy::close, title = "Покупка подписки") {
@@ -127,6 +153,7 @@ data class AccountActions(
     val onAddLink: () -> Unit = {},
     val onRemoveLink: (String) -> Unit = {},
     val onSignOut: () -> Unit = {},
+    val onOpenConnection: (String) -> Unit = {},
 )
 
 /** The OpenFlux account: drawn from its state alone, so it is drawn in shots too. */
@@ -138,6 +165,8 @@ fun OpenFluxAccountContent(
     error: String?,
     actions: AccountActions,
     offsetSeconds: Int = 0,
+    /** The profile this device is connected through, to mark that connection. */
+    connectedProfileId: String? = null,
 ) {
     val idle = busy == null
     if (summary == null) {
@@ -163,16 +192,13 @@ fun OpenFluxAccountContent(
     }
     busy?.let { ProgressLine(it) }
     error?.let { Banner(it, Tone.Danger) }
-    Section("Подключения из бота") {
-        for (link in bot.links) {
+    AccountConnectionsSection(bot.links.filter { it.account }, bot.session?.viaTelegram == true, connectedProfileId, actions.onOpenConnection)
+    Section("Подключения по ссылке из бота") {
+        for (link in bot.links.filterNot { it.account }) {
             RowItem(
                 link.name.ifBlank { "Подключение из бота" },
-                subtitle = when {
-                    link.gone -> "закончилось или заменено: возьмите новую ссылку в боте"
-                    link.account -> "подключение аккаунта, обновляется само"
-                    else -> "по ссылке из бота, обновляется само"
-                },
-                trailing = if (link.account) null else ({ TextAction("Убрать", { actions.onRemoveLink(link.token) }, enabled = idle) }),
+                subtitle = if (link.gone) "закончилось или заменено: возьмите новую ссылку в боте" else "обновляется само",
+                trailing = { TextAction("Убрать", { actions.onRemoveLink(link.token) }, enabled = idle) },
             )
         }
         RowItem("Добавить ссылку из бота", subtitle = "link.openflux.dev/…: подключение появится здесь и будет обновляться само", onClick = actions.onAddLink)

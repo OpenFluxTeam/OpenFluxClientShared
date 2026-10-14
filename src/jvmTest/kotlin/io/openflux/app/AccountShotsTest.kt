@@ -35,7 +35,8 @@ class AccountShotsTest {
     )
     private val none = BotSubscription(planId = "none", planName = "No Active Subscription", status = "inactive")
     private val invoice = BotInvoice("0b7c3c3e-5a39-4e43-9c8e-0d7d0d6c1a11", "https://pay.example/x", "30.00", "active", now / 1000, now / 1000 + 86_400)
-    private val accountLink = BotLink("AAAAAAAAAAAAAAAAAAAAAA", "p1", "OpenFlux #4", account = true)
+    private val accountLink = BotLink("AAAAAAAAAAAAAAAAAAAAAA", "p1", "OpenFlux #4", account = true, status = "running")
+    private val pausedLink = BotLink("CCCCCCCCCCCCCCCCCCCCCC", "p3", "OpenFlux #5", account = true, status = "paused")
     private val handLink = BotLink("BBBBBBBBBBBBBBBBBBBBBB", "p2", "Рабочий ноутбук #19")
 
     private fun shot(name: String, bot: BotState, frame: Shots.Frame = Shots.PHONE) =
@@ -53,7 +54,7 @@ class AccountShotsTest {
     @Test fun active() = shot("active", BotState(session = telegram, subscription = sub(27.5), links = listOf(accountLink, handLink)))
     @Test fun activeWide() = shot("active", BotState(session = telegram, subscription = sub(27.5), links = listOf(accountLink)), Shots.WIDE)
     @Test fun endingEmail() = shot("ending-email", BotState(session = email, subscription = sub(2.2), links = listOf(accountLink)))
-    @Test fun severalSlots() = shot("slots", BotState(session = telegram, subscription = sub(10.0, slots = 3), links = listOf(accountLink)))
+    @Test fun severalSlots() = shot("slots", BotState(session = telegram, subscription = sub(10.0, slots = 3), links = listOf(accountLink, pausedLink, handLink)))
     @Test fun noFreeSlot() = shot("no-slot", BotState(session = telegram, subscription = sub(20.0), connectionNote = BotAccountManager.NO_FREE_SLOT_TG))
     @Test fun preparing() = shot("preparing", BotState(session = email, subscription = sub(30.0), preparing = true))
     @Test fun waitingPayment() = shot("waiting", BotState(session = email, subscription = none, pendingInvoice = BotPendingInvoice("own30", "k", invoice)))
@@ -81,4 +82,19 @@ class AccountShotsTest {
     @Test fun waitingSmall() = sheet("waiting", PurchaseUi.Waiting(invoice, start30, null), Shots.SMALL)
     @Test fun paidSheet() = sheet("paid", PurchaseUi.Paid(start30))
     @Test fun expired() = sheet("expired", PurchaseUi.Expired(start30))
+
+    // ---- a connection of the account ----
+
+    private fun connection(name: String, link: BotLink, connected: Boolean = false, tg: Boolean = true) =
+        Shots.render("connection-$name") {
+            val c = testContainer()
+            androidx.compose.runtime.CompositionLocalProvider(io.openflux.desktop.service.LocalAppContainer provides c, io.openflux.app.components.LocalToaster provides io.openflux.app.components.Toaster()) {
+                ScreenScaffold(link.name, onBack = {}) { io.openflux.app.account.AccountConnectionContent(link, tg, connected, c.platform, {}, {}) }
+            }
+        }
+
+    @Test fun connectionRunning() = connection("running", accountLink)
+    @Test fun connectionConnected() = connection("connected", accountLink, connected = true)
+    @Test fun connectionPaused() = connection("paused", pausedLink)
+    @Test fun connectionPausedEmail() = connection("paused-email", pausedLink, tg = false)
 }

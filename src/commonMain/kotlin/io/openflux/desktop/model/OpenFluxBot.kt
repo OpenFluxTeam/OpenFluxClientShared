@@ -72,6 +72,8 @@ data class BotLink(
     val gone: Boolean = false,
     /** The connection of the signed-in account (made or found by the app), not one added by hand: sign-out takes it away. */
     val account: Boolean = false,
+    /** The account's connection as GET /api/v1/sessions last said: "running", "paused", "creating"…; "" when not known. */
+    val status: String = "",
 ) {
     override fun toString() = "BotLink($profileId, gone=$gone)"
 }
@@ -89,6 +91,8 @@ data class BotState(
     val connectionNote: String? = null,
     /** The purchase made from the app last: waiting for its payment, or paid/expired until the person has seen it. */
     val pendingInvoice: BotPendingInvoice? = null,
+    /** What the app already told the person by a notification (the keys of [io.openflux.app.account.accountNotices]). */
+    val noticed: List<String> = emptyList(),
 )
 
 /**

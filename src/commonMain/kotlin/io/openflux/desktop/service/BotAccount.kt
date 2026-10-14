@@ -180,6 +180,9 @@ class BotAccountManager(
         return inv
     }
 
+    /** Keeps what the app already told the person by a notification; under the lock, so no other change is lost. */
+    suspend fun setNoticed(keys: Set<String>) = lock.withLock { repo.save(repo.state.value.copy(noticed = keys.toList())) }
+
     /** Forgets the purchase (the person saw it paid or ended, or gave it up: an unpaid invoice then just ends). */
     suspend fun dismissInvoice() = lock.withLock { savePending(null) }
 
@@ -383,6 +386,8 @@ class BotAccountManager(
                 unreadable = unreadable(e) // one the core cannot read must not hide the others
             }
         }
+        // Each connection of the account keeps its state for the window (running, paused, being made).
+        saveLinks(repo.state.value.links.map { l -> items.firstOrNull { it.connectToken == l.token }?.let { l.copy(status = it.status) } ?: l })
         // A connection that runs and whose link is held: the account has one (a running one whose link is not ready yet is still "being made").
         val running = items.any { item -> item.ready && repo.state.value.links.any { it.token == item.connectToken } }
         val paused = items.any { it.status == PAUSED }

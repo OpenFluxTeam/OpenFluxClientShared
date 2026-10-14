@@ -269,6 +269,23 @@ class BotConnectionTest {
         assertFalse(m.state.value.preparing, "not waiting for a connection that is not coming")
     }
 
+    // ---- each connection's state, for the window ----
+
+    @Test
+    fun eachConnectionOfTheAccountKeepsItsState() = runTest {
+        val (m, _, api) = env()
+        api.sessions += BotSessionItem("s1", "running", tokenA)
+        api.sessions += BotSessionItem("s2", "paused", tokenB)
+        api.links[tokenA] = BotConnection("OpenFlux #1", link("x", "ab".repeat(32)))
+        api.links[tokenB] = BotConnection("OpenFlux #2", link("x", "cd".repeat(32)))
+        m.completeLogin(session)
+        assertEquals(mapOf(tokenA to "running", tokenB to "paused"), m.state.value.links.associate { it.token to it.status })
+
+        api.sessions[1] = BotSessionItem("s2", "running", tokenB) // resumed in the bot
+        m.refresh()
+        assertEquals("running", m.state.value.links.first { it.token == tokenB }.status, "the window follows the bot")
+    }
+
     // ---- the words, by how the person signed in ----
 
     private val byEmail = BotSession("ofs_e", 10_000_000_000_000_001, "", 1_900_000_000)
