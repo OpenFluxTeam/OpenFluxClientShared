@@ -47,6 +47,21 @@ class BotLoginApiTest {
     private val appId = "ofa_testtesttesttest"
 
     @Test
+    fun aRefusalCarriesTheServicesOwnWordsWithoutItsHtmlAndEmoji() = runBlocking {
+        val said = """{"code":7, "message":"session creation blocked: ⚠️ <b>Все ваши оплаченные подключения (2 из 2) уже активны.</b>\n\n<i>💡 Остановите ненужное.</i>", "details":[]}"""
+        val api = HttpBotApi(server { _, _ -> 403 to said }, appId)
+        val e = assertFailsWith<BotException> { api.createSession("ofs_x") }
+        assertEquals("forbidden", e.code)
+        assertEquals("Все ваши оплаченные подключения (2 из 2) уже активны. Остановите ненужное.", e.message)
+    }
+
+    @Test
+    fun aRefusalWithoutWordsKeepsTheUsualSentence() = runBlocking {
+        val api = HttpBotApi(server { _, _ -> 403 to "" }, appId)
+        assertEquals(io.openflux.desktop.service.BotAccountManager.HttpForbidden, assertFailsWith<BotException> { api.createSession("ofs_x") }.message)
+    }
+
+    @Test
     fun exchangeSendsTheCodeVerifierAndAddressWithTheKey() = runBlocking {
         val api = HttpBotApi(server { _, _ -> 200 to """{"userId":"7","role":"user","token":"ofs_tok","expiresAt":"1900000000","sessionId":"s1"}""" }, appId)
         val s = api.exchange("c0de", "v".repeat(43), "http://127.0.0.1:47621/callback")
