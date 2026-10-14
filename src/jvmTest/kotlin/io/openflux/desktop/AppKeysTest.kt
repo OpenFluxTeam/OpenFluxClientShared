@@ -23,4 +23,15 @@ class AppKeysTest {
         assertEquals("http://127.0.0.1:8099", AppKeys.pickBase("http://127.0.0.1:8099"))
         assertEquals("http://localhost:8099", AppKeys.pickBase("http://localhost:8099"))
     }
+
+    @Test
+    fun theIssuerMovesOnlyToThisMachine() {
+        assertEquals("https://id.openflux.dev/realms/openflux", AppKeys.pickIssuer(null))
+        assertEquals("https://id.openflux.dev/realms/openflux", AppKeys.pickIssuer("https://evil.example/realms/openflux"))
+        assertEquals("https://id.openflux.dev/realms/openflux", AppKeys.pickIssuer("http://127.0.0.1.evil.example/realms/openflux"))
+        assertEquals("http://127.0.0.1:8099/realms/openflux", AppKeys.pickIssuer("http://127.0.0.1:8099/realms/openflux/"))
+    }
+
+    @Test
+    fun theDesktopClientDefaultsToOurs() = assertEquals("openflux-desktop", AppKeys.desktopClientId())
 }

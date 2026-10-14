@@ -56,6 +56,11 @@ fun createAppContainer(appVersion: String): AppContainer {
         subscriptionRepo = FileSubscriptionRepository(AppDirs.config),
         botApi = io.openflux.desktop.data.HttpBotApi(io.openflux.desktop.data.AppKeys.apiBase(), io.openflux.desktop.data.AppKeys.desktop()),
         botRepo = io.openflux.desktop.data.FileBotRepository(AppDirs.config),
+        signIn = io.openflux.desktop.data.LoopbackSignIn(
+            io.openflux.desktop.data.AppKeys.desktopClientId(),
+            issuer = io.openflux.desktop.data.AppKeys.idIssuer(),
+            open = platform::openUrl,
+        ),
         settingsPageHost = KcefSettingsPageHost,
     )
     // The subscription's list of locations is refreshed in the background.

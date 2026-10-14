@@ -1,6 +1,7 @@
 package io.openflux.desktop.data
 
 import io.openflux.desktop.model.OpenFluxBot
+import io.openflux.desktop.model.OpenFluxId
 import java.net.URI
 
 /**
@@ -27,5 +28,20 @@ object AppKeys {
         val uri = runCatching { URI(override.orEmpty().trim()) }.getOrNull() ?: return OpenFluxBot.API
         val local = uri.scheme == "http" && (uri.host == "127.0.0.1" || uri.host == "localhost")
         return if (local) override!!.trim().trimEnd('/') else OpenFluxBot.API
+    }
+
+    /** The desktop build's Keycloak client: -Dopenflux.clientId, then OPENFLUX_CLIENT_ID (a stand), else ours. */
+    fun desktopClientId(): String =
+        System.getProperty("openflux.clientId")?.trim()?.takeIf { it.isNotEmpty() }
+            ?: System.getenv("OPENFLUX_CLIENT_ID")?.trim()?.takeIf { it.isNotEmpty() }
+            ?: OpenFluxId.DESKTOP_CLIENT
+
+    /** The sign-in page's issuer; OPENFLUX_ID_ISSUER moves it, but only to this machine (a stand-in for tests). */
+    fun idIssuer(): String = pickIssuer(System.getenv("OPENFLUX_ID_ISSUER"))
+
+    internal fun pickIssuer(override: String?): String {
+        val uri = runCatching { URI(override.orEmpty().trim()) }.getOrNull() ?: return OpenFluxId.ISSUER
+        val local = uri.scheme == "http" && (uri.host == "127.0.0.1" || uri.host == "localhost")
+        return if (local) override!!.trim().trimEnd('/') else OpenFluxId.ISSUER
     }
 }
