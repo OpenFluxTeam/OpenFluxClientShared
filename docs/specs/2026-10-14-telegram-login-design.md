@@ -1,3 +1,5 @@
+> **Superseded 2026-10-14:** the sign-in through the bot was removed in nevex-net/openflux#2; the current plan is `PLAN-client-keycloak-signin.md` in the workspace root.
+
 # Вход через Telegram в приложениях: спецификация
 
 Статус: на согласовании (2026-10-14). Код не написан.
