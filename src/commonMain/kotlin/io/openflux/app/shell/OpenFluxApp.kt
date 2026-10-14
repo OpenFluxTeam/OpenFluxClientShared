@@ -31,6 +31,7 @@ import io.openflux.desktop.model.ThemeMode
 import io.openflux.desktop.service.AppContainer
 import io.openflux.desktop.service.LocalAppContainer
 import io.openflux.desktop.service.PlatformKind
+import io.openflux.desktop.service.isPhone
 import io.openflux.app.platform.BrowserViews
 import io.openflux.app.platform.LocalBrowserViews
 import io.openflux.app.platform.LocalScrollbars
@@ -63,7 +64,7 @@ internal fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortc
         ThemeMode.Light -> false
         ThemeMode.Dark -> true
     }
-    val touch = container.platform.kind == PlatformKind.Android
+    val touch = container.platform.kind.isPhone
     val toaster = remember { Toaster() }
     val navigator = rememberAppNavigator(container)
     val serverLink = remember(container) { link ?: ServerLink(container) }

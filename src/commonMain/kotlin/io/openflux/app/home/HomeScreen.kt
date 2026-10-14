@@ -76,6 +76,7 @@ import io.openflux.desktop.model.managed
 import io.openflux.desktop.model.profile
 import io.openflux.desktop.service.LocalAppContainer
 import io.openflux.desktop.service.PlatformKind
+import io.openflux.desktop.service.isPhone
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -227,7 +228,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     if (!exitMode && (platform.fullTunnelSupported || (platform.systemProxySupported && !settings.fullTunnel))) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s, Alignment.CenterHorizontally), modifier = Modifier.fillMaxWidth()) {
             if (platform.fullTunnelSupported) {
-                Chip(if (platform.kind == PlatformKind.Android) "VPN: весь трафик" else "Весь трафик", settings.fullTunnel, { m.setFullTunnel(!settings.fullTunnel) })
+                Chip(if (platform.kind.isPhone) "VPN: весь трафик" else "Весь трафик", settings.fullTunnel, { m.setFullTunnel(!settings.fullTunnel) })
             }
             if (platform.systemProxySupported && !settings.fullTunnel) {
                 Chip("Системный прокси", settings.systemProxy, { m.setSystemProxy(!settings.systemProxy) })
@@ -270,7 +271,7 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
     val traffic by container.connection.traffic.collectAsState()
     val socks by container.connection.socksAddress.collectAsState()
     val address by container.connection.exitAddress.collectAsState()
-    val android = container.platform.kind == PlatformKind.Android
+    val android = container.platform.kind.isPhone
     fun copy(what: String, text: String) { container.platform.setClipboardText(text); toaster.show("$what скопирован") }
     Section(null) {
         Collapsible("Сведения") {
@@ -325,7 +326,7 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
     val state by container.connection.state.collectAsState()
     val subscription by container.subscription.state.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
-    val touch = container.platform.kind == PlatformKind.Android
+    val touch = container.platform.kind.isPhone
     val shown = if (query.isBlank()) profiles else profiles.filter { p ->
         p.name.contains(query.trim(), ignoreCase = true) || p.carriers.any { it.value.contains(query.trim(), ignoreCase = true) }
     }

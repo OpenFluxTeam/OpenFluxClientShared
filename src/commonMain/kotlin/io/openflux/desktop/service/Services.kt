@@ -154,7 +154,10 @@ interface ConnectionService {
 }
 
 /** Where the app runs; decides wording and touch-sized controls. */
-enum class PlatformKind { Desktop, Android }
+enum class PlatformKind { Desktop, Android, Ios }
+
+/** A phone (Android or iOS): touch UI, the system VPN, a gallery to pick a QR from. */
+val PlatformKind.isPhone: Boolean get() = this != PlatformKind.Desktop
 
 /** Platform facilities the UI needs without touching the platform itself. */
 interface PlatformServices {

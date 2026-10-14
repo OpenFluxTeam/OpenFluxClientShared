@@ -61,6 +61,7 @@ import io.openflux.desktop.model.profile
 import io.openflux.desktop.service.AccountException
 import io.openflux.desktop.service.LocalAppContainer
 import io.openflux.desktop.service.PlatformKind
+import io.openflux.desktop.service.isPhone
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -91,7 +92,7 @@ private fun SettingsPage.dest(): Dest = when (this) {
 @Composable
 fun SettingsRoot(selected: Dest? = null) {
     val navigator = LocalNavigator.current
-    val android = LocalAppContainer.current.platform.kind == PlatformKind.Android
+    val android = LocalAppContainer.current.platform.kind.isPhone
     ScreenScaffold("Настройки") {
         Section(null) {
             for (p in SettingsPage.entries) {
@@ -112,7 +113,7 @@ fun SettingsRoot(selected: Dest? = null) {
 fun SettingsPageScreen(dest: Dest.SettingsPage) {
     val navigator = LocalNavigator.current
     val page = SettingsPage.of(dest.page) ?: return
-    val android = LocalAppContainer.current.platform.kind == PlatformKind.Android
+    val android = LocalAppContainer.current.platform.kind.isPhone
     ScreenScaffold(if (page == SettingsPage.Vpn && android) "VPN" else page.title, onBack = { navigator.back() }) {
         when (page) {
             SettingsPage.Connection -> ConnectionPage()
@@ -138,7 +139,7 @@ private fun NextConnectionNote() {
 private fun ConnectionPage() {
     val container = LocalAppContainer.current
     val settings by container.settings.settings.collectAsState()
-    val android = container.platform.kind == PlatformKind.Android
+    val android = container.platform.kind.isPhone
     var port by remember(settings.socksPort) { mutableStateOf(settings.socksPort.toString()) }
     val parsed = port.toIntOrNull()
     val valid = parsed != null && parsed in 1024..65534
@@ -168,7 +169,7 @@ private fun VpnPage() {
     val container = LocalAppContainer.current
     val settings by container.settings.settings.collectAsState()
     val platform = container.platform
-    val android = platform.kind == PlatformKind.Android
+    val android = platform.kind.isPhone
     fun setFull(on: Boolean) {
         container.settings.update { it.copy(fullTunnel = on) }
         val s = container.connection.state.value
@@ -301,7 +302,7 @@ private fun CorePage() {
     var result by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var downloads by remember { mutableStateOf(0) }
-    if (platform.kind == PlatformKind.Android) {
+    if (platform.kind.isPhone) {
         Section(null) { ValueRow("Встроенное ядро", platform.coreVersion) }
     } else {
         io.openflux.app.components.Group("Файл ядра") {
