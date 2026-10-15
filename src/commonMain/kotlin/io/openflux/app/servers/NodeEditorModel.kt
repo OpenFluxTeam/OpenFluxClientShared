@@ -303,6 +303,24 @@ class NodeEditorModel(
         draft = draft.copy(board = true, boardLink = url)
     }
 
+    /** The node's Telemost conference: the Telemost page opens in the built-in browser and the person makes it there. */
+    fun createTelemost() = run("Открываю Телемост во встроенном браузере…") {
+        val url = accountDocument { container.accounts.createDocument(DocumentKind.TelemostConference, it) } ?: return@run
+        draft = draft.copy(telemost = true, telemostLink = url)
+    }
+
+    /** New Avito Code rooms now (made by the server, as on applying), so their code can be seen, copied or kept. */
+    fun createAvitoRooms() = run("Создаю комнаты Avito…") {
+        val rooms = link.call(serverId) { this.createAvitoRooms() }
+        draft = draft.copy(avito = true, avitoRooms = rooms)
+    }
+
+    /** New cups.online rooms now, the same way. */
+    fun createCupsRooms() = run("Создаю комнаты cups.online…") {
+        val rooms = link.call(serverId) { this.createCupsRooms() }
+        draft = draft.copy(cups = true, cupsRooms = rooms)
+    }
+
     private suspend fun accountDocument(make: suspend (String) -> String): String? = try {
         make(NodeDocuments.fileName(draft.name, host, container.platform.now()))
     } catch (e: AccountException) {
@@ -322,13 +340,13 @@ class NodeEditorModel(
         var r = d
         if (r.cups && r.cupsRooms.isEmpty()) {
             busyText = "Создаю комнаты cups.online…"
-            val rooms = link.call(serverId) { createCupsRooms() }
+            val rooms = link.call(serverId) { this.createCupsRooms() }
             r = r.copy(cupsRooms = rooms)
             draft = draft.copy(cupsRooms = rooms)
         }
         if (r.avito && r.avitoRooms.isEmpty()) {
             busyText = "Создаю комнаты Avito…"
-            val rooms = link.call(serverId) { createAvitoRooms() }
+            val rooms = link.call(serverId) { this.createAvitoRooms() }
             r = r.copy(avitoRooms = rooms)
             draft = draft.copy(avitoRooms = rooms)
         }

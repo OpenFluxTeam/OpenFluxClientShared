@@ -81,7 +81,7 @@ data class NodeDraft(
         }
     }
 
-    /** How many things differ from [original]: each transport turned on/off or relinked, the mode, the name. */
+    /** How many things differ from [original]: each transport turned on/off, relinked or given other rooms, the mode, the name. */
     fun changes(original: NodeDraft): Int {
         var n = 0
         if (name.trim() != original.name.trim()) n++
@@ -91,9 +91,9 @@ data class NodeDraft(
         if (needsYandexDoc && original.needsYandexDoc && yandexDoc.trim() != original.yandexDoc.trim()) n++
         if (mailru != original.mailru) n++ else if (mailru && mailruLink.trim() != original.mailruLink.trim()) n++
         if (board != original.board) n++ else if (board && boardLink.trim() != original.boardLink.trim()) n++
-        if (cups != original.cups) n++
+        if (cups != original.cups) n++ else if (cups && cupsRooms.trim() != original.cupsRooms.trim()) n++
         if (telemost != original.telemost) n++ else if (telemost && telemostLink.trim() != original.telemostLink.trim()) n++
-        if (avito != original.avito) n++
+        if (avito != original.avito) n++ else if (avito && avitoRooms.trim() != original.avitoRooms.trim()) n++
         val before = original.scripts.associateBy { it.id }
         val after = scripts.associateBy { it.id }
         n += (before.keys + after.keys).count { before[it]?.value?.trim() != after[it]?.value?.trim() || before[it]?.settings != after[it]?.settings }
