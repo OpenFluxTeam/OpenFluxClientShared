@@ -117,8 +117,9 @@ data class SlotSetupActions(
 /**
  * A place's sheet: what it is (tariff, state, term, its connection's number), and — for a manual place — its own
  * documents. A manual connection takes *all* the place's documents, in their order (the first working one becomes
- * the main route; Телемост and Доски always go last — the bot's own rule), so nothing is picked here: the button
- * is ready as soon as there is one document. Documents can be edited only while the place holds no live connection.
+ * the main route; Телемост and Доски always go last — the bot's own rule), so nothing is picked here. Documents are not
+ * required: without them the service makes cups.online and Avito rooms, which need no account. Documents can be edited
+ * only while the place holds no live connection.
  * Drawn from plain data, so it is tested and shot alone.
  */
 @Composable
@@ -148,13 +149,14 @@ fun SlotSetupContent(
         } else {
             Text(
                 "Свои документы: подключение берёт их все, по порядку — первый рабочий становится основным, " +
-                    "Телемост и Доски идут последними. От одного до пяти, разных видов.",
+                    "Телемост и Доски идут последними. До пяти, разных видов; без них работают cups.online и Avito.",
                 style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
             )
             when {
                 documents == null -> ProgressLine("Загружаю документы…")
                 documents.isEmpty() -> Text(
-                    "Документов пока нет. Добавьте ссылку на свой документ: Яндекс Диск, Облако Mail.ru, Телемост, Доски или Cups.",
+                    "Своих документов нет: подключение пойдёт через cups.online и Avito, им аккаунт не нужен. " +
+                        "Добавьте документ (Яндекс Диск, Облако Mail.ru, Телемост, Доски), если нужен ещё транспорт.",
                     style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
                 )
                 else -> Section("Документы") {
@@ -177,8 +179,8 @@ fun SlotSetupContent(
             if (!live) AddDocumentField(idle, actions.onAddDocument)
             when {
                 live -> SecondaryButton("Остановить", actions.onStop, Modifier.fillMaxWidth(), enabled = idle)
-                slot.canStart -> PrimaryButton("Запустить", actions.onConnect, Modifier.fillMaxWidth(), enabled = idle && !documents.isNullOrEmpty())
-                else -> PrimaryButton("Подключить", actions.onConnect, Modifier.fillMaxWidth(), enabled = idle && !documents.isNullOrEmpty())
+                slot.canStart -> PrimaryButton("Запустить", actions.onConnect, Modifier.fillMaxWidth(), enabled = idle && documents != null)
+                else -> PrimaryButton("Подключить", actions.onConnect, Modifier.fillMaxWidth(), enabled = idle && documents != null)
             }
         }
         busy?.let { ProgressLine(it) }

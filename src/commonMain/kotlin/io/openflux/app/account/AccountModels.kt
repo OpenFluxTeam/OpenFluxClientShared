@@ -138,11 +138,13 @@ class SubscriptionModel(private val container: AppContainer, private val scope: 
         }
     }
 
-    /** A manual connection is made from all the place's documents, in their list order (the bot's rule). */
+    /**
+     * A manual connection is made from all the place's documents, in their list order (the bot's rule). None is
+     * fine: the service then makes cups.online and Avito rooms, which need no account (its refusal is shown).
+     */
     fun connectSlot() {
         val id = openSlotId ?: return
-        val ids = documents?.map { it.id }.orEmpty()
-        if (ids.isEmpty()) return
+        val ids = documents?.map { it.id } ?: return
         call("Подключаю место…") {
             container.bot.connectSlot(id, ids)
             closeSlotSetup()
