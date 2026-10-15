@@ -67,7 +67,6 @@ import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.ExitAddress
 import io.openflux.desktop.model.KnownServer
-import io.openflux.desktop.model.NetworkKind
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.model.editableNode
@@ -279,9 +278,6 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
                 ValueRow("Сейчас через", traffic.activeCarriers.mapNotNull { TransportType.fromCli(it)?.title }.distinct().joinToString(", "))
             }
             ValueRow("Шифрование", if (p.secret.isNotEmpty()) "AES-256-GCM" else "нет ключа")
-            if (p.bonding && p.session) {
-                ValueRow("Бондинг", p.carriers.joinToString(" + ") { c -> c.type.title + if (c.network != NetworkKind.Default) " · " + c.network.label else "" })
-            }
             if (!settings.fullTunnel) {
                 val socksAddr = socks ?: "127.0.0.1:${settings.socksPort}"
                 ValueRow("SOCKS5", socksAddr, mono = true, onCopy = { copy("Адрес", socksAddr) })

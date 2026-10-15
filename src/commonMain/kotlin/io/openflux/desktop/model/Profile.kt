@@ -25,9 +25,8 @@ val Profile.editableNode: Boolean
         carriers.any { it.type == TransportType.DIRECT && it.value.substringAfterLast(':', "").toIntOrNull() != null }
 
 /**
- * The network a carrier leaves through. With bonding, carriers on different
- * networks (mobile data and Wi-Fi) add their speeds up. Kept on the device:
- * never in `openflux://` links.
+ * The network a carrier leaves through (mobile data, Wi-Fi). Kept on the
+ * device: never in `openflux://` links.
  */
 @Serializable
 enum class NetworkKind(val cli: String, val label: String) {
@@ -89,12 +88,6 @@ data class Profile(
     /** The main carrier's network (see [NetworkKind]). */
     val network: NetworkKind = NetworkKind.Default,
     /**
-     * Split the Session over all carriers at once (the core's bonding): their
-     * speeds add up and one that drops leaves the rest carrying on. Needs an
-     * exit that bonds (node-v1.3.0+); others route by flow as before.
-     */
-    val bonding: Boolean = false,
-    /**
      * The mode without a server: the exit is a PHP node on an ordinary web host, reached over
      * cups.online ([transport] CUPSONLINE, [value] the room's address) or a Mail.ru document
      * (MAILRU, [value] its link). No key, no Session, TCP only. Profiles saved before this
@@ -115,12 +108,6 @@ data class Profile(
             else -> transport.label
         }
 
-    /** "Mail.ru · Мобильная + Яндекс · Wi-Fi" for a bonded profile, "" otherwise. */
-    val bondingSummary: String
-        get() = if (!bonding || !session) "" else carriers.joinToString(" + ") { c ->
-            c.type.shortLabel + if (c.network != NetworkKind.Default) " · " + c.network.label else ""
-        }
-
     /** Problems that keep the profile from connecting, empty when it can. */
     fun problems(): List<String> = buildList {
         if (name.isBlank()) add("Укажите название")
@@ -135,7 +122,6 @@ data class Profile(
         if (session && secret.length < MIN_SECRET) add("Для режима Session нужен ключ не короче $MIN_SECRET символов")
         if (!session && secret.isNotEmpty() && secret.length < MIN_SECRET) add("Ключ должен быть не короче $MIN_SECRET символов")
         if (!session && transport.sessionOnly) add("${transport.label} работает только в режиме Session")
-        if (bonding && (!session || carriers.size < 2)) add("Для бондинга нужен режим Session и хотя бы два транспорта")
     }
 
     /** What keeps a stream-mode profile from connecting, null when nothing does. */
