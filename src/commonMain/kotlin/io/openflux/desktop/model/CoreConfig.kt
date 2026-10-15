@@ -95,7 +95,6 @@ object CoreConfig {
             }
             appendLine("EncryptionKeyFile = ${confValue(paths.keyFile ?: error("Session requires a key"))}")
             appendLine("CookieStore = ${confValue(paths.cookieStore)}")
-            if (!exit && profile.bonding) appendLine("Bonding = yes")
             // The core refuses Telemost under its TUN: the rest of the profile still connects.
             val specs = profile.sessionSpecs().filterNot { exit && it.type == TransportType.DIRECT }
                 .filterNot { !exit && settings.fullTunnel && it.type == TransportType.TELEMOST }

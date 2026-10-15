@@ -229,12 +229,6 @@ fun ProfileEditScreen(dest: Dest.ProfileEdit) {
                     style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
                 )
             }
-            if (d.session) {
-                Toggle(
-                    "Бондинг: все транспорты сразу", d.bonding, { on -> m.edit { it.copy(bonding = on) } },
-                    subtitle = "Скорости складываются. Нужна нода node-v1.3.0 или новее",
-                )
-            }
         }
         d.carriers.forEachIndexed { i, _ ->
             TransportBlock(m, i)
