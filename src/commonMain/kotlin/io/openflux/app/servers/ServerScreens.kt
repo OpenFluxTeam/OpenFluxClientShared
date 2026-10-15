@@ -118,17 +118,17 @@ fun ServersRoot(selected: Dest? = null) {
                 }
             }
         }
-        Section(null) {
-            val exit = state.isActive && settings.mode == ConnectionMode.Exit
-            RowItem(
-                "Это устройство",
-                subtitle = if (exit) "Работает как нода" else "Раздать интернет другим через это устройство",
-                leading = { Icon(Icons.Rounded.Devices, contentDescription = null, tint = AppTheme.colors.textSecondary) },
-                trailing = { Chevron() },
-                selected = selected == Dest.ThisDevice,
-                onClick = { navigator.open(Dest.ThisDevice) },
-            )
-        }
+//        Section(null) {
+//            val exit = state.isActive && settings.mode == ConnectionMode.Exit
+//            RowItem(
+//                "Это устройство",
+//                subtitle = if (exit) "Работает как нода" else "Раздать интернет другим через это устройство",
+//                leading = { Icon(Icons.Rounded.Devices, contentDescription = null, tint = AppTheme.colors.textSecondary) },
+//                trailing = { Chevron() },
+//                selected = selected == Dest.ThisDevice,
+//                onClick = { navigator.open(Dest.ThisDevice) },
+//            )
+//        }
     }
 }
 
