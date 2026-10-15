@@ -163,7 +163,7 @@ fun moneyText(minor: Long, currency: String = "RUB"): String {
 @Serializable
 data class BotInvoice(
     val id: String,
-    /** The payment page (https); empty when there is nothing to pay (the free tier settles at once). */
+    /** The payment page (https). The free way settles at once and gives a placeholder (t.me/#invoice_…): not a page. */
     val payUrl: String = "",
     /** The amount as the service writes it ("30.00"). */
     val amount: String = "",
