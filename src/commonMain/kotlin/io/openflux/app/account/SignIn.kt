@@ -170,11 +170,12 @@ fun SignInContent(ui: SignInUi, onStart: () -> Unit, onCancel: () -> Unit, onReo
             SignInUi.Idle -> {
                 Text("Вход в OpenFlux", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
                 Text(
-                    "Войдите по почте или через Telegram на странице OpenFlux: подписка и подключение появятся здесь сами.",
+                    if (LocalAppContainer.current.platform.purchasesInApp) "Войдите по почте или через Telegram на странице OpenFlux: подписка и подключение появятся здесь сами."
+                    else "Войдите по почте или через Telegram на странице OpenFlux: подключения вашего аккаунта появятся здесь сами.",
                     style = AppTheme.type.body, color = AppTheme.colors.textSecondary,
                 )
                 PrimaryButton("Войти", onStart, Modifier.fillMaxWidth())
-                Text(
+                if (LocalAppContainer.current.platform.purchasesInApp) Text(
                     "Покупали в боте @${OpenFluxBot.USERNAME}? Выберите вход через Telegram, чтобы открыть тот же аккаунт.",
                     style = AppTheme.type.body, color = AppTheme.colors.textSecondary,
                 )

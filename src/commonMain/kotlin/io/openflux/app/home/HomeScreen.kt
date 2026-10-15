@@ -150,21 +150,25 @@ private fun StartPanel(hasSubscription: Boolean, preparing: Boolean, botSignedIn
     }
     // Signed in through Telegram but nothing to connect to: say why, instead of offering to sign in again.
     if (botNote != null) {
-        Banner(botNote, Tone.Warning, action = "Открыть подписку", onAction = { navigator.open(Dest.Account) })
+        Banner(botNote, Tone.Warning, action = if (LocalAppContainer.current.platform.purchasesInApp) "Открыть подписку" else "Открыть аккаунт", onAction = { navigator.open(Dest.Account) })
         return
     }
     if (botSignedIn) {
-        Banner("Вы вошли, подключения пока нет", Tone.Info, action = "Открыть подписку", onAction = { navigator.open(Dest.Account) })
+        Banner("Вы вошли, подключения пока нет", Tone.Info, action = if (LocalAppContainer.current.platform.purchasesInApp) "Открыть подписку" else "Открыть аккаунт", onAction = { navigator.open(Dest.Account) })
         return
     }
     if (hasSubscription) {
-        Banner("В подписке пока нет локаций", Tone.Info, action = "Открыть подписку", onAction = { navigator.open(Dest.Account) })
+        Banner("В подписке пока нет локаций", Tone.Info, action = if (LocalAppContainer.current.platform.purchasesInApp) "Открыть подписку" else "Открыть аккаунт", onAction = { navigator.open(Dest.Account) })
         return
     }
     Text("Приступим", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
     Text("Все способы — под кнопкой ＋", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
     Section(null) {
-        RowItem("Войти в аккаунт OpenFlux", subtitle = "По почте или через Telegram; подписка и подключение появятся сами", onClick = { navigator.open(Dest.Auth) })
+        RowItem(
+            "Войти в аккаунт OpenFlux",
+            subtitle = if (LocalAppContainer.current.platform.purchasesInApp) "По почте или через Telegram; подписка и подключение появятся сами" else "По почте или через Telegram; подключения появятся сами",
+            onClick = { navigator.open(Dest.Auth) },
+        )
         RowItem("Ключ или ссылка", subtitle = "От друга или из сервиса", onClick = { navigator.open(Dest.AddKey) })
         RowItem("Свой сервер", subtitle = "VDS по SSH: нода поставится сама", onClick = { navigator.open(Dest.AddServer) })
     }
@@ -246,7 +250,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
             action = "Войти заново",
             onAction = { scope.launch { runCatching { container.accounts.signIn(b.kind) }.onFailure { toaster.show(it.message ?: "Вход не выполнен") } } },
         )
-        is HomeBanner.Subscription -> Banner(b.look.line, Tone.Warning, action = "Продлить", onAction = { navigator.open(Dest.Account) })
+        is HomeBanner.Subscription -> Banner(b.look.line, Tone.Warning, action = if (container.platform.purchasesInApp) "Продлить" else "Открыть", onAction = { navigator.open(Dest.Account) })
         HomeBanner.ThisDevice -> Banner("Это устройство работает как нода", Tone.Info, action = "Открыть", onAction = { navigator.open(Dest.ThisDevice) })
         null -> Unit
     }
@@ -339,7 +343,7 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
                     val look = sub.look(container.platform.now(), container.platform.utcOffsetSeconds)
                     RowItem(
                         sub.title.ifBlank { "Подписка" }, subtitle = look.line,
-                        trailing = { TextAction(if (look.attention) "Продлить" else "Открыть", { navigator.open(Dest.Account) }) },
+                        trailing = { TextAction(if (look.attention && container.platform.purchasesInApp) "Продлить" else "Открыть", { navigator.open(Dest.Account) }) },
                     )
                 }
             }

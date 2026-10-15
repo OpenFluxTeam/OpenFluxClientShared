@@ -265,6 +265,18 @@ interface PlatformServices {
     /** The OpenFlux first-party script signing key (hex); "" when scripts aren't supported. */
     val officialScriptKey: String get() = ""
 
+    /** Where "Поддержка" in About leads (a chat or a site); null hides it. */
+    val supportUrl: String? get() = null
+
+    /** The app downloads and installs its own releases; false where a store updates it (iOS: TestFlight, the App Store). */
+    val selfUpdates: Boolean get() = true
+
+    /**
+     * The app may offer buying: plans, invoices, renewing, the bot's purchase. False where the store allows buying a
+     * digital service only through itself (iOS): the account then shows its state and connections, never a way to pay.
+     */
+    val purchasesInApp: Boolean get() = true
+
     /**
      * Reads a downloaded transport and returns the core's JSON trust report
      * (name, version, params, signature, fingerprint, official) without

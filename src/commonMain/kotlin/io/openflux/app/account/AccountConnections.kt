@@ -63,7 +63,7 @@ fun AccountConnectionContent(
     val shortLink = OpenFluxBot.linkOf(link.token)
     Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
         when {
-            link.gone -> Banner("Бот больше не обслуживает это подключение", Tone.Warning)
+            link.gone -> Banner(if (platform.purchasesInApp) "Бот больше не обслуживает это подключение" else "Это подключение больше не действует", Tone.Warning)
             connected -> Banner("Это устройство подключено через него", Tone.Success)
             link.status == "paused" -> {
                 Banner("Подключение приостановлено: пока его не возобновят, оно не работает", Tone.Warning)
@@ -78,7 +78,7 @@ fun AccountConnectionContent(
             Section("Поделиться") {
                 Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
                     Text(
-                        "На другом устройстве добавьте эту ссылку через «Добавить ссылку из бота» или отсканируйте QR. " +
+                        "На другом устройстве добавьте эту ссылку через «${if (platform.purchasesInApp) "Добавить ссылку из бота" else "Добавить ссылку"}» или отсканируйте QR. " +
                             "Одновременно работает одно устройство: второе вытеснит первое.",
                         style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
                     )
