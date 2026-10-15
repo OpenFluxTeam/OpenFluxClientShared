@@ -36,6 +36,7 @@ import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.shell.rememberScreenModel
 import io.openflux.app.text.Fmt
 import io.openflux.app.theme.AppTheme
+import io.openflux.desktop.model.BotSlot
 import io.openflux.desktop.model.BotState
 import io.openflux.desktop.model.OpenFluxBot
 import io.openflux.desktop.model.SubscriptionKind
@@ -91,6 +92,14 @@ fun AccountScreen() {
                 onRemoveLink = m::removeBotLink,
                 onSignOut = { botSignOutAsk = true },
                 onOpenConnection = { openConnection = it },
+                onStartSlot = m::startSlot,
+                onStopSlot = m::stopSlot,
+                onOpenSlot = { slot ->
+                    // A manual place opens its documents (its connection is made from them); an auto one opens
+                    // its connection when it has one, else its sheet (to start it).
+                    if (!slot.manual && slot.connectToken.isNotEmpty()) openConnection = slot.connectToken
+                    else m.openSlotSetup(slot.id)
+                },
             ),
             connectedProfileId = connectedProfileId,
         )
@@ -128,6 +137,26 @@ fun AccountScreen() {
             )
         }
     }
+    val setupSlot = m.openSlot
+    if (setupSlot != null) {
+        Sheet(onDismiss = m::closeSlotSetup, title = slotTitle(setupSlot)) {
+            SlotSetupContent(
+                setupSlot,
+                m.documents,
+                m.busy,
+                m.error,
+                platform.utcOffsetSeconds,
+                SlotSetupActions(
+                    onStart = { m.startSlot(setupSlot.id) },
+                    onStop = { m.stopSlot(setupSlot.id) },
+                    onAddDocument = m::addDocument,
+                    onRemoveDocument = m::removeDocument,
+                    onCheckDocument = m::checkDocument,
+                    onConnect = m::connectSlot,
+                ),
+            )
+        }
+    }
     if (buy.isOpen) {
         Sheet(onDismiss = buy::close, title = "Покупка подписки") {
             PurchaseContent(
@@ -154,6 +183,9 @@ data class AccountActions(
     val onRemoveLink: (String) -> Unit = {},
     val onSignOut: () -> Unit = {},
     val onOpenConnection: (String) -> Unit = {},
+    val onStartSlot: (String) -> Unit = {},
+    val onStopSlot: (String) -> Unit = {},
+    val onOpenSlot: (BotSlot) -> Unit = {},
 )
 
 /** The OpenFlux account: drawn from its state alone, so it is drawn in shots too. */
@@ -192,7 +224,13 @@ fun OpenFluxAccountContent(
     }
     busy?.let { ProgressLine(it) }
     error?.let { Banner(it, Tone.Danger) }
-    AccountConnectionsSection(bot.links.filter { it.account }, bot.session?.viaTelegram == true, connectedProfileId, actions.onOpenConnection)
+    val slots = bot.slots
+    if (!slots.isNullOrEmpty()) {
+        // The account's places, from the slots API: each with its state and the one thing it can do now.
+        SlotsSection(slots, offsetSeconds, idle, actions.onStartSlot, actions.onStopSlot, actions.onOpenSlot)
+    } else {
+        AccountConnectionsSection(bot.links.filter { it.account }, bot.session?.viaTelegram == true, connectedProfileId, actions.onOpenConnection)
+    }
     Section("Подключения по ссылке из бота") {
         for (link in bot.links.filterNot { it.account }) {
             RowItem(

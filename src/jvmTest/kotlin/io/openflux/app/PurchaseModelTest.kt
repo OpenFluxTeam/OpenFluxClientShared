@@ -6,6 +6,7 @@ import io.openflux.app.account.purchaseUi
 import io.openflux.app.account.tariffsOf
 import io.openflux.desktop.model.BotException
 import io.openflux.desktop.model.BotInvoice
+import io.openflux.desktop.model.BotPaymentMethod
 import io.openflux.desktop.model.BotPendingInvoice
 import io.openflux.desktop.model.BotPlan
 import io.openflux.desktop.model.BotSession
@@ -35,13 +36,16 @@ class PurchaseModelTest {
         var create: () -> BotInvoice = { BotInvoice("0b7c3c3e-5a39-4e43-9c8e-0d7d0d6c1a11", "https://pay.example/x", "30.00", "active") }
         var status: () -> BotInvoice = { BotInvoice("0b7c3c3e-5a39-4e43-9c8e-0d7d0d6c1a11", "https://pay.example/x", "30.00", "active") }
         var bought = 0
+        var methods: () -> List<BotPaymentMethod> = { emptyList() }
+        var lastGateway = ""
         override suspend fun subscription(token: String) = BotSubscription(isActive = bought > 0)
         override suspend fun signOut(token: String) {}
         override suspend fun resolve(connectToken: String): BotConnection = throw BotException("not_found", "Не найдено")
         override suspend fun sessions(token: String): List<BotSessionItem> = emptyList()
         override suspend fun createSession(token: String): BotSessionItem = throw BotException("forbidden", "x")
         override suspend fun plans(token: String?) = plans()
-        override suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String, gateway: String) = create()
+        override suspend fun paymentMethods(token: String) = methods()
+        override suspend fun createInvoice(token: String, termCode: String, idempotencyKey: String, gateway: String): BotInvoice { lastGateway = gateway; return create() }
         override suspend fun invoice(token: String, id: String) = status().also { if (it.paid) bought++ }
     }
 
@@ -174,6 +178,34 @@ class PurchaseModelTest {
         advanceTimeBy(60_000); runCurrent()
         assertEquals(0, asked, "the sheet no longer asks (the account's own loop does, when it runs)")
         assertEquals("active", c.bot.state.value.pendingInvoice?.invoice?.status, "the window still shows the invoice")
+    }
+
+    @Test
+    fun theWaysToPayComeWithTheTerms() = runTest {
+        bot.plans = { listOf(start30) }
+        bot.methods = { listOf(BotPaymentMethod("platega", "Карта или СБП"), BotPaymentMethod("cryptopay", "Криптовалюта")) }
+        signedIn()
+        val m = PurchaseModel(c, this)
+        m.open(); runCurrent()
+        val choose = assertIs<PurchaseUi.Choose>(m.ui)
+        assertEquals(listOf("platega", "cryptopay"), choose.methods.map { it.id })
+        assertEquals("platega", choose.chosenGateway, "the first way is the default")
+        m.chooseGateway("cryptopay")
+        assertEquals("cryptopay", assertIs<PurchaseUi.Choose>(m.ui).chosenGateway)
+        m.close()
+    }
+
+    @Test
+    fun theChosenWayToPayGoesWithTheInvoice() = runTest {
+        bot.plans = { listOf(start30) }
+        bot.methods = { listOf(BotPaymentMethod("platega", "Карта или СБП"), BotPaymentMethod("cryptopay", "Криптовалюта")) }
+        signedIn()
+        val m = PurchaseModel(c, this)
+        m.open(); runCurrent()
+        m.chooseGateway("cryptopay")
+        m.pay(); runCurrent()
+        assertEquals("cryptopay", bot.lastGateway, "the way chosen goes with the invoice")
+        m.close()
     }
 
     @Test

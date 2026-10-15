@@ -23,6 +23,7 @@ import io.openflux.app.text.Fmt
 import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.BotException
 import io.openflux.desktop.model.BotInvoice
+import io.openflux.desktop.model.BotPaymentMethod
 import io.openflux.desktop.model.BotPendingInvoice
 import io.openflux.desktop.model.BotPlan
 import io.openflux.desktop.service.AppContainer
@@ -44,7 +45,16 @@ sealed interface PurchaseUi {
     data object Loading : PurchaseUi
     data class Failed(val message: String) : PurchaseUi
     data object NothingOnSale : PurchaseUi
-    data class Choose(val tariffs: List<Tariff>, val selected: BotPlan?, val busy: Boolean, val error: String?) : PurchaseUi
+    data class Choose(
+        val tariffs: List<Tariff>,
+        val selected: BotPlan?,
+        val busy: Boolean,
+        val error: String?,
+        /** The ways to pay the service offers now; empty when it picks the way itself. */
+        val methods: List<BotPaymentMethod> = emptyList(),
+        /** The way chosen ([methods]' id), sent with the invoice; null when there is nothing to choose. */
+        val chosenGateway: String? = null,
+    ) : PurchaseUi
     data class Waiting(val invoice: BotInvoice, val term: BotPlan?, val error: String?) : PurchaseUi
     data class Paid(val term: BotPlan?) : PurchaseUi
     data class Expired(val term: BotPlan?) : PurchaseUi
@@ -61,6 +71,8 @@ fun purchaseUi(
     pending: BotPendingInvoice?,
     busy: Boolean,
     error: String?,
+    methods: List<BotPaymentMethod> = emptyList(),
+    chosenGateway: String? = null,
 ): PurchaseUi {
     val inv = pending?.invoice
     val term = pending?.let { p -> plans?.firstOrNull { it.id == p.termCode } }
@@ -74,7 +86,8 @@ fun purchaseUi(
     if (plans == null) return if (plansError != null) PurchaseUi.Failed(plansError) else PurchaseUi.Loading
     if (plans.isEmpty()) return PurchaseUi.NothingOnSale
     val selected = plans.firstOrNull { it.id == pending?.termCode } ?: plans.firstOrNull { it.id == selectedId } ?: plans.first()
-    return PurchaseUi.Choose(tariffsOf(plans), selected, busy, error)
+    val chosen = chosenGateway?.takeIf { id -> methods.any { it.id == id } } ?: methods.firstOrNull()?.id
+    return PurchaseUi.Choose(tariffsOf(plans), selected, busy, error, methods, chosen)
 }
 
 /**
@@ -93,6 +106,12 @@ class PurchaseModel(private val container: AppContainer, private val scope: Coro
         private set
     var selected by mutableStateOf<String?>(null)
         private set
+    /** The ways to pay the service offers now (the first is the default). */
+    var methods by mutableStateOf<List<BotPaymentMethod>>(emptyList())
+        private set
+    /** The way to pay chosen for this purchase; sent as the invoice's `gateway`. */
+    var chosenGateway by mutableStateOf<String?>(null)
+        private set
     var busy by mutableStateOf(false)
         private set
     var error by mutableStateOf<String?>(null)
@@ -103,7 +122,7 @@ class PurchaseModel(private val container: AppContainer, private val scope: Coro
     private var poll: Job? = null
 
     val ui: PurchaseUi get() = uiFor(bot.state.value.pendingInvoice)
-    fun uiFor(pending: BotPendingInvoice?): PurchaseUi = purchaseUi(plans, plansError, selected, pending, busy, error)
+    fun uiFor(pending: BotPendingInvoice?): PurchaseUi = purchaseUi(plans, plansError, selected, pending, busy, error, methods, chosenGateway)
 
     fun clearNotice() { notice = null }
 
@@ -145,9 +164,22 @@ class PurchaseModel(private val container: AppContainer, private val scope: Coro
                 throw e
             } catch (e: BotException) {
                 plansError = e.message ?: "Не удалось загрузить тарифы"
+                return@launch
             }
+            // The ways to pay are asked with the terms; a failure here leaves the choice to the service.
+            methods = try {
+                bot.paymentMethods()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: BotException) {
+                emptyList()
+            }
+            if (chosenGateway == null || methods.none { it.id == chosenGateway }) chosenGateway = methods.firstOrNull()?.id
         }
     }
+
+    /** The person picked a way to pay; it goes with the invoice when the purchase is made. */
+    fun chooseGateway(id: String) { chosenGateway = id }
 
     /** Another term; a purchase whose call was lost on another term is given up (its invoice, if any, just ends). */
     fun select(id: String) {
@@ -165,7 +197,8 @@ class PurchaseModel(private val container: AppContainer, private val scope: Coro
         error = null
         scope.launch {
             try {
-                val inv = bot.checkout(term)
+                val gateway = chosenGateway ?: methods.firstOrNull()?.id.orEmpty()
+                val inv = bot.checkout(term, gateway)
                 if (inv.payUrl.startsWith("https://")) container.platform.openUrl(inv.payUrl)
             } catch (e: CancellationException) {
                 throw e
@@ -219,6 +252,7 @@ class PurchaseModel(private val container: AppContainer, private val scope: Coro
 /** What the person can do on the sheet. */
 data class PurchaseActions(
     val onSelect: (String) -> Unit = {},
+    val onChooseGateway: (String) -> Unit = {},
     val onPay: () -> Unit = {},
     val onReopen: () -> Unit = {},
     val onCheck: () -> Unit = {},
@@ -255,6 +289,18 @@ fun PurchaseContent(ui: PurchaseUi, actions: PurchaseActions, offsetSeconds: Int
                         }
                     }
                     if (t.description.isNotBlank()) Text(t.description, style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
+                }
+                if (ui.methods.isNotEmpty()) {
+                    Section("Способ оплаты") {
+                        for (m in ui.methods) {
+                            RowItem(
+                                m.name.ifBlank { m.id },
+                                selected = ui.chosenGateway == m.id,
+                                onClick = { actions.onChooseGateway(m.id) },
+                                enabled = !ui.busy,
+                            )
+                        }
+                    }
                 }
                 Text(
                     "Каждая покупка — новое место для одного подключения. Оплата откроется в браузере.",

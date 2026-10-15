@@ -6,17 +6,22 @@ import io.openflux.app.account.OpenFluxAccountContent
 import io.openflux.app.account.PurchaseActions
 import io.openflux.app.account.PurchaseContent
 import io.openflux.app.account.PurchaseUi
+import io.openflux.app.account.SlotSetupActions
+import io.openflux.app.account.SlotSetupContent
 import io.openflux.app.account.accountSummary
 import io.openflux.app.account.tariffsOf
 import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ScreenScaffold
 import io.openflux.app.components.TextAction
 import io.openflux.app.theme.AppTheme
+import io.openflux.desktop.model.BotDocument
 import io.openflux.desktop.model.BotInvoice
 import io.openflux.desktop.model.BotLink
+import io.openflux.desktop.model.BotPaymentMethod
 import io.openflux.desktop.model.BotPendingInvoice
 import io.openflux.desktop.model.BotPlan
 import io.openflux.desktop.model.BotSession
+import io.openflux.desktop.model.BotSlot
 import io.openflux.desktop.model.BotState
 import io.openflux.desktop.model.BotSubscription
 import io.openflux.desktop.service.BotAccountManager
@@ -82,6 +87,28 @@ class AccountShotsTest {
     @Test fun waitingSmall() = sheet("waiting", PurchaseUi.Waiting(invoice, start30, null), Shots.SMALL)
     @Test fun paidSheet() = sheet("paid", PurchaseUi.Paid(start30))
     @Test fun expired() = sheet("expired", PurchaseUi.Expired(start30))
+
+    private val methods = listOf(BotPaymentMethod("platega", "Карта или СБП"), BotPaymentMethod("cryptopay", "Криптовалюта"))
+    @Test fun chooseWays() = sheet("choose-ways", PurchaseUi.Choose(tariffsOf(listOf(start30, start90)), start30, false, null, methods, "platega"))
+
+    // ---- a place's sheet ----
+
+    private val slotRunning = BotSlot("5f0c7c2e-1d1a-4b0e-9a55-2b0d0c9e7a10", "Ноутбук", "Start", "auto", "running", (now + 27 * day) / 1000, 19, canStop = true, connectToken = "AAAAAAAAAAAAAAAAAAAAAA")
+    private val slotManual = BotSlot("6f0c7c2e-1d1a-4b0e-9a55-2b0d0c9e7a10", "", "Start", "manual", "free", (now + 20 * day) / 1000, needsSetup = true)
+
+    @Test fun places() = shot("places", BotState(session = telegram, subscription = sub(27.5), slots = listOf(slotRunning, slotManual)))
+    @Test fun placesSmall() = shot("places", BotState(session = telegram, subscription = sub(27.5), slots = listOf(slotRunning, slotManual)), Shots.SMALL)
+
+    private fun placeSetupShot(name: String, documents: List<BotDocument>?) =
+        Shots.render(name) {
+            ScreenScaffold("Место", onBack = {}) { SlotSetupContent(slotManual, documents, null, null, msk, SlotSetupActions()) }
+        }
+
+    @Test fun placeSetup() = placeSetupShot(
+        "place-setup",
+        listOf(BotDocument("d1", "yandex", "Яндекс Диск …a1b2", "ok"), BotDocument("d2", "mailru", "Облако Mail.ru …c3d4", "unknown")),
+    )
+    @Test fun placeSetupEmpty() = placeSetupShot("place-setup-empty", emptyList())
 
     // ---- a connection of the account ----
 

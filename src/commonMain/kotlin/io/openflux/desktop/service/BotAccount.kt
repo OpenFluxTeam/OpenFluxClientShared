@@ -163,15 +163,19 @@ class BotAccountManager(
      * gives that invoice back; a call lost on the way (or one the service is still handling) is repeated with the key
      * it had, so it never makes a second invoice. An invoice paid at once (the free tier) brings the subscription in.
      */
-    suspend fun checkout(termCode: String): BotInvoice {
+    suspend fun checkout(termCode: String, gateway: String = ""): BotInvoice {
         val inv = lock.withLock {
             val token = repo.state.value.session?.token ?: throw BotException("unauthorized", "Войдите в аккаунт OpenFlux")
             val old = repo.state.value.pendingInvoice
             if (old != null && old.termCode == termCode && old.invoice != null && old.waiting) return old.invoice
-            val pending = if (old != null && old.termCode == termCode && old.invoice == null) old else BotPendingInvoice(termCode, newIdempotencyKey())
+            val pending = if (old != null && old.termCode == termCode && old.invoice == null) {
+                old.copy(gateway = gateway)
+            } else {
+                BotPendingInvoice(termCode, newIdempotencyKey(), gateway = gateway)
+            }
             savePending(pending) // before the call: the key must outlive a call lost on the way
             val inv = try {
-                api.createInvoice(token, termCode, pending.key)
+                api.createInvoice(token, termCode, pending.key, pending.gateway)
             } catch (e: BotException) {
                 // Lost on the way, or still being handled: the service may hold an invoice under this key. Else it holds none.
                 if (e.code != "network" && e.code != "busy") savePending(null)
@@ -260,6 +264,50 @@ class BotAccountManager(
                 ),
             )
         }
+    }
+
+    // ---- the account's places ----
+
+    /** The account's slots (the bot's "Мои подключения"); a service without the API answers not_found, kept as unknown. */
+    suspend fun slots(): List<BotSlot> = withToken { api.slots(it) }
+
+    /** The Start of a slot: its paused connection comes back, a free automatic slot gets one. */
+    suspend fun startSlot(slotId: String): BotSlot = slotAction { token -> api.startSlot(token, slotId) }
+
+    /** The Stop of a slot: its connection pauses and the slot keeps it (key and document) for Start. */
+    suspend fun stopSlot(slotId: String): BotSlot = slotAction { token -> api.stopSlot(token, slotId) }
+
+    /** Sets a free manual slot up from its own documents, in the order given (the first is tried first). */
+    suspend fun connectSlot(slotId: String, documentIds: List<String>): BotSlot =
+        slotAction { token -> api.connectSlot(token, slotId, documentIds) }
+
+    /** The answer of a slot action is put back on the state, so the window shows the new state at once. */
+    private suspend fun slotAction(call: suspend (String) -> BotSlot): BotSlot {
+        val slot = withToken { token -> call(token) }
+        lock.withLock {
+            val slots = repo.state.value.slots.orEmpty()
+            val i = slots.indexOfFirst { it.id == slot.id }
+            val updated = if (i >= 0) slots.toMutableList().also { it[i] = slot } else slots + slot
+            repo.save(repo.state.value.copy(slots = updated))
+        }
+        return slot
+    }
+
+    /** The person's own documents of a manual slot. */
+    suspend fun documents(slotId: String): List<BotDocument> = withToken { api.documents(it, slotId) }
+    suspend fun addDocument(slotId: String, url: String): BotDocument = withToken { api.addDocument(it, slotId, url) }
+    suspend fun deleteDocument(slotId: String, documentId: String) = withToken { api.deleteDocument(it, slotId, documentId) }
+    suspend fun checkDocument(slotId: String, documentId: String): BotDocument = withToken { api.checkDocument(it, slotId, documentId) }
+
+    /** The ways to pay now, in the service's order; empty when signed out (nothing to buy with). */
+    suspend fun paymentMethods(): List<BotPaymentMethod> {
+        val token = repo.state.value.session?.token ?: return emptyList()
+        return api.paymentMethods(token)
+    }
+
+    private suspend fun <T> withToken(block: suspend (String) -> T): T {
+        val token = repo.state.value.session?.token ?: throw BotException("unauthorized", "Войдите в аккаунт OpenFlux")
+        return block(token)
     }
 
     // ---- connection links ----
@@ -363,6 +411,16 @@ class BotAccountManager(
                 throw e
             } catch (e: BotException) {
                 if (e.unauthorized) s.copy(session = null, subscription = null, pendingInvoice = null) else s.also { error = e.message }
+            }
+        }
+        // The account's slots (the bot's "Мои подключения"): not_found means the service has no slots API yet.
+        s.session?.let { sess ->
+            try {
+                s = s.copy(slots = api.slots(sess.token))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: BotException) {
+                if (e.notFound) s = s.copy(slots = null)
             }
         }
         repo.save(s.copy(lastError = error))

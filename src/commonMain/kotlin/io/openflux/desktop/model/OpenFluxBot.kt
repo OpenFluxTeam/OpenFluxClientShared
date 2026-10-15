@@ -106,6 +106,8 @@ data class BotPendingInvoice(
     val termCode: String,
     val key: String,
     val invoice: BotInvoice? = null,
+    /** The way to pay chosen for this purchase (the invoice's `gateway`); "" for the service's own default. */
+    val gateway: String = "",
 ) {
     /** Still to be paid (or not known yet): asked about until it is paid or ends. */
     val waiting: Boolean get() = invoice == null || (!invoice.paid && !invoice.expired)

@@ -4,6 +4,9 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import io.openflux.desktop.model.BotDocument
+import io.openflux.desktop.model.BotException
+import io.openflux.desktop.model.BotSlot
 import io.openflux.desktop.model.DeviceInfo
 import io.openflux.desktop.model.OrderInfo
 import io.openflux.desktop.model.PlansResult
@@ -85,6 +88,67 @@ class SubscriptionModel(private val container: AppContainer, private val scope: 
     fun botRefresh() = call("Обновляю данные бота…") { container.bot.refresh() }
     fun removeBotLink(token: String) = call("Убираю подключение…") { container.bot.removeLink(token) }
     fun openBot() = container.platform.openUrl(io.openflux.desktop.model.OpenFluxBot.CHAT_URL)
+
+    // ---- the account's places (slots) ----
+
+    var openSlotId by mutableStateOf<String?>(null)
+        private set
+    var documents by mutableStateOf<List<BotDocument>?>(null)
+        private set
+
+    /** The place whose sheet is open, read from the freshest bot state (so Start/Stop show in it at once). */
+    val openSlot: BotSlot? get() = openSlotId?.let { id -> container.bot.state.value.slots?.firstOrNull { it.id == id } }
+
+    fun startSlot(slotId: String) = call("Запускаю место…") { container.bot.startSlot(slotId); notice = "Место запущено" }
+    fun stopSlot(slotId: String) = call("Останавливаю место…") { container.bot.stopSlot(slotId); notice = "Место остановлено" }
+
+    /** Opens a manual place's sheet and loads its own documents. */
+    fun openSlotSetup(slotId: String) {
+        openSlotId = slotId
+        documents = null
+        error = null
+        scope.launch {
+            try {
+                documents = container.bot.documents(slotId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: BotException) {
+                if (openSlotId == slotId) { documents = emptyList(); error = e.message }
+            }
+        }
+    }
+
+    fun closeSlotSetup() { openSlotId = null; documents = null }
+
+    fun addDocument(url: String) {
+        val id = openSlotId ?: return
+        call("Добавляю документ…") { container.bot.addDocument(id, url); documents = container.bot.documents(id) }
+    }
+
+    fun removeDocument(documentId: String) {
+        val id = openSlotId ?: return
+        call("Убираю документ…") { container.bot.deleteDocument(id, documentId); documents = container.bot.documents(id) }
+    }
+
+    fun checkDocument(documentId: String) {
+        val id = openSlotId ?: return
+        call("Проверяю документ…") {
+            val d = container.bot.checkDocument(id, documentId)
+            documents = documents?.map { if (it.id == d.id) d else it }
+        }
+    }
+
+    /** A manual connection is made from all the place's documents, in their list order (the bot's rule). */
+    fun connectSlot() {
+        val id = openSlotId ?: return
+        val ids = documents?.map { it.id }.orEmpty()
+        if (ids.isEmpty()) return
+        call("Подключаю место…") {
+            container.bot.connectSlot(id, ids)
+            closeSlotSetup()
+            notice = "Место настроено. Подключение появится само"
+        }
+    }
 
     fun openSupport() {
         val url = manager.state.value?.support.orEmpty()
