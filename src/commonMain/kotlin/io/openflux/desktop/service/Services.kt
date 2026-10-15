@@ -265,6 +265,9 @@ interface PlatformServices {
     /** The OpenFlux first-party script signing key (hex); "" when scripts aren't supported. */
     val officialScriptKey: String get() = ""
 
+    /** This device can serve as an exit node (Home's «Выходная нода», «Это устройство»); false where it cannot (iOS). */
+    val exitNodeSupported: Boolean get() = true
+
     /** Where "Поддержка" in About leads (a chat or a site); null hides it. */
     val supportUrl: String? get() = null
 

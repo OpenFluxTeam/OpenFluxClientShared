@@ -118,7 +118,7 @@ fun ServersRoot(selected: Dest? = null) {
                 }
             }
         }
-        Section(null) {
+        if (LocalAppContainer.current.platform.exitNodeSupported) Section(null) {
             val exit = state.isActive && settings.mode == ConnectionMode.Exit
             RowItem(
                 "Это устройство",

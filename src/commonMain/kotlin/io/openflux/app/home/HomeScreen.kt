@@ -191,7 +191,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     // node or client hides it: the switch could not leave either, their own button stops them.
     var exitTab by rememberSaveable { mutableStateOf(false) }
     val showExit = exitMode || (exitTab && !state.isActive)
-    if (!state.isActive) {
+    if (!state.isActive && platform.exitNodeSupported) {
         Segmented(listOf(false, true), showExit, { exitTab = it }, label = { if (it) "Выходная нода" else "Клиент" })
     }
     if (showExit) {
