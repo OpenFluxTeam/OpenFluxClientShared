@@ -135,7 +135,7 @@ class SlotsTest {
     }
 
     @Test
-    fun aManualPlaceWithNoDocumentsIsNotConnected() = runTest {
+    fun aManualPlaceWithNoDocumentsConnectsThroughTheServiceRooms() = runTest {
         bot.slots = mutableListOf(freeManual())
         bot.documents = mutableListOf()
         signedIn()
@@ -144,8 +144,18 @@ class SlotsTest {
         advanceUntilIdle()
         m.connectSlot()
         advanceUntilIdle()
-        assertTrue(bot.connectOrders.isEmpty(), "nothing to connect from")
-        assertEquals(manualId, m.openSlotId, "the sheet stays open")
+        // No documents of its own: the service makes cups.online and Avito rooms, which need no account.
+        assertEquals(listOf(emptyList<String>()), bot.connectOrders, "connected with no documents")
+    }
+
+    @Test
+    fun aManualPlaceIsNotConnectedBeforeItsDocumentsAreRead() = runTest {
+        bot.slots = mutableListOf(freeManual())
+        signedIn()
+        val m = SubscriptionModel(c, this)
+        m.connectSlot() // no sheet open, nothing read
+        advanceUntilIdle()
+        assertTrue(bot.connectOrders.isEmpty(), "nothing is sent before the place's documents are known")
     }
 
     @Test
