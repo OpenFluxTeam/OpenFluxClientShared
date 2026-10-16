@@ -1,4 +1,25 @@
-# OpenFluxClientShared
+<p align="center">
+  <img src="docs/images/icon.png" width="120" alt="OpenFlux">
+</p>
+
+<h1 align="center">OpenFluxClientShared</h1>
+
+<p align="center">
+  The interface and logic shared by the OpenFlux apps for Android, Windows, macOS and Linux.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue"></a>
+  <img alt="Kotlin Multiplatform" src="https://img.shields.io/badge/Compose-Multiplatform-4F7CFF">
+</p>
+
+<p align="center">
+  <img src="docs/images/phones-3.png" alt="The interface on a phone" width="640">
+</p>
+
+<p align="center">
+  <img src="docs/images/desktop-servers.png" alt="The same interface in a wide window" width="760">
+</p>
 
 The Compose Multiplatform UI and business logic shared by
 [OpenFluxAndroid](https://github.com/OpenFluxTeam/OpenFluxAndroid) and
@@ -60,11 +81,7 @@ preserved as extracted from that repository. **Huge thanks to
 
 It talks to the [OpenFlux](https://github.com/OpenFluxTeam/OpenFlux) core
 (the tunnel/transports/protocol) through the service interfaces in
-`commonMain`, implemented per platform in the consuming app. That core's own
-`openflux://` links and QR codes, and its cups.online transport, were
-contributed by [@damnurmum](https://github.com/damnurmum) (of
-[OpenFlux-Android](https://github.com/damnurmum/OpenFlux-Android)) — this
-module's share screens and QR scanning build on that work. Thank you!
+`commonMain`, implemented per platform in the consuming app.
 
 ## License
 
