@@ -305,7 +305,7 @@ private fun CorePage() {
         Section(null) { ValueRow("Встроенное ядро", platform.coreVersion) }
     } else {
         io.openflux.app.components.Group("Файл ядра") {
-            Segmented(CoreSource.entries, settings.coreSource, { s -> container.settings.update { it.copy(coreSource = s) } }, label = { it.label })
+            Segmented(CoreSource.choices, settings.coreSource, { s -> container.settings.update { it.copy(coreSource = s) } }, label = { it.label })
         }
         val repo = settings.coreSource.repo
         when {

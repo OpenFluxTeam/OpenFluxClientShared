@@ -51,7 +51,6 @@ import io.openflux.app.shell.LocalServerLink
 import io.openflux.app.shell.rememberScreenModel
 import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.ConnectionMode
-import io.openflux.desktop.model.NodeCoreSource
 import io.openflux.desktop.model.isActive
 import io.openflux.desktop.service.LocalAppContainer
 import kotlinx.coroutines.launch
@@ -153,8 +152,6 @@ fun LoginFields(form: LoginForm, showAddress: Boolean = true) {
         Collapsible("Дополнительно") {
             Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
                 SecretField(form.sudo, { form.sudo = it }, "Пароль sudo, если логин не root")
-                Text("Ядро на сервере", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
-                Segmented(NodeCoreSource.entries, form.core, { form.core = it }, label = { it.label })
             }
         }
     }

@@ -779,7 +779,7 @@ class CoreBinary {
     fun resolve(settings: AppSettings): File? = when (settings.coreSource) {
         CoreSource.Custom -> File(settings.customCorePath.trim()).takeIf { settings.customCorePath.isNotBlank() && it.isFile }
         CoreSource.Bundled -> bundled()
-        CoreSource.Fork, CoreSource.Official -> downloaded(settings.coreSource)
+        CoreSource.Release, CoreSource.Fork, CoreSource.Official -> downloaded(settings.coreSource)
     }?.let(::runnable)
 
     /**
@@ -791,14 +791,19 @@ class CoreBinary {
     private fun downloadDir(source: CoreSource): File =
         File(AppDirs.config, "cores/" + source.repo!!.replace('/', '_'))
 
-    /** The core downloaded for [source] (Fork, Official), null when none. */
+    /** Where 3.8.1 and older kept the fork's core they downloaded: used until the next download. */
+    private fun legacyDir(): File = File(AppDirs.config, "cores/meepo161_OpenFlux")
+
+    private fun downloadedDir(source: CoreSource): File? =
+        listOf(downloadDir(source), legacyDir()).firstOrNull { File(it, fileName).isFile }
+
+    /** The core downloaded for [source], null when none. */
     fun downloaded(source: CoreSource): File? =
-        source.repo?.let { File(downloadDir(source), fileName).takeIf(File::isFile) }
+        source.repo?.let { downloadedDir(source)?.let { dir -> File(dir, fileName) } }
 
     /** The release tag of [downloaded]. */
     fun downloadedTag(source: CoreSource): String? =
-        source.repo?.let { File(downloadDir(source), "tag").takeIf(File::isFile)?.readText()?.trim() }
-            ?.takeIf { downloaded(source) != null }
+        source.repo?.let { downloadedDir(source)?.let { dir -> File(dir, "tag").takeIf(File::isFile)?.readText()?.trim() } }
 
     /**
      * Downloads the newest v* release core for this OS from [source]'s

@@ -5,7 +5,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.openflux.desktop.model.KnownServer
-import io.openflux.desktop.model.NodeCoreSource
 import io.openflux.desktop.model.NodeServers
 import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.SshTarget
@@ -25,7 +24,6 @@ class LoginForm(private val link: ServerLink) {
     var privateKey by mutableStateOf("")
     var passphrase by mutableStateOf("")
     var sudo by mutableStateOf("")
-    var core by mutableStateOf(NodeCoreSource.Fork)
     var error by mutableStateOf<String?>(null)
     var busy by mutableStateOf(false)
         private set
@@ -54,7 +52,7 @@ class LoginForm(private val link: ServerLink) {
             privateKey = if (useKey) privateKey.trim() else "",
             passphrase = if (useKey) passphrase else "",
         )
-        return attempt { link.connect(target, core) }
+        return attempt { link.connect(target) }
     }
 
     /** Trusts the key the server showed and connects; the server's id, or null with [error]. */
