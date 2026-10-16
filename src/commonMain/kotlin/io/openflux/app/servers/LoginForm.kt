@@ -12,7 +12,7 @@ import io.openflux.desktop.service.PlatformServices
 
 /**
  * The way into a server (spec 5.1, step 1): address (with ":port" when it is not 22), login, password or private
- * key; under "Дополнительно" the sudo password and whose core the server gets. Once [link] holds the way in,
+ * key; under "Дополнительно" the sudo password. Once [link] holds the way in,
  * the form forgets the secrets.
  */
 @Stable
