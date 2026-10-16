@@ -222,13 +222,18 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     // The switch is a small universe: the Moon while off, the Sun with its network of devices while connected.
     val busy = (traffic.downBytesPerSec + traffic.upBytesPerSec).toDouble()
     // Its height is set, not left to an aspect ratio: in a wide window that would ask for more than the cap and
-    // the scene would spill over what is above and below it.
+    // the scene would spill over what is above and below it. A short window keeps it to half its height, so what
+    // follows (a failure, the connection) stays in view.
+    val windowHeight = with(androidx.compose.ui.platform.LocalDensity.current) {
+        androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toDp()
+    }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val cap = if (windowHeight > 0.dp) minOf(480.dp, windowHeight * 0.52f) else 480.dp
         CosmicSwitch(
             state.look(),
             label = if (state.isActive) "Отключить" else "Подключить",
             onClick = m::toggle,
-            modifier = Modifier.fillMaxWidth().height(minOf(maxWidth / 1.12f, 480.dp)),
+            modifier = Modifier.fillMaxWidth().height(minOf(maxWidth / 1.12f, cap)),
             traffic = (kotlin.math.log10(busy + 1.0) / 7.0).toFloat(),
             shortcut = "Ctrl+Enter",
         )
