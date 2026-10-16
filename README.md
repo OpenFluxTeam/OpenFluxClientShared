@@ -14,6 +14,10 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/OpenFluxTeam/OpenFlux">Core</a> · <a href="https://github.com/OpenFluxTeam/OpenFluxDesktop">Desktop</a> · <a href="https://github.com/OpenFluxTeam/OpenFluxAndroid">Android</a> · <a href="https://testflight.apple.com/join/BwnAcdus">iOS (TestFlight; the App Store release is coming)</a>
+</p>
+
+<p align="center">
   <img src="docs/images/phones-3.png" alt="The interface on a phone" width="640">
 </p>
 
