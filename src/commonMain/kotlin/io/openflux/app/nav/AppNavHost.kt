@@ -20,6 +20,7 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.scene.SinglePaneSceneStrategy
 import androidx.navigation3.ui.NavDisplay
 import io.openflux.app.theme.AppTheme
+import io.openflux.app.theme.appBackground
 
 /**
  * Shows the screens [navigator] holds. Every section's stack is decorated on its own and always, so a section
@@ -71,5 +72,5 @@ private fun backward(): ContentTransform =
 fun destEntry(dest: Dest, metadata: Map<String, Any> = emptyMap(), content: @Composable () -> Unit): NavEntry<Dest> =
     NavEntry(dest, contentKey = "${dest.owner.name}/$dest", metadata = metadata) {
         // Opaque: a screen leaving or arriving must not show the one under it.
-        Box(Modifier.fillMaxSize().background(AppTheme.colors.background)) { content() }
+        Box(Modifier.fillMaxSize().appBackground()) { content() }
     }

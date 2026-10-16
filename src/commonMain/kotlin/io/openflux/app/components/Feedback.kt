@@ -3,6 +3,15 @@ package io.openflux.app.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import io.openflux.app.theme.Motion
+import io.openflux.app.theme.appear
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,13 +63,17 @@ fun Banner(
 ) {
     val c = AppTheme.colors
     val (icon, color) = when (tone) {
-        Tone.Info -> Icons.Rounded.Info to c.textSecondary
+        Tone.Info -> Icons.Rounded.Info to c.accentText
         Tone.Success -> Icons.Rounded.CheckCircle to c.success
         Tone.Warning -> Icons.Rounded.Warning to c.warning
         Tone.Danger -> Icons.Rounded.Error to c.danger
     }
+    val shape = RoundedCornerShape(AppTheme.shapes.medium)
+    // Tinted by its tone, with a bar of the tone on its leading edge; it rises in when it appears.
     Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(AppTheme.shapes.medium)).background(c.surfaceHigh)
+        modifier.appear().fillMaxWidth().clip(shape).background(c.surface).background(color.copy(alpha = if (c.isDark) 0.10f else 0.07f))
+            .border(1.dp, color.copy(alpha = 0.32f), shape)
+            .drawBehind { drawRect(color, size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height)) }
             .padding(start = AppTheme.spacing.m, end = AppTheme.spacing.xs, top = AppTheme.spacing.xs, bottom = AppTheme.spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s),
@@ -113,14 +126,23 @@ fun ToastHost(toaster: Toaster, modifier: Modifier = Modifier) {
         toaster.clear(serial)
     }
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-        AnimatedVisibility(toaster.current != null, enter = fadeIn(), exit = fadeOut()) {
-            Text(
-                toaster.current.orEmpty(),
-                modifier = Modifier.widthIn(max = 480.dp).clip(RoundedCornerShape(AppTheme.shapes.medium))
-                    .background(AppTheme.colors.text).padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.m),
-                style = AppTheme.type.body,
-                color = AppTheme.colors.background,
-            )
+        val c = AppTheme.colors
+        val shape = RoundedCornerShape(AppTheme.shapes.medium)
+        AnimatedVisibility(
+            toaster.current != null,
+            enter = slideInVertically(Motion.bouncy()) { it / 2 } + fadeIn() + scaleIn(initialScale = 0.92f),
+            exit = slideOutVertically { it / 3 } + fadeOut(),
+        ) {
+            Row(
+                Modifier.widthIn(max = 480.dp).shadow(16.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
+                    .clip(shape).background(c.surfaceHigh).border(1.dp, c.border, shape)
+                    .padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.m),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s),
+            ) {
+                Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = c.accentText, modifier = Modifier.size(18.dp))
+                Text(toaster.current.orEmpty(), style = AppTheme.type.body, color = c.text)
+            }
         }
     }
 }
@@ -143,9 +165,10 @@ fun ConfirmDialog(
         titleContentColor = c.text,
         textContentColor = c.textSecondary,
         shape = RoundedCornerShape(AppTheme.shapes.large),
+        modifier = Modifier.border(1.dp, c.border, RoundedCornerShape(AppTheme.shapes.large)),
         title = { Text(title, style = AppTheme.type.title) },
         text = text?.let { { Text(it, style = AppTheme.type.body) } },
-        confirmButton = { TextAction(confirm, { onConfirm() }, color = if (danger) c.danger else c.accent) },
+        confirmButton = { if (danger) DangerButton(confirm, { onConfirm() }) else PrimaryButton(confirm, { onConfirm() }) },
         dismissButton = { TextAction(dismiss, onDismiss, color = c.textSecondary) },
     )
 }
