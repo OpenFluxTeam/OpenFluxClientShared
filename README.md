@@ -18,11 +18,15 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/phones-3.png" alt="The interface on a phone" width="640">
+  <img src="docs/images/switch.gif" alt="Home's switch: the Moon burns into the Sun and the devices round it connect" width="420">
 </p>
 
 <p align="center">
-  <img src="docs/images/desktop-servers.png" alt="The same interface in a wide window" width="760">
+  <img src="docs/images/phones.png" alt="The interface on a phone: Home connected, servers, a node, settings" width="860">
+</p>
+
+<p align="center">
+  <img src="docs/images/desktop-home.png" alt="The same interface in a wide window" width="760">
 </p>
 
 The Compose Multiplatform UI and business logic shared by
@@ -53,6 +57,10 @@ src/
     platform/       Windows system proxy (WinInet), admin rights
     data/           Settings and profile storage
 ```
+
+## Home's switch
+
+The connect button on Home is a scene (`app/cosmic`): the Moon while off, its crust cracking with fire while connecting, the Sun once connected, with phones, tablets, laptops and monitors round it that wake, settle into orbits and join each other and the Sun with links of traffic. The body is a ray-cast sphere in a runtime shader (SkSL through skia's `RuntimeEffect` on the desktop, AGSL `RuntimeShader` on Android 13 and later; older Android draws it from the pictures), textured with NASA's LRO map of the Moon and a patch of the Sun's surface from SDO. The devices are boxes of panels, each drawn in perspective through a homography. The web prototype it was ported from, with the port plan, is `cosmic-button` in the workspace.
 
 ## Navigation
 
