@@ -88,7 +88,7 @@ class ProfileEditorModel(private val container: AppContainer, id: String?, priva
         }
     }
 
-    fun addTransport() = edit { it.copy(extras = it.extras + ExtraTransport(TransportType.DIRECT, priority = 50)) }
+    fun addTransport() = edit { it.copy(extras = it.extras + ExtraTransport(TransportType.DIRECT, priority = 110)) }
 
     fun removeTransport(index: Int) = edit { p -> p.copy(extras = p.extras.filterIndexed { i, _ -> i != index - 1 }) }
 
