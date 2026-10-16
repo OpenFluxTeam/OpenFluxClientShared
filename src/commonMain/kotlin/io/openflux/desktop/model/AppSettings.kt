@@ -53,10 +53,9 @@ enum class CoreSource(val label: String, val repo: String? = null) {
     }
 }
 
-/** The OpenFlux core repositories: the one the app's core is built from, and the original it was forked from. */
+/** The OpenFlux core repository: the app's core is built from it and its releases are downloaded from it. */
 object CoreRepos {
-    const val CORE = "OpenFluxTeam/OpenFlux"
-    const val OFFICIAL = "p1neappleXpress/OpenFlux"
+    const val CORE = "p1neappleXpress/OpenFlux"
 }
 
 /**
@@ -65,7 +64,7 @@ object CoreRepos {
  * source.
  */
 enum class NodeCoreSource(val id: String, val repo: String) {
-    Core("fork", CoreRepos.CORE),
+    Core("official", CoreRepos.CORE),
 }
 
 /** The Windows proxy settings found before OpenFlux changed them. */

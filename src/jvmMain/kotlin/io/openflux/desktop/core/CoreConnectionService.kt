@@ -791,11 +791,8 @@ class CoreBinary {
     private fun downloadDir(source: CoreSource): File =
         File(AppDirs.config, "cores/" + source.repo!!.replace('/', '_'))
 
-    /** Where 3.8.1 and older kept the fork's core they downloaded: used until the next download. */
-    private fun legacyDir(): File = File(AppDirs.config, "cores/meepo161_OpenFlux")
-
     private fun downloadedDir(source: CoreSource): File? =
-        listOf(downloadDir(source), legacyDir()).firstOrNull { File(it, fileName).isFile }
+        downloadDir(source).takeIf { File(it, fileName).isFile }
 
     /** The core downloaded for [source], null when none. */
     fun downloaded(source: CoreSource): File? =
