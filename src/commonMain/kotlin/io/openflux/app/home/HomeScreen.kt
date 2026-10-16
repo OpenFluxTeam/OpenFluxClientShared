@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import io.openflux.app.components.IconBubble
@@ -57,8 +58,10 @@ import io.openflux.app.components.Brand
 import io.openflux.app.components.Chip
 import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ConfirmDialog
-import io.openflux.app.components.ConnectButton
 import io.openflux.app.components.ConnectLook
+import io.openflux.app.cosmic.CosmicSwitch
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.height
 import io.openflux.app.components.Field
 import io.openflux.app.components.IconAction
 import io.openflux.app.components.LocalToaster
@@ -216,13 +219,20 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         return
     }
 
-    ConnectButton(
-        state.look(),
-        label = if (state.isActive) "Отключить" else "Подключить",
-        onClick = m::toggle,
-        shortcut = "Ctrl+Enter",
-        timer = (state as? ConnectionState.Connected)?.let { Fmt.duration(now - it.since) },
-    )
+    // The switch is a small universe: the Moon while off, the Sun with its network of devices while connected.
+    val busy = (traffic.downBytesPerSec + traffic.upBytesPerSec).toDouble()
+    // Its height is set, not left to an aspect ratio: in a wide window that would ask for more than the cap and
+    // the scene would spill over what is above and below it.
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        CosmicSwitch(
+            state.look(),
+            label = if (state.isActive) "Отключить" else "Подключить",
+            onClick = m::toggle,
+            modifier = Modifier.fillMaxWidth().height(minOf(maxWidth / 1.12f, 480.dp)),
+            traffic = (kotlin.math.log10(busy + 1.0) / 7.0).toFloat(),
+            shortcut = "Ctrl+Enter",
+        )
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
         AnimatedContent(
             state.title(),
@@ -230,7 +240,9 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         ) { Text(it, style = AppTheme.type.title, color = AppTheme.colors.text, textAlign = TextAlign.Center) }
         val connected = state as? ConnectionState.Connected
         AnimatedVisibility(connected != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+            val since = connected?.since ?: now
             FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
+                StatPill(Icons.Rounded.Schedule, Fmt.duration(now - since))
                 StatPill(Icons.Rounded.ArrowDownward, Fmt.speed(traffic.downBytesPerSec))
                 StatPill(Icons.Rounded.ArrowUpward, Fmt.speed(traffic.upBytesPerSec))
             }
@@ -339,7 +351,7 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
     }
 }
 
-/** A small tile of one fact under the big button: the speed down or up. */
+/** A small tile of one fact under the switch: the time connected, the speed down or up. */
 @Composable
 private fun StatPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
     val c = AppTheme.colors
