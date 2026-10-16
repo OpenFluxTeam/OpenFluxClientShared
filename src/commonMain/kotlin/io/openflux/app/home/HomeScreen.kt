@@ -17,7 +17,6 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Public
-import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import io.openflux.app.components.IconBubble
@@ -222,6 +221,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         label = if (state.isActive) "Отключить" else "Подключить",
         onClick = m::toggle,
         shortcut = "Ctrl+Enter",
+        timer = (state as? ConnectionState.Connected)?.let { Fmt.duration(now - it.since) },
     )
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
         AnimatedContent(
@@ -230,9 +230,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         ) { Text(it, style = AppTheme.type.title, color = AppTheme.colors.text, textAlign = TextAlign.Center) }
         val connected = state as? ConnectionState.Connected
         AnimatedVisibility(connected != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-            val since = connected?.since ?: now
             FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-                StatPill(Icons.Rounded.Schedule, Fmt.duration(now - since))
                 StatPill(Icons.Rounded.ArrowDownward, Fmt.speed(traffic.downBytesPerSec))
                 StatPill(Icons.Rounded.ArrowUpward, Fmt.speed(traffic.upBytesPerSec))
             }
@@ -341,7 +339,7 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
     }
 }
 
-/** A small tile of one fact under the big button: the time connected, the speed down or up. */
+/** A small tile of one fact under the big button: the speed down or up. */
 @Composable
 private fun StatPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
     val c = AppTheme.colors

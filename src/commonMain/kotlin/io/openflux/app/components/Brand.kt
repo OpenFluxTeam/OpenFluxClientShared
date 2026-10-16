@@ -42,8 +42,7 @@ fun BrandTile(modifier: Modifier = Modifier, size: Dp = 40.dp) {
 }
 
 /**
- * The program's name with its logo: the side column's small one, or Home's [large] one whose name is written in
- * the accent's gradient.
+ * The program's name with its logo: the side column's, or Home's slightly [large] one.
  */
 @Composable
 fun Brand(modifier: Modifier = Modifier, large: Boolean = false, subtitle: String = "Зашифрованный туннель") {
@@ -54,11 +53,11 @@ fun Brand(modifier: Modifier = Modifier, large: Boolean = false, subtitle: Strin
             Text(
                 "OpenFlux",
                 style = if (large) {
-                    TextStyle(brush = c.accentBrush, fontSize = 26.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.4).sp)
+                    TextStyle(fontSize = 22.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.2).sp)
                 } else {
                     AppTheme.type.title.copy(fontWeight = FontWeight.Bold)
                 },
-                color = if (large) Color.Unspecified else c.text,
+                color = c.text,
                 maxLines = 1,
             )
             Text(subtitle, style = AppTheme.type.caption, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)

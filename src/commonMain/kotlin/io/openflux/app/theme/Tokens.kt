@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.sp
 
 /**
  * The colours of the interface: the 2.x palette (deep navy, one blue accent) made richer: the accent runs into
- * violet on what it fills, and glows a little under what matters.
+ * azure on what it fills, and glows a little under what matters.
  */
 @Immutable
 data class Colors(
@@ -47,7 +47,7 @@ data class Colors(
     val scrim: Color,
 )
 
-/** The accent's fill: blue into violet, corner to corner. */
+/** The accent's fill: blue into azure, corner to corner. */
 val Colors.accentBrush: Brush get() = Brush.linearGradient(listOf(accent, accentEnd))
 
 /** The light under a filled accent. */
@@ -64,7 +64,7 @@ val DarkColors = Colors(
     textSecondary = Color(0xFF97A0B5),
     textMuted = Color(0xFF5E677C),
     accent = Color(0xFF3B68FA),
-    accentEnd = Color(0xFF7048E8),
+    accentEnd = Color(0xFF2C86F0),
     accentText = Color(0xFF7D9BFF),
     accentSoft = Color(0x293B68FA),
     onAccent = Color(0xFFFFFFFF),
@@ -85,7 +85,7 @@ val LightColors = Colors(
     textSecondary = Color(0xFF5A6275),
     textMuted = Color(0xFF8A91A3),
     accent = Color(0xFF2F5BEA),
-    accentEnd = Color(0xFF6A3FE0),
+    accentEnd = Color(0xFF1C6FD8),
     accentText = Color(0xFF2F5BEA),
     accentSoft = Color(0x1A2F5BEA),
     onAccent = Color(0xFFFFFFFF),
