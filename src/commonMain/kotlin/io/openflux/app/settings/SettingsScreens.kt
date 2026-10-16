@@ -435,8 +435,7 @@ private fun AboutPage() {
         }
     }
     Section("Исходный код") {
-        RowItem("Ядро OpenFlux (форк)", subtitle = "github.com/${CoreRepos.FORK}", onClick = { platform.openUrl("https://github.com/${CoreRepos.FORK}") })
-        RowItem("Ядро OpenFlux (оригинал)", subtitle = "github.com/${CoreRepos.OFFICIAL}", onClick = { platform.openUrl("https://github.com/${CoreRepos.OFFICIAL}") })
+        RowItem("Ядро OpenFlux", subtitle = "github.com/${CoreRepos.OFFICIAL}", onClick = { platform.openUrl("https://github.com/${CoreRepos.OFFICIAL}") })
         RowItem("Это приложение", subtitle = "github.com/${platform.clientRepo}", onClick = { platform.openUrl("https://github.com/${platform.clientRepo}") })
     }
     Text(
