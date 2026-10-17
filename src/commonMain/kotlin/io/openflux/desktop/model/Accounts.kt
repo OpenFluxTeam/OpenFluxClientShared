@@ -31,8 +31,9 @@ enum class AccountKind(
     val finishCookie: String? = null,
     /**
      * Whether the core opens this service's documents as the signed-in
-     * user. Mail.ru's transport opens its document anonymously, and Cloud
-     * refuses that request (403) when it carries an account's cookies.
+     * user. Mail.ru's transport does since Cloud stopped opening a public
+     * document for an anonymous visitor (401): each device opens it with its
+     * own Mail.ru sign-in, and an exit never hands its own to a client.
      */
     val opensSignedIn: Boolean = true,
 ) {
@@ -47,7 +48,6 @@ enum class AccountKind(
         waitForHome = false,
         finishUrl = "https://cloud.mail.ru/home/",
         finishCookie = "sdcs",
-        opensSignedIn = false,
     ),
     Max("MAX", "ic_max", "https://web.max.ru/", "https://web.max.ru/", ".max.ru", false, setOf(TransportType.ONEME), signsIn = false);
 

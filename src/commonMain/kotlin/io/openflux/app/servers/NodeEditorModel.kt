@@ -181,7 +181,7 @@ class NodeEditorModel(
     fun pushMailruSignIn() {
         val info = installed ?: return
         val cookies = mailruCookies()
-        if (cookies.isEmpty()) { error = "Сначала войдите в Mail.ru: Настройки → Сервисы"; return }
+        if (!NodeDocuments.signedInMailru(cookies)) { error = "Сначала войдите в Mail.ru: Настройки → Сервисы"; return }
         if (info.transportTypes.none { it == TransportType.MAILRU }) {
             error = "У ноды нет транспорта Mail.ru"
             return
@@ -411,7 +411,7 @@ class NodeEditorModel(
      */
     private fun cookiesFor(d: NodeDraft): String {
         if (d.needsYandexDoc && pendingCookiesDoc.isNotEmpty() && d.yandexDoc == pendingCookiesDoc) return pendingCookies
-        return if (d.mailru && d.mailruLink.isNotBlank()) mailruCookies() else ""
+        return if (d.mailru && d.mailruLink.isNotBlank()) mailruCookies().takeIf(NodeDocuments::signedInMailru).orEmpty() else ""
     }
 
     private fun renameHere(name: String) {

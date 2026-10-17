@@ -189,6 +189,10 @@ object NodeDocuments {
     /** The document link without query or fragment, null if it is not a Yandex document. */
     fun clean(url: String): String? = url.trim().replace(Regex("[?#].*$"), "").takeIf(DOC_URL::matches)
 
+    /** Whether a Cookie header holds a Mail.ru login (its session cookie, Mpop). */
+    fun signedInMailru(cookieHeader: String): Boolean =
+        cookieHeader.split(';').any { it.trim().substringBefore('=') == "Mpop" && it.contains('=') }
+
     /** Whether a Cookie header holds a Yandex login (the core's provision.CookieStore check). */
     fun signedIn(cookieHeader: String): Boolean =
         cookieHeader.split(';').any { it.trim().substringBefore('=') == "Session_id" && it.contains('=') }
