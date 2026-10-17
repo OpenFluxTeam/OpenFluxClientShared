@@ -172,9 +172,21 @@ class NodeEditorModel(
             return
         }
         run("Передаю вход Яндекса ноде…") {
-            installed = link.call(serverId) { setTransports(info.id, info.transports, sudo(), cookies, null) }
+            installed = pushSignIn(info, cookies)
+            recordNodeSignIn(container, serverId, info.id, AccountKind.Yandex)
             notice = "Вход Яндекса передан ноде"
         }
+    }
+
+    /**
+     * The sign-in to the node's document of its service, merged on the node without a restart (the channel's
+     * other document keeps its sign-in). A wizard without pushSignIn (an older core here) sends it the old way.
+     */
+    private suspend fun pushSignIn(info: InstalledChannel, cookies: String): InstalledChannel = try {
+        link.call(serverId) { pushSignIn(info.id, info.transports, sudo(), cookies) }
+    } catch (e: NodeWizardException) {
+        if (e.message?.contains("не поддерживается") != true) throw e
+        link.call(serverId) { setTransports(info.id, info.transports, sudo(), cookies, null) }
     }
 
     /** Gives the node the Mail.ru sign-in saved in the app (Settings → Сервисы): Mail.ru opens its document only for a signed-in user. */
@@ -187,7 +199,8 @@ class NodeEditorModel(
             return
         }
         run("Передаю вход Mail.ru ноде…") {
-            installed = link.call(serverId) { setTransports(info.id, info.transports, sudo(), cookies, null) }
+            installed = pushSignIn(info, cookies)
+            recordNodeSignIn(container, serverId, info.id, AccountKind.Mailru)
             notice = "Вход Mail.ru передан ноде"
         }
     }
@@ -233,7 +246,9 @@ class NodeEditorModel(
             busyText = "Спрашиваю сервер, что изменится…"
             val plan = link.call(serverId, retry = true) { plan(ch.id, transports, cookiesFor(ready).isNotEmpty(), ready.autoUpdate, ready.mode) }
             busyText = "Устанавливаю ноду: ядро, настройки, запуск…"
-            link.call(serverId) { apply(ch, transports, plan.port, ready.autoUpdate, sudo(), cookiesFor(ready), ready.mode) }
+            val signIn = cookiesFor(ready)
+            link.call(serverId) { apply(ch, transports, plan.port, ready.autoUpdate, sudo(), signIn, ready.mode) }
+            signInKind(signIn)?.let { recordNodeSignIn(container, serverId, ch.id, it) }
             pendingCookies = ""
             installedId = ch.id
             val name = ready.name.trim().ifEmpty { defaultName(ch.id) }
@@ -412,6 +427,14 @@ class NodeEditorModel(
     private fun cookiesFor(d: NodeDraft): String {
         if (d.needsYandexDoc && pendingCookiesDoc.isNotEmpty() && d.yandexDoc == pendingCookiesDoc) return pendingCookies
         return if (d.mailru && d.mailruLink.isNotBlank()) mailruCookies().takeIf(NodeDocuments::signedInMailru).orEmpty() else ""
+    }
+
+    /** Whose sign-in a Cookie header is, as the core routes it: Session_id is Yandex's, Mpop Mail.ru's. */
+    private fun signInKind(cookies: String): AccountKind? = when {
+        cookies.isEmpty() -> null
+        NodeDocuments.signedIn(cookies) -> AccountKind.Yandex
+        NodeDocuments.signedInMailru(cookies) -> AccountKind.Mailru
+        else -> null
     }
 
     private fun renameHere(name: String) {

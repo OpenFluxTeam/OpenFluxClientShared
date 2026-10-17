@@ -145,6 +145,16 @@ class CoreNodeWizard(
         return json.decodeFromJsonElement(InstalledChannel.serializer(), reply.getValue("channel"))
     }
 
+    override suspend fun pushSignIn(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String): InstalledChannel {
+        val reply = call("pushSignIn", "channel=$channel ${transports.names()}") {
+            put("channel", channel)
+            put("transports", transports.json())
+            put("sudoPassword", sudoPassword)
+            put("cookies", cookieHeader)
+        }
+        return json.decodeFromJsonElement(InstalledChannel.serializer(), reply.getValue("channel"))
+    }
+
     override suspend fun channelShareLink(name: String, key: String, host: String, port: Int, transports: List<NodeTransport>, context: String): String =
         call("shareLink", "$host:$port ${transports.names()} context") {
             put("name", name)

@@ -362,6 +362,14 @@ interface NodeWizardService {
     suspend fun setTransports(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String = "", mode: NodeMode? = null): InstalledChannel =
         throw NodeWizardException("Изменение каналов на сервере здесь не поддерживается")
 
+    /**
+     * Gives the channel's document of [cookieHeader]'s service (Yandex: Session_id, Mail.ru: Mpop) that sign-in;
+     * the channel's other document keeps its own, and a node whose core can takes it without a restart. Returns
+     * the channel as it is now.
+     */
+    suspend fun pushSignIn(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String): InstalledChannel =
+        throw NodeWizardException("Передача входа ноде здесь не поддерживается")
+
     /** [shareLink] for a channel already on the server: the link keeps its [context]. */
     suspend fun channelShareLink(name: String, key: String, host: String, port: Int, transports: List<NodeTransport>, context: String): String =
         throw NodeWizardException("Изменение каналов на сервере здесь не поддерживается")

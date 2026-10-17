@@ -68,6 +68,12 @@ internal fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortc
     val navigator = rememberAppNavigator(container)
     val serverLink = remember(container) { link ?: ServerLink(container) }
     DisposableEffect(serverLink) { onDispose { serverLink.close() } }
+    // While the app runs, nodes that got a sign-in from it get it again when it changes or they say it expired.
+    val signInKeeper = remember(serverLink) { io.openflux.app.servers.nodeSignInKeeper(container, serverLink) }
+    LaunchedEffect(signInKeeper) {
+        // Off the frame clock: its waits are real minutes, also under a UI test.
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { signInKeeper.run(container.accounts.sessions) }
+    }
     var addOpen by rememberSaveable { mutableStateOf(false) }
     // A key or a profile link opened from outside (a scanned code, a chat) goes to "Ключ, ссылка или файл".
     LaunchedEffect(container) {

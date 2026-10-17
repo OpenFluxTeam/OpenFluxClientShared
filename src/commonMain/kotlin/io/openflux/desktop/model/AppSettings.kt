@@ -154,6 +154,12 @@ data class AppSettings(
     val useAccountSessions: Boolean = true,
     /** Node wizard: servers used before, newest first. No passwords. */
     val knownServers: List<KnownServer> = emptyList(),
+    /**
+     * Keep your nodes signed in: the app gives a node it gave a sign-in before the account's sign-in again when
+     * it changes or the node says it is signed out (see NodeSignInPolicy). Fingerprints only, never cookies.
+     */
+    val keepNodeSignIns: Boolean = true,
+    val nodeSignIns: Map<String, NodeSignInRecord> = emptyMap(),
     /** The new interface's place and screens (JSON of io.openflux.app.nav.NavState), restored at the next start on the desktop. */
     val navState: String = "",
 )

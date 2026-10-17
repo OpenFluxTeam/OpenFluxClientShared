@@ -104,6 +104,8 @@ data class InstalledChannel(
     val mode: String = "l4",
     /** The channel's encryption key, which the server gives its root: the owner's link and profile are made from it. */
     val key: String = "",
+    /** The documents the node says are signed out or down (an older node says nothing). */
+    val signin: List<NodeSignInState> = emptyList(),
 ) {
     // The key stays out of any log or message.
     override fun toString() = "InstalledChannel($id, port=$port, $state)"
