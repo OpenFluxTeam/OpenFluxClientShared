@@ -248,3 +248,7 @@ object NodeServers {
     /** A TCP port, null when [text] is not one. */
     fun port(text: String): Int? = text.trim().toIntOrNull()?.takeIf { it in 1..65535 }
 }
+
+/** What moving a server's nodes to this app's core did: the core now installed and the channels restarted on it. */
+@Serializable
+data class NodeUpgrade(val core: String = "", val restarted: List<String> = emptyList())

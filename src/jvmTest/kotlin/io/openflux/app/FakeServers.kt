@@ -8,6 +8,7 @@ import io.openflux.desktop.model.NodeCoreSource
 import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodePlan
 import io.openflux.desktop.model.NodeTransport
+import io.openflux.desktop.model.NodeUpgrade
 import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.FakeShareLinkCodec
 import io.openflux.desktop.model.ServerProbe
@@ -90,6 +91,12 @@ class FakeNodeService(vararg servers: FakeServer) : NodeWizardService {
         val s = here("remove")
         sudo(s, sudoPassword)
         s.channels.remove(channel)
+    }
+
+    override suspend fun upgrade(sudoPassword: String): NodeUpgrade {
+        val s = here("upgrade")
+        sudo(s, sudoPassword)
+        return NodeUpgrade("node-v9.9.9", s.channels.values.filter { it.state == "active" }.map { it.id })
     }
 
     override suspend fun showChannel(channel: String, sudoPassword: String): InstalledChannel {

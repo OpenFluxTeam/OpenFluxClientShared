@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.Devices
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -243,6 +244,7 @@ fun ServerScreen(dest: Dest.Server) {
     val link = LocalServerLink.current
     val m = rememberScreenModel { ServerScreenModel(container, link, dest.id, it) }
     var tab by rememberSaveable { mutableStateOf(0) }
+    var upgradeAsk by remember { mutableStateOf(false) }
     var forgetAsk by remember { mutableStateOf(false) }
     LaunchedEffect(m) { if (m.hasAccess && m.channels == null && !m.needsSudo) m.load() }
     ScreenScaffold(m.host, onBack = { navigator.back() }) {
@@ -279,6 +281,7 @@ fun ServerScreen(dest: Dest.Server) {
                             )
                         }
                     }
+                    SecondaryButton("Обновить ноды", { upgradeAsk = true }, Modifier.fillMaxWidth(), leading = Icons.Rounded.Refresh)
                     SecondaryButton("Поставить ноду", { navigator.open(Dest.NewNode(dest.id)) }, leading = Icons.Rounded.Add)
                 }
             }
@@ -295,8 +298,18 @@ fun ServerScreen(dest: Dest.Server) {
             }
             DangerButton("Забыть сервер", { forgetAsk = true })
         }
+        m.notice?.let { Banner(it, Tone.Success) }
         m.error?.let { Banner(it, Tone.Danger) }
         m.busy?.let { ProgressLine(it) }
+    }
+    if (upgradeAsk) {
+        ConfirmDialog(
+            title = "Обновить ноды?",
+            text = "Все ноды на сервере перейдут на ядро, которое входит в это приложение, и запущенные перезапустятся. Подключения через них прервутся на несколько секунд.",
+            confirm = "Обновить",
+            onConfirm = { upgradeAsk = false; m.upgrade() },
+            onDismiss = { upgradeAsk = false },
+        )
     }
     HostKeyDialog(onTrust = m::trust)
     if (forgetAsk) {

@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import io.openflux.desktop.model.InstalledChannel
 import io.openflux.desktop.model.KnownServer
 import io.openflux.desktop.model.NodeCoreSource
+import io.openflux.desktop.model.NodeUpgrade
 import io.openflux.desktop.model.NodeServers
 import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.ServerProbe
@@ -121,6 +122,12 @@ class ServerLink(private val container: AppContainer) {
         val ids = probes[serverId]?.channels.orEmpty()
         if (ids.isNotEmpty() && needsSudo(serverId) && sudo(serverId).isEmpty()) throw NodeWizardException("Введите пароль sudo", sudo = true)
         return ids.map { id -> call(serverId, retry = true) { showChannel(id, sudo(serverId)) } }.sortedBy { it.port }
+    }
+
+    /** Moves the nodes on [serverId] to the core this app pins; asks for the sudo password the way [channels] does. */
+    suspend fun upgrade(serverId: String): NodeUpgrade {
+        if (needsSudo(serverId) && sudo(serverId).isEmpty()) throw NodeWizardException("Введите пароль sudo", sudo = true)
+        return call(serverId) { upgrade(sudo(serverId)) }
     }
 
     /** Connects again to read what is on the server now. */

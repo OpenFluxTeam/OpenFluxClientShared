@@ -17,6 +17,7 @@ import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodePlan
 import io.openflux.desktop.model.InstalledChannel
 import io.openflux.desktop.model.NodeTransport
+import io.openflux.desktop.model.NodeUpgrade
 import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.ServerProbe
 import io.openflux.desktop.model.SshTarget
@@ -331,6 +332,13 @@ interface NodeWizardService {
         mode: NodeMode = NodeMode.L4,
     )
     suspend fun remove(channel: String, sudoPassword: String)
+
+    /**
+     * Moves every node on the server to the core this app pins and restarts the running ones (their tunnels
+     * drop for a moment).
+     */
+    suspend fun upgrade(sudoPassword: String): NodeUpgrade =
+        throw NodeWizardException("Обновление нод здесь не поддерживается")
 
     /** A channel already on the server: its documents, port, state and encryption context (needs root). */
     suspend fun showChannel(channel: String, sudoPassword: String): InstalledChannel =

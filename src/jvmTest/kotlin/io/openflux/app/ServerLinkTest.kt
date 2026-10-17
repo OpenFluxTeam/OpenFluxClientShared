@@ -34,6 +34,16 @@ class ServerLinkTest {
     }
 
     @Test
+    fun upgradeRestartsTheRunningNodes() = runTest {
+        a.channels["of-1"] = InstalledChannel("of-1", "active", 22001)
+        a.channels["of-2"] = InstalledChannel("of-2", "inactive", 22002)
+        val id = link.connect(target("a.example"))
+        val done = link.upgrade(id)
+        assertEquals("node-v9.9.9", done.core)
+        assertEquals(listOf("of-1"), done.restarted)
+    }
+
+    @Test
     fun unknownHostKeyAsksAndTrustConnects() = runTest {
         assertFailsWith<NodeWizardException> { link.connect(target("a.example", key = "")) }
         val prompt = assertNotNull(link.hostKeyPrompt)

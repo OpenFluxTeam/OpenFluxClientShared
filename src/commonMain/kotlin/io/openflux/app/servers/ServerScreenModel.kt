@@ -43,6 +43,9 @@ class ServerScreenModel(private val container: AppContainer, private val link: S
         private set
     var error by mutableStateOf<String?>(null)
         private set
+    /** What the last update of the nodes did, in a sentence. */
+    var notice by mutableStateOf<String?>(null)
+        private set
     var sudoInput by mutableStateOf("")
     private var job: Job? = null
 
@@ -61,6 +64,18 @@ class ServerScreenModel(private val container: AppContainer, private val link: S
     fun refresh() = run("Читаю сервер…") {
         link.refresh(serverId)
         channels = link.channels(serverId)
+    }
+
+    /** Moves the nodes to the core this app pins and restarts the running ones, then reads the server again. */
+    fun upgrade() = run("Обновляю ноды на сервере…") {
+        if (sudoInput.isNotEmpty()) link.setSudo(serverId, sudoInput)
+        val done = link.upgrade(serverId)
+        link.refresh(serverId)
+        channels = link.channels(serverId)
+        notice = "Ядро ${done.core}: " + when (done.restarted.size) {
+            0 -> "запущенных нод не было, перезапускать нечего"
+            else -> "перезапущено нод: ${done.restarted.size}"
+        }
     }
 
     fun connect() = run("Подключаюсь к серверу…") {
@@ -91,6 +106,7 @@ class ServerScreenModel(private val container: AppContainer, private val link: S
         if (job?.isActive == true) return
         busy = message
         error = null
+        notice = null
         job = scope.launch {
             try {
                 block()

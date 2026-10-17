@@ -9,6 +9,7 @@ import io.openflux.desktop.model.NodeCoreSource
 import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodePlan
 import io.openflux.desktop.model.NodeTransport
+import io.openflux.desktop.model.NodeUpgrade
 import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.ServerProbe
 import io.openflux.desktop.model.SshTarget
@@ -118,6 +119,11 @@ class CoreNodeWizard(
             put("channel", channel)
             put("sudoPassword", sudoPassword)
         }
+    }
+
+    override suspend fun upgrade(sudoPassword: String): NodeUpgrade {
+        val reply = call("upgrade") { put("sudoPassword", sudoPassword) }
+        return json.decodeFromJsonElement(NodeUpgrade.serializer(), reply)
     }
 
     override suspend fun showChannel(channel: String, sudoPassword: String): InstalledChannel {
