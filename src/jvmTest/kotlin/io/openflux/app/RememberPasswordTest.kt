@@ -21,6 +21,11 @@ class RememberPasswordTest {
     private val link = ServerLink(c)
     private val id = "a.example:22:root"
 
+    init {
+        // The server was trusted on the first visit, as the host key dialog does.
+        c.settings.update { it.copy(knownHostKeys = mapOf(io.openflux.desktop.model.NodeServers.hostKeyId("a.example", 22) to "SHA256:a.example")) }
+    }
+
     private fun target(pw: String = "pw") = SshTarget("a.example", 22, "root", password = pw, hostKey = "SHA256:a.example")
 
     @Test
