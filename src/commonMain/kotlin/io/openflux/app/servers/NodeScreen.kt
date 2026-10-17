@@ -116,6 +116,9 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
                         if (info.transportTypes.any { it == TransportType.VYANDEX || it == TransportType.YANDEX }) {
                             DropdownMenuItem({ Text("Передать вход Яндекса ноде") }, { menu = false; m.pushYandexSignIn() })
                         }
+                        if (info.transportTypes.any { it == TransportType.MAILRU }) {
+                            DropdownMenuItem({ Text("Передать вход Mail.ru ноде") }, { menu = false; m.pushMailruSignIn() })
+                        }
                         DropdownMenuItem({ Text("Удалить с сервера", color = AppTheme.colors.danger) }, { menu = false; removeAsk = true })
                     }
                 }

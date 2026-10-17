@@ -46,6 +46,9 @@ class NodeEditorModel(
     private val yandexCookies: () -> String = {
         AccountCookies.header(container.accounts.validSession(AccountKind.Yandex)?.cookies.orEmpty())
     },
+    private val mailruCookies: () -> String = {
+        AccountCookies.header(container.accounts.validSession(AccountKind.Mailru)?.cookies.orEmpty())
+    },
 ) {
     val creating: Boolean get() = channelId == null && installedId == null
 
@@ -171,6 +174,21 @@ class NodeEditorModel(
         run("Передаю вход Яндекса ноде…") {
             installed = link.call(serverId) { setTransports(info.id, info.transports, sudo(), cookies, null) }
             notice = "Вход Яндекса передан ноде"
+        }
+    }
+
+    /** Gives the node the Mail.ru sign-in saved in the app (Settings → Сервисы): Mail.ru opens its document only for a signed-in user. */
+    fun pushMailruSignIn() {
+        val info = installed ?: return
+        val cookies = mailruCookies()
+        if (cookies.isEmpty()) { error = "Сначала войдите в Mail.ru: Настройки → Сервисы"; return }
+        if (info.transportTypes.none { it == TransportType.MAILRU }) {
+            error = "У ноды нет транспорта Mail.ru"
+            return
+        }
+        run("Передаю вход Mail.ru ноде…") {
+            installed = link.call(serverId) { setTransports(info.id, info.transports, sudo(), cookies, null) }
+            notice = "Вход Mail.ru передан ноде"
         }
     }
 
@@ -387,9 +405,14 @@ class NodeEditorModel(
         return copy(session = true, extras = this.extras.filterNot { it.type == TransportType.SCRIPT } + extras)
     }
 
-    /** The sign-in goes along only with a Yandex document, and only the one it made. */
-    private fun cookiesFor(d: NodeDraft): String =
-        if (d.needsYandexDoc && pendingCookiesDoc.isNotEmpty() && d.yandexDoc == pendingCookiesDoc) pendingCookies else ""
+    /**
+     * The sign-in goes along with a Yandex document (only the one it made) or, failing that, with a Mail.ru
+     * document: the app's saved Mail.ru account, since Mail.ru no longer opens a public document anonymously.
+     */
+    private fun cookiesFor(d: NodeDraft): String {
+        if (d.needsYandexDoc && pendingCookiesDoc.isNotEmpty() && d.yandexDoc == pendingCookiesDoc) return pendingCookies
+        return if (d.mailru && d.mailruLink.isNotBlank()) mailruCookies() else ""
+    }
 
     private fun renameHere(name: String) {
         val p = localProfile ?: return
