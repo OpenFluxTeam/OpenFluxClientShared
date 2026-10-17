@@ -66,7 +66,8 @@ fun CosmicSwitch(
     val camera = remember { Camera() }
     val canvas = remember { CanvasSize() }
     val reduced = rememberReducedMotion()
-    val images by produceState<CosmicImages?>(null) { value = loadCosmicImages() }
+    val scene = LocalCosmicScene.current
+    val images by produceState<CosmicImages?>(null, scene) { if (scene) value = loadCosmicImages() }
     val frame = remember { mutableIntStateOf(0) }
     var first by remember { androidx.compose.runtime.mutableStateOf(true) }
     LaunchedEffect(look) {
@@ -79,7 +80,8 @@ fun CosmicSwitch(
         }
     }
     SideEffect { universe.traffic = traffic.coerceIn(0f, 1f) }
-    LaunchedEffect(universe) {
+    LaunchedEffect(universe, scene) {
+        if (!scene) return@LaunchedEffect
         var last = 0L
         while (true) {
             withInfiniteAnimationFrameNanos { now ->

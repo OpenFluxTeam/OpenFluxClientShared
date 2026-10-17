@@ -73,3 +73,9 @@ compose.resources {
     packageOfResClass = "io.openflux.desktop.resources"
     generateResClass = always
 }
+
+// A test run does not animate Home's scene (see LocalCosmicScene): a slow CI runner never finished its frame loop
+// in time. Screenshot runs (SHOTS=<dir>) keep it.
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    if (System.getenv("SHOTS") == null) systemProperty("openflux.cosmicScene", "off")
+}

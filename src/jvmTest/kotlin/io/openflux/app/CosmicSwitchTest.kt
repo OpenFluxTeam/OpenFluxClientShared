@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.toAwtImage
@@ -20,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import io.openflux.app.components.ConnectLook
 import io.openflux.app.cosmic.CosmicSwitch
 import io.openflux.app.theme.AppTheme
+import io.openflux.app.cosmic.LocalCosmicScene
 import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
@@ -31,8 +33,10 @@ class CosmicSwitchTest {
     fun theBodyIsTheButton() = runComposeUiTest {
         var clicks = 0
         setContent {
-            AppTheme(dark = true, touch = false) {
-                CosmicSwitch(ConnectLook.Off, "Подключить", { clicks++ }, Modifier.fillMaxSize())
+            CompositionLocalProvider(LocalCosmicScene provides true) {
+                AppTheme(dark = true, touch = false) {
+                    CosmicSwitch(ConnectLook.Off, "Подключить", { clicks++ }, Modifier.fillMaxSize())
+                }
             }
         }
         onNodeWithContentDescription("Подключить").performClick()
