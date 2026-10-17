@@ -113,6 +113,12 @@ class TestPlatform : PlatformServices {
     override suspend fun httpText(url: String): String = releases ?: throw java.io.IOException("нет связи")
     var rooms = "packed-rooms"
     override suspend fun newCupsRooms(): String = rooms
+    /** The system secret store, in memory. */
+    val vault = mutableMapOf<String, String>()
+    override val secretStoreSupported = true
+    override fun loadSecret(key: String) = vault[key]
+    override fun saveSecret(key: String, value: String): Boolean { vault[key] = value; return true }
+    override fun deleteSecret(key: String) { vault.remove(key) }
     var secrets = 0
     override fun newSecret() = "%064x".format(++secrets)
 }

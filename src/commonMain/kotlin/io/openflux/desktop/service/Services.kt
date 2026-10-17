@@ -214,6 +214,14 @@ interface PlatformServices {
     fun openUrl(url: String)
     /** A new random channel key (64 hex characters). */
     fun newSecret(): String
+    /** Whether [saveSecret] keeps secrets in the system's protected storage (DPAPI, Keychain, Keystore) on this device. */
+    val secretStoreSupported: Boolean get() = false
+    /** A secret kept by [saveSecret] under [key], null when none or it cannot be read. */
+    fun loadSecret(key: String): String? = null
+    /** Keeps [value] under [key], encrypted by the system; false if it could not be kept (nothing is written in the clear). */
+    fun saveSecret(key: String, value: String): Boolean = false
+    /** Forgets the secret under [key]. */
+    fun deleteSecret(key: String) {}
     fun now(): Long
     /** Newest app release tag on GitHub, null when unknown. */
     suspend fun latestRelease(): String?

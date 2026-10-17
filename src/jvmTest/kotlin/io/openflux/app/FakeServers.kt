@@ -28,6 +28,8 @@ class FakeServer(
     var sudo: String = "root",
     var sudoPassword: String = "",
     var autoupdate: Boolean = true,
+    /** The password the server takes; null: any non-empty one. */
+    var password: String? = null,
     val channels: MutableMap<String, InstalledChannel> = linkedMapOf(),
 )
 
@@ -63,6 +65,7 @@ class FakeNodeService(vararg servers: FakeServer) : NodeWizardService {
             throw NodeWizardException("Новый сервер", hostKey = s.hostKey, trust = target.hostKey.isEmpty(), mismatch = target.hostKey.isNotEmpty())
         }
         if (target.password.isEmpty() && target.privateKey.isEmpty()) throw NodeWizardException("Сервер не принял вход")
+        if (s.password != null && target.privateKey.isEmpty() && target.password != s.password) throw NodeWizardException("сервер не принял логин, пароль или ключ")
         connected = s
         return ServerProbe(os = "Ubuntu 24.04", arch = "amd64", systemd = true, sudo = s.sudo, core = "node-v1.4.1", autoupdate = s.autoupdate, channels = s.channels.keys.toList())
     }

@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import io.openflux.app.components.Banner
+import io.openflux.app.components.CheckRow
 import io.openflux.app.components.Chip
 import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ConfirmDialog
@@ -147,7 +148,8 @@ fun LoginFields(form: LoginForm, showAddress: Boolean = true) {
         TextAction("Выбрать файл ключа…", { scope.launch { form.readKeyFile(container.platform) } })
         SecretField(form.passphrase, { form.passphrase = it }, "Парольная фраза ключа, если есть")
     } else {
-        SecretField(form.password, { form.password = it; form.error = null }, "Пароль")
+        SecretField(form.password, { form.password = it; form.error = null }, if (form.remember && form.savedServerId() != null) "Пароль (сохранён — можно не вводить)" else "Пароль")
+        if (container.platform.secretStoreSupported) CheckRow("Запомнить пароль", form.remember, { form.remember = it })
     }
     Section(null) {
         Collapsible("Дополнительно") {
@@ -246,7 +248,9 @@ fun ServerScreen(dest: Dest.Server) {
     var tab by rememberSaveable { mutableStateOf(0) }
     var upgradeAsk by remember { mutableStateOf(false) }
     var forgetAsk by remember { mutableStateOf(false) }
-    LaunchedEffect(m) { if (m.hasAccess && m.channels == null && !m.needsSudo) m.load() }
+    LaunchedEffect(m) {
+        if (m.hasAccess && m.channels == null && !m.needsSudo) m.load() else m.connectSaved()
+    }
     ScreenScaffold(m.host, onBack = { navigator.back() }) {
         if (!m.hasAccess) {
             Text("Войдите на сервер, чтобы увидеть и менять его ноды.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
@@ -294,7 +298,8 @@ fun ServerScreen(dest: Dest.Server) {
                     ValueRow("Автообновление ядра", if (probe.autoupdate) "включено" else "выключено")
                 }
                 RowItem("Обновить сведения", onClick = m::refresh)
-                RowItem("Закрыть доступ", subtitle = "Пароль забудется до следующего входа", onClick = m::closeAccess)
+                RowItem("Закрыть доступ", subtitle = if (m.hasSavedPassword) "Сохранённый пароль останется: следующий вход без ввода" else "Пароль забудется до следующего входа", onClick = m::closeAccess)
+                if (m.hasSavedPassword) RowItem("Забыть сохранённый пароль", subtitle = "Следующий вход потребует ввести пароль", onClick = m::forgetPassword)
             }
             DangerButton("Забыть сервер", { forgetAsk = true })
         }
