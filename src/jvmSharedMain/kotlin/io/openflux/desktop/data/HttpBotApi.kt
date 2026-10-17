@@ -316,7 +316,7 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
                 }
                 val code = conn.responseCode
                 val stream = if (code >= 400) conn.errorStream else conn.inputStream
-                val text = stream?.use { it.readNBytes(MAX_BYTES).toString(Charsets.UTF_8) }.orEmpty()
+                val text = stream?.use { it.readUpTo(MAX_BYTES).toString(Charsets.UTF_8) }.orEmpty()
                 if (code >= 300) refuse(code, rawWords(text))?.let { throw it }
                 when {
                     code == 401 -> throw BotException("unauthorized", "Войдите заново")

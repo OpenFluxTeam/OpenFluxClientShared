@@ -146,7 +146,7 @@ class HttpSubscriptionApi : SubscriptionApi {
                 }
                 val code = conn.responseCode
                 val stream = if (code >= 400) conn.errorStream else conn.inputStream
-                val text = stream?.use { it.readNBytes(MAX_BYTES + 1).also { b -> if (b.size > MAX_BYTES) throw SubscriptionException(SubscriptionException.BAD_RESPONSE, "Ответ сервиса слишком большой") }.toString(Charsets.UTF_8) }.orEmpty()
+                val text = stream?.use { it.readUpTo(MAX_BYTES + 1).also { b -> if (b.size > MAX_BYTES) throw SubscriptionException(SubscriptionException.BAD_RESPONSE, "Ответ сервиса слишком большой") }.toString(Charsets.UTF_8) }.orEmpty()
                 if (code in 300..399) throw SubscriptionException(SubscriptionException.BAD_RESPONSE, "Сервис перенаправляет запрос: проверьте адрес")
                 if (code >= 400) throw failure(code, text)
                 try {
