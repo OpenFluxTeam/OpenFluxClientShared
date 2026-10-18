@@ -389,20 +389,27 @@ class NodeEditorModel(
     /**
      * The JS transports as the node gets them: this device's package (it goes to the server each time, so the node
      * runs the version the app has), the author's key, and the primary parameter folded into the settings line the
-     * way the app runs it (CoreConfig).
+     * way the app runs it (CoreConfig). If the last setup page submission included a node half (the {client, node}
+     * pattern), it is merged into that transport's settings so the exit starts with them.
      */
-    private fun withPackages(ts: List<NodeTransport>): List<NodeTransport> = ts.map { t ->
-        if (t.type != TransportType.SCRIPT.cliName) return@map t
-        val installed = container.scripts.byId(t.script)?.takeIf(NodeTransports::nodeCanRun)
-            ?: throw NodeWizardException("JS-транспорт ${t.script} не установлен на этом устройстве как подписанный пакет .flux")
-        val bytes = container.scripts.packageBytes(t.script)?.first
-            ?: throw NodeWizardException("Пакет JS-транспорта ${installed.name.ifBlank { t.script }} не читается: переустановите его")
-        val settings = ScriptSettingsCodec.decode(t.params) + (installed.primaryParam?.key?.let { mapOf(it to t.url) } ?: emptyMap())
-        t.copy(
-            pubkey = installed.pubkeyHex,
-            pkg = Base64.encode(bytes),
-            params = if (settings.isEmpty()) "" else ScriptSettingsCodec.encode(settings),
-        )
+    private fun withPackages(ts: List<NodeTransport>): List<NodeTransport> {
+        val nodeParams = container.connection.consumeNodeParams()
+        return ts.map { t ->
+            if (t.type != TransportType.SCRIPT.cliName) return@map t
+            val installed = container.scripts.byId(t.script)?.takeIf(NodeTransports::nodeCanRun)
+                ?: throw NodeWizardException("JS-транспорт ${t.script} не установлен на этом устройстве как подписанный пакет .flux")
+            val bytes = container.scripts.packageBytes(t.script)?.first
+                ?: throw NodeWizardException("Пакет JS-транспорта ${installed.name.ifBlank { t.script }} не читается: переустановите его")
+            var settings = ScriptSettingsCodec.decode(t.params) + (installed.primaryParam?.key?.let { mapOf(it to t.url) } ?: emptyMap())
+            if (nodeParams != null && nodeParams.first == t.script) {
+                settings = settings + nodeParams.second
+            }
+            t.copy(
+                pubkey = installed.pubkeyHex,
+                pkg = Base64.encode(bytes),
+                params = if (settings.isEmpty()) "" else ScriptSettingsCodec.encode(settings),
+            )
+        }
     }
 
     /** The link cannot carry a JS transport: the node's profile gets them here, as the node runs them. */

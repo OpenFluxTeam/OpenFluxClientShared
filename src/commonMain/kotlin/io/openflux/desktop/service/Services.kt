@@ -150,6 +150,14 @@ interface ConnectionService {
     suspend fun pushAccountToExit(kind: AccountKind): Int =
         throw UnsupportedOperationException("Передать вход ноде здесь нельзя")
 
+    /**
+     * The node half of the last {client, node} setup page submission, for
+     * the wizard to include in [NodeTransport.params] when provisioning the
+     * exit. Returns (transport name, params) or null. Consuming: cleared
+     * after reading.
+     */
+    fun consumeNodeParams(): Pair<String, Map<String, String>>? = null
+
     /** Stops the core and undoes system changes; called once on app exit. */
     fun shutdown()
 }

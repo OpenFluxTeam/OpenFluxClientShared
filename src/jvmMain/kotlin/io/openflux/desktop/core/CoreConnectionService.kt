@@ -95,6 +95,8 @@ class CoreConnectionService(
     private var pendingCaptcha: IpcCookiesRequest? = null
     /** "Позже": checks for a Yandex page stay quiet until then (the other transports carry on); a new connection resets it. */
     @Volatile private var captchaSnoozedUntil = 0L
+    /** The node half of the last {client, node} setup submission, for the wizard's provision step: (transport name, params). */
+    @Volatile private var pendingNodeParams: Pair<String, Map<String, String>>? = null
 
     /** One started core: its process, files and the settings it began with. */
     private class Run(
@@ -631,9 +633,10 @@ class CoreConnectionService(
 
     /**
      * window.openfluxSubmit(payload) from a script's own setup page
-     * (BuiltInBrowser.submissions); [SetupSubmission.flatten] says how the
-     * payload is read. Only the client half of {client, node} is applied -
-     * node delivery during a node deploy is a separate, not yet wired, path.
+     * (BuiltInBrowser.submissions); [SetupPages.flattenScoped] says how the
+     * payload is read. The client half is applied to the running transport;
+     * the node half (if present) is stored in [pendingNodeParams] for the
+     * wizard's provision step (ChannelTransport.Params on the exit node).
      */
     private fun onSetupSubmission(json: String) {
         val request = pendingCaptcha ?: return
@@ -641,9 +644,14 @@ class CoreConnectionService(
         _captcha.update { it?.copy(busy = true, error = "") }
         scope.launch {
             try {
-                val jar = SetupPages.flatten(json)
+                val scoped = SetupPages.flattenScoped(json)
+                if (scoped.node != null) pendingNodeParams = request.transport to scoped.node
                 val ipc = synchronized(lock) { run }?.ipc ?: throw IllegalStateException("Ядро не на связи")
-                ipc.offerCookies(IpcCookiesOffer(request.transport, jar, remote = request.remote))
+                ipc.offerCookies(IpcCookiesOffer(request.transport, scoped.client, remote = request.remote))
+                if (scoped.node != null) {
+                    ipc.offerCookies(IpcCookiesOffer(request.transport, scoped.node, remote = true))
+                    log(LogLevel.Info, "Настройка ноды передана на выход для «${request.transport}»")
+                }
                 log(LogLevel.Success, "Настройка передана транспорту «${request.transport}»")
                 pendingCaptcha = null
                 _captcha.value = null
@@ -652,6 +660,13 @@ class CoreConnectionService(
                 _captcha.update { it?.copy(busy = false, error = e.message ?: "Не удалось передать настройку") }
             }
         }
+    }
+
+    /** The node half of the last setup submission, for the wizard to provision the exit. */
+    override fun consumeNodeParams(): Pair<String, Map<String, String>>? {
+        val params = pendingNodeParams
+        pendingNodeParams = null
+        return params
     }
 
     override fun submitCaptcha() {

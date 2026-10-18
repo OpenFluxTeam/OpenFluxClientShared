@@ -74,4 +74,23 @@ class SetupPagesTest {
             assertFailsWith<IllegalArgumentException>(bad) { SetupPages.flatten(bad) }
         }
     }
+
+    @Test
+    fun scopedSubmissionReturnsBothHalves() {
+        val flat = SetupPages.flattenScoped("""{"token":"abc"}""")
+        assertEquals(mapOf("token" to "abc"), flat.client)
+        assertNull(flat.node)
+
+        val scoped = SetupPages.flattenScoped("""{"client":{"token":"a","uid":"1"},"node":{"token":"b","exit":"true"}}""")
+        assertEquals(mapOf("token" to "a", "uid" to "1"), scoped.client)
+        assertEquals(mapOf("token" to "b", "exit" to "true"), scoped.node)
+
+        val clientOnly = SetupPages.flattenScoped("""{"client":{"a":"1"}}""")
+        assertEquals(mapOf("a" to "1"), clientOnly.client)
+        assertNull(clientOnly.node)
+
+        assertFailsWith<IllegalArgumentException> {
+            SetupPages.flattenScoped("""{"client":{},"node":{"b":"2"}}""")
+        }
+    }
 }

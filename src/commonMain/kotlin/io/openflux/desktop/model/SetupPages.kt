@@ -64,20 +64,34 @@ object SetupPages {
      * (the client half is delivered); strings, numbers and booleans become
      * strings; null, objects and arrays are dropped; nothing left is an error.
      */
-    fun flatten(json: String): Map<String, String> {
+    fun flatten(json: String): Map<String, String> = flattenScoped(json).first
+
+    data class ScopedSubmission(val client: Map<String, String>, val node: Map<String, String>?)
+
+    /**
+     * Like [flatten] but also returns the node half of a {client, node}
+     * payload (null when the page passed a flat object or no node key).
+     * Mirrors core's script.FlattenSubmissionScoped.
+     */
+    fun flattenScoped(json: String): ScopedSubmission {
         val root = try {
             Json.parseToJsonElement(json).jsonObject
         } catch (e: Exception) {
             throw IllegalArgumentException("Страница настройки передала не JSON-объект")
         }
-        val scoped = (root["client"] as? JsonObject) ?: root
-        val jar = scoped.entries
+        val clientObj = root["client"] as? JsonObject
+        val source = clientObj ?: root
+        val client = flattenObject(source)
+        require(client.isNotEmpty()) { "Страница настройки не передала данных" }
+        val node = if (clientObj != null) (root["node"] as? JsonObject)?.let { flattenObject(it) } else null
+        return ScopedSubmission(client, node)
+    }
+
+    private fun flattenObject(obj: JsonObject): Map<String, String> =
+        obj.entries
             .filter { it.key.isNotEmpty() }
             .mapNotNull { (k, v) -> (v as? JsonPrimitive)?.takeIf { it !is JsonNull }?.let { k to it.content } }
             .toMap()
-        require(jar.isNotEmpty()) { "Страница настройки не передала данных" }
-        return jar
-    }
 
     /** A-Z only, so every index into the result is an index into [s]. */
     private fun asciiLower(s: String): String {
