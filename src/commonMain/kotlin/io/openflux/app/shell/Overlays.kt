@@ -94,12 +94,12 @@ private fun BrowserOverlay(
 
 /** A Yandex check (or a script transport's own setup page) the core cannot pass by itself. */
 @Composable
-fun CaptchaOverlay() {
+fun PromptOverlay() {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
     val connection = container.connection
-    val prompt by connection.captcha.collectAsState()
-    val page by connection.captchaPage.collectAsState()
+    val prompt by connection.prompt.collectAsState()
+    val page by connection.promptPage.collectAsState()
     val sessions by container.accounts.sessions.collectAsState()
     val current = prompt ?: return
     val setup = current.own
@@ -116,17 +116,17 @@ fun CaptchaOverlay() {
         },
         page = page,
         waiting = current.progress.ifEmpty { "Открываю страницу…" },
-        onClose = connection::dismissCaptcha,
+        onClose = connection::dismissPrompt,
         closeLabel = "Позже",
         error = current.error.ifBlank { null },
     ) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-            if (!setup) PrimaryButton(if (current.busy) "Передаю…" else "Готово", connection::submitCaptcha, enabled = !current.busy && page != null)
-            SecondaryButton("Открыть заново", connection::openCaptcha, enabled = !current.busy)
+            if (!setup) PrimaryButton(if (current.busy) "Передаю…" else "Готово", connection::submitPrompt, enabled = !current.busy && page != null)
+            SecondaryButton("Открыть заново", connection::openPrompt, enabled = !current.busy)
         }
         if (!setup && sessions[AccountKind.Yandex]?.let { !it.expired && it.cookies.isNotEmpty() } != true) {
             TextAction("Не проходить каждый раз: войти в Яндекс", {
-                connection.dismissCaptcha()
+                connection.dismissPrompt()
                 navigator.open(Dest.SettingsPage("services"))
             })
         }

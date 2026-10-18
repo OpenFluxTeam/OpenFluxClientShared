@@ -74,7 +74,7 @@ sealed interface ExitAddress {
  * on the script's own loopback server. An own page hands its data back
  * itself (window.openfluxSubmit); nothing is collected from it.
  */
-data class CaptchaPrompt(
+data class TransportPrompt(
     val url: String,
     val reason: String,
     /** The check belongs to the exit node: the browser goes through its address. */

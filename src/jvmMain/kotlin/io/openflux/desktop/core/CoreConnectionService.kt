@@ -5,7 +5,7 @@ import io.openflux.desktop.model.SetupPages
 import io.openflux.desktop.data.AppDirs
 import io.openflux.desktop.data.restrictToOwner
 import io.openflux.desktop.model.AppSettings
-import io.openflux.desktop.model.CaptchaPrompt
+import io.openflux.desktop.model.TransportPrompt
 import io.openflux.app.platform.BrowserPage
 import io.openflux.desktop.platform.MacElevation
 import io.openflux.desktop.platform.WindowsCoreElevation
@@ -60,7 +60,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Runs the OpenFlux core as a child process for one profile at a time and
- * turns what it reports (IPC status, captcha requests, log lines) into the
+ * turns what it reports (IPC status, prompt requests, log lines) into the
  * UI's state flows.
  */
 class CoreConnectionService(
@@ -80,8 +80,8 @@ class CoreConnectionService(
     override val exitAddress: StateFlow<ExitAddress> = _exitAddress.asStateFlow()
     private val _logs = MutableStateFlow<List<LogLine>>(emptyList())
     override val logs: StateFlow<List<LogLine>> = _logs.asStateFlow()
-    private val _captcha = MutableStateFlow<CaptchaPrompt?>(null)
-    override val captcha: StateFlow<CaptchaPrompt?> = _captcha.asStateFlow()
+    private val _prompt = MutableStateFlow<TransportPrompt?>(null)
+    override val prompt: StateFlow<TransportPrompt?> = _prompt.asStateFlow()
     private val _exitShareLink = MutableStateFlow<String?>(null)
     override val exitShareLink: StateFlow<String?> = _exitShareLink.asStateFlow()
     private val _socksAddress = MutableStateFlow<String?>(null)
@@ -90,11 +90,11 @@ class CoreConnectionService(
     private val lineIds = AtomicLong()
     private val lock = Any()
     private var run: Run? = null
-    private val captchaBrowser = CaptchaBrowser()
-    override val captchaPage: StateFlow<BrowserPage?> = captchaBrowser.page
-    private var pendingCaptcha: IpcCookiesRequest? = null
+    private val promptBrowser = PromptBrowser()
+    override val promptPage: StateFlow<BrowserPage?> = promptBrowser.page
+    private var pendingPrompt: IpcCookiesRequest? = null
     /** "Позже": checks for a Yandex page stay quiet until then (the other transports carry on); a new connection resets it. */
-    @Volatile private var captchaSnoozedUntil = 0L
+    @Volatile private var promptSnoozedUntil = 0L
     /** The node half of the last {client, node} setup submission, for the wizard's provision step: (transport name, params). */
     @Volatile private var pendingNodeParams: Pair<String, Map<String, String>>? = null
 
@@ -206,8 +206,8 @@ class CoreConnectionService(
         _exitShareLink.value = null
         _exitAddress.value = ExitAddress.Unknown
         _traffic.value = TrafficStats()
-        _captcha.value = null
-        captchaSnoozedUntil = 0
+        _prompt.value = null
+        promptSnoozedUntil = 0
         val files = mutableListOf<File>()
         try {
             val core = binary.resolve(current) ?: throw IllegalStateException(
@@ -418,7 +418,7 @@ class CoreConnectionService(
                                 if (status.connected) markConnected(run) else markReconnecting(run)
                             }
                         }
-                        is IpcMessage.Cookies -> onCaptchaRequest(message.request)
+                        is IpcMessage.Cookies -> onPromptRequest(message.request)
                     }
                 }
             } catch (e: Exception) {
@@ -487,9 +487,9 @@ class CoreConnectionService(
         _socksAddress.value = null
         _exitAddress.value = ExitAddress.Unknown
         _traffic.value = TrafficStats()
-        _captcha.value = null
-        pendingCaptcha = null
-        captchaBrowser.close()
+        _prompt.value = null
+        pendingPrompt = null
+        promptBrowser.close()
         restoreSystemProxy()
     }
 
@@ -592,13 +592,13 @@ class CoreConnectionService(
         }
     }
 
-    // ---- captcha ----
+    // ---- prompt ----
 
-    private fun onCaptchaRequest(request: IpcCookiesRequest) {
-        if (pendingCaptcha == request) return
+    private fun onPromptRequest(request: IpcCookiesRequest) {
+        if (pendingPrompt == request) return
         // A script's own setup page was asked for by the person; only a Yandex check is snoozed.
-        if (!request.isOwn && System.currentTimeMillis() < captchaSnoozedUntil) return
-        pendingCaptcha = request
+        if (!request.isOwn && System.currentTimeMillis() < promptSnoozedUntil) return
+        pendingPrompt = request
         log(
             LogLevel.Warning,
             when {
@@ -607,26 +607,26 @@ class CoreConnectionService(
                 else -> "Яндекс просит пройти проверку"
             },
         )
-        _captcha.value = CaptchaPrompt(
+        _prompt.value = TransportPrompt(
             request.url, request.reason, request.remote,
             html = request.html.ifEmpty { null }, own = request.isOwn, transport = request.transport,
         )
-        openCaptcha()
+        openPrompt()
     }
 
-    override fun openCaptcha() {
-        val request = pendingCaptcha ?: return
+    override fun openPrompt() {
+        val request = pendingPrompt ?: return
         scope.launch {
-            _captcha.update { it?.copy(error = "", progress = "Открываю страницу проверки…") }
+            _prompt.update { it?.copy(error = "", progress = "Открываю страницу проверки…") }
             val error = runCatching {
-                captchaBrowser.open(request) { step -> _captcha.update { it?.copy(progress = step) } }
+                promptBrowser.open(request) { step -> _prompt.update { it?.copy(progress = step) } }
             }.exceptionOrNull()
-            _captcha.update { it?.copy(error = error?.message.orEmpty(), progress = "") }
+            _prompt.update { it?.copy(error = error?.message.orEmpty(), progress = "") }
             // A script's own setup page submits itself (onSetupSubmission); only
             // a real check can pass silently and needs this nudge.
-            if (error == null && !request.isOwn && captchaBrowser.awaitPassed() && pendingCaptcha == request) {
+            if (error == null && !request.isOwn && promptBrowser.awaitPassed() && pendingPrompt == request) {
                 log(LogLevel.Info, "Страница Яндекса открылась без проверки, передаю cookies")
-                submitCaptcha()
+                submitPrompt()
             }
         }
     }
@@ -639,9 +639,9 @@ class CoreConnectionService(
      * wizard's provision step (ChannelTransport.Params on the exit node).
      */
     private fun onSetupSubmission(json: String) {
-        val request = pendingCaptcha ?: return
-        if (!request.isOwn || _captcha.value?.busy == true) return
-        _captcha.update { it?.copy(busy = true, error = "") }
+        val request = pendingPrompt ?: return
+        if (!request.isOwn || _prompt.value?.busy == true) return
+        _prompt.update { it?.copy(busy = true, error = "") }
         scope.launch {
             try {
                 val scoped = SetupPages.flattenScoped(json)
@@ -653,11 +653,11 @@ class CoreConnectionService(
                     log(LogLevel.Info, "Настройка ноды передана на выход для «${request.transport}»")
                 }
                 log(LogLevel.Success, "Настройка передана транспорту «${request.transport}»")
-                pendingCaptcha = null
-                _captcha.value = null
-                captchaBrowser.close()
+                pendingPrompt = null
+                _prompt.value = null
+                promptBrowser.close()
             } catch (e: Exception) {
-                _captcha.update { it?.copy(busy = false, error = e.message ?: "Не удалось передать настройку") }
+                _prompt.update { it?.copy(busy = false, error = e.message ?: "Не удалось передать настройку") }
             }
         }
     }
@@ -669,31 +669,31 @@ class CoreConnectionService(
         return params
     }
 
-    override fun submitCaptcha() {
-        val request = pendingCaptcha ?: return
-        if (_captcha.value?.busy == true) return
-        _captcha.update { it?.copy(busy = true, error = "") }
+    override fun submitPrompt() {
+        val request = pendingPrompt ?: return
+        if (_prompt.value?.busy == true) return
+        _prompt.update { it?.copy(busy = true, error = "") }
         scope.launch {
             try {
-                val jar = captchaBrowser.collect(request.url)
+                val jar = promptBrowser.collect(request.url)
                 require(jar.isNotEmpty()) { "Нет cookies для ${URI(request.url).host}: пройдите проверку на странице выше" }
                 val ipc = synchronized(lock) { run }?.ipc ?: throw IllegalStateException("Ядро не на связи")
                 ipc.offerCookies(IpcCookiesOffer(request.transport, jar, remote = request.remote))
                 log(LogLevel.Success, "Проверка пройдена, cookies переданы ${if (request.remote) "ноде" else "ядру"}")
-                pendingCaptcha = null
-                _captcha.value = null
-                captchaBrowser.close()
+                pendingPrompt = null
+                _prompt.value = null
+                promptBrowser.close()
             } catch (e: Exception) {
-                _captcha.update { it?.copy(busy = false, error = e.message ?: "Не удалось передать cookies") }
+                _prompt.update { it?.copy(busy = false, error = e.message ?: "Не удалось передать cookies") }
             }
         }
     }
 
-    override fun dismissCaptcha() {
-        if (pendingCaptcha?.isOwn == false) captchaSnoozedUntil = System.currentTimeMillis() + CAPTCHA_SNOOZE_MS
-        pendingCaptcha = null
-        _captcha.value = null
-        captchaBrowser.close()
+    override fun dismissPrompt() {
+        if (pendingPrompt?.isOwn == false) promptSnoozedUntil = System.currentTimeMillis() + PROMPT_SNOOZE_MS
+        pendingPrompt = null
+        _prompt.value = null
+        promptBrowser.close()
     }
 
     // ---- logs ----
@@ -715,12 +715,12 @@ class CoreConnectionService(
             cleanup(current)
         }
         restoreSystemProxy()
-        captchaBrowser.close()
+        promptBrowser.close()
     }
 
     companion object {
         private const val MAX_LOG_LINES = 5000
-        private const val CAPTCHA_SNOOZE_MS = 10 * 60_000L
+        private const val PROMPT_SNOOZE_MS = 10 * 60_000L
         /** How long the core has to open its IPC socket before the log takes over. */
         private const val IPC_WAIT_MS = 8000L
         /** How long a root core has to take its routes down after the stop file appears. */

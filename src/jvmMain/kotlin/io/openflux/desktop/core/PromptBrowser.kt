@@ -16,7 +16,7 @@ import java.util.Date
  * node asked for it. Cookies are read only when the user submits the check,
  * then wiped from the browser.
  */
-class CaptchaBrowser : AutoCloseable {
+class PromptBrowser : AutoCloseable {
     private val _page = MutableStateFlow<BrowserPage?>(null)
     val page: StateFlow<BrowserPage?> = _page.asStateFlow()
 

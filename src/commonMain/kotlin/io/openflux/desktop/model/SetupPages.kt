@@ -10,7 +10,7 @@ import kotlinx.serialization.json.jsonObject
  * What both apps do with a script transport's own setup page (see
  * transport/script/setuppage.go and devhost in the core: the contract and its
  * reference). The core decides which pages are the script's own
- * ([CaptchaPrompt.own]); this is only how the app handles one.
+ * ([TransportPrompt.own]); this is only how the app handles one.
  */
 object SetupPages {
     /** Fired on window once window.openfluxSubmit is defined. */

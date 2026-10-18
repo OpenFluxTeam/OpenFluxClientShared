@@ -69,7 +69,7 @@ class NodeVerifier(
                 if (started && state is ConnectionState.Failed) throw NodeWizardException(state.message)
                 if (started && state is ConnectionState.Connected) {
                     stage = when {
-                        connection.captcha.value != null -> "Яндекс просит пройти проверку: пройдите её в открывшемся окне"
+                        connection.prompt.value != null -> "Яндекс просит пройти проверку: пройдите её в открывшемся окне"
                         lastProblem.isNotEmpty() -> "Канал поднялся, пробую открыть сайт через него ещё раз…"
                         else -> "Канал поднялся, открываю сайт через него…"
                     }

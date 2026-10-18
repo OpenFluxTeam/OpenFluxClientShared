@@ -3,7 +3,7 @@ package io.openflux.desktop
 import io.openflux.desktop.model.AccountInfo
 import io.openflux.desktop.model.AppSettings
 import io.openflux.desktop.model.AuthResult
-import io.openflux.desktop.model.CaptchaPrompt
+import io.openflux.desktop.model.TransportPrompt
 import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.DeviceInfo
@@ -712,17 +712,17 @@ class SubscriptionManagerTest {
         override val traffic = MutableStateFlow(TrafficStats())
         override val exitAddress = MutableStateFlow<ExitAddress>(ExitAddress.Unknown)
         override val logs: StateFlow<List<LogLine>> = MutableStateFlow(emptyList())
-        override val captcha: StateFlow<CaptchaPrompt?> = MutableStateFlow(null)
+        override val prompt: StateFlow<TransportPrompt?> = MutableStateFlow(null)
         override val exitShareLink: StateFlow<String?> = MutableStateFlow(null)
         override val socksAddress: StateFlow<String?> = MutableStateFlow(null)
-        override val captchaPage: StateFlow<BrowserPage?> = MutableStateFlow(null)
+        override val promptPage: StateFlow<BrowserPage?> = MutableStateFlow(null)
         override fun connect(profile: Profile, mode: ConnectionMode?) { state.value = ConnectionState.Connected(profile, ConnectionMode.Client, 0) }
         override fun disconnect() { state.value = ConnectionState.Idle }
         override fun refreshExitAddress() = Unit
         override fun clearLogs() = Unit
-        override fun openCaptcha() = Unit
-        override fun submitCaptcha() = Unit
-        override fun dismissCaptcha() = Unit
+        override fun openPrompt() = Unit
+        override fun submitPrompt() = Unit
+        override fun dismissPrompt() = Unit
         override fun shutdown() = Unit
     }
 

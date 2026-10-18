@@ -4,7 +4,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.AccountSession
 import io.openflux.desktop.model.AppSettings
-import io.openflux.desktop.model.CaptchaPrompt
+import io.openflux.desktop.model.TransportPrompt
 import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.CoreSource
@@ -119,13 +119,13 @@ interface ConnectionService {
     val traffic: StateFlow<TrafficStats>
     val exitAddress: StateFlow<ExitAddress>
     val logs: StateFlow<List<LogLine>>
-    val captcha: StateFlow<CaptchaPrompt?>
+    val prompt: StateFlow<TransportPrompt?>
     /** Exit mode: the `openflux://` link the core printed for clients. */
     val exitShareLink: StateFlow<String?>
     /** The local SOCKS5 address while connected as a client. */
     val socksAddress: StateFlow<String?>
-    /** The Yandex check in the built-in browser while [captcha] is open. */
-    val captchaPage: StateFlow<BrowserPage?>
+    /** The Yandex check in the built-in browser while [prompt] is open. */
+    val promptPage: StateFlow<BrowserPage?>
 
     /**
      * Starts [profile] in [mode], or in the settings' mode when null. The
@@ -138,9 +138,9 @@ interface ConnectionService {
     fun refreshExitAddress()
     fun clearLogs()
 
-    fun openCaptcha()
-    fun submitCaptcha()
-    fun dismissCaptcha()
+    fun openPrompt()
+    fun submitPrompt()
+    fun dismissPrompt()
 
     /**
      * Hands the saved sign-in of [kind] to the exit over the tunnel, for

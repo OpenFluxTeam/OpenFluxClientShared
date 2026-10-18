@@ -9,7 +9,7 @@ import kotlin.test.assertNull
 
 class BuiltInBrowserTest {
     /**
-     * The wizard and the captcha wipe cookies before they open a page. Before
+     * The wizard and the prompt browser wipe cookies before they open a page. Before
      * the browser runs that must not touch CEF: CefCookieManager would start
      * CEF with default settings, and KCEF then fails with "Must be called
      * before CefApp is initialized" and hangs on the next try.

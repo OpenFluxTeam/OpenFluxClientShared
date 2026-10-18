@@ -107,7 +107,7 @@ internal fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortc
                 // Above the bottom bar on a phone.
                 ToastHost(toaster, Modifier.align(Alignment.BottomCenter).padding(start = 16.dp, end = 16.dp, bottom = 88.dp))
             }
-            CaptchaOverlay()
+            PromptOverlay()
             SignInOverlay()
             ScriptSettingsOverlay()
             if (addOpen) {
