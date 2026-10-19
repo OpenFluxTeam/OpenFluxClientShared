@@ -11,7 +11,9 @@ import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.SubStatus
 import io.openflux.desktop.model.SubscriptionState
 import io.openflux.desktop.model.isActive
+import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.managed
+import io.openflux.desktop.model.needsNode
 import io.openflux.desktop.model.profile
 import io.openflux.desktop.service.AppContainer
 
@@ -19,6 +21,10 @@ import io.openflux.desktop.service.AppContainer
 sealed interface HomeBanner {
     data class Failed(val message: String) : HomeBanner
     data object NeedsAdmin : HomeBanner
+    /** The chosen profile is a script transport with no node: nothing to connect to until one is made. */
+    data class NeedsNode(val profile: Profile) : HomeBanner
+    /** The chosen profile is a node's own (made on another device, or kept to run here): it is not a way to connect. */
+    data class NodeProfile(val profile: Profile) : HomeBanner
     data class Account(val kind: AccountKind, val needsCheck: Boolean) : HomeBanner
     data class Subscription(val look: SubLook) : HomeBanner
     data object ThisDevice : HomeBanner
@@ -109,6 +115,9 @@ class HomeModel(private val container: AppContainer) {
         nowMillis: Long,
     ): HomeBanner? {
         val platform = container.platform
+        // Before a failed attempt's message: the way out is the node, and a refused connect only says so.
+        if (profile?.needsNode(container.scripts.scripts.value) == true) return HomeBanner.NeedsNode(profile)
+        if (profile?.source == ProfileSource.ThisNode && settings.mode != ConnectionMode.Exit) return HomeBanner.NodeProfile(profile)
         if (state is ConnectionState.Failed) return HomeBanner.Failed(state.message)
         if (settings.mode != ConnectionMode.Exit && settings.fullTunnel && platform.fullTunnelSupported && !platform.elevated && platform.fullTunnelPrompt == null) {
             return HomeBanner.NeedsAdmin

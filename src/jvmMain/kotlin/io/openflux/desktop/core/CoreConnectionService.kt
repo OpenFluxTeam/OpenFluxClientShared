@@ -20,6 +20,9 @@ import io.openflux.desktop.model.CorePaths
 import io.openflux.desktop.model.CoreSource
 import io.openflux.desktop.model.ExitAddress
 import io.openflux.desktop.model.LogLevel
+import io.openflux.desktop.model.needsNode
+import io.openflux.desktop.model.NODE_PROFILE_MESSAGE
+import io.openflux.desktop.model.NEEDS_NODE_MESSAGE
 import io.openflux.desktop.model.LogLine
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.TrafficStats
@@ -243,6 +246,8 @@ class CoreConnectionService(
                 cookieStore = File(AppDirs.config, "cookies/$tag.json").also { it.parentFile.mkdirs() }.absolutePath,
                 ipcSocket = ipcSocket?.absolutePath,
             )
+            require(!profile.needsNode(scripts.scripts.value)) { NEEDS_NODE_MESSAGE }
+            require(current.mode == ConnectionMode.Exit || profile.source != ProfileSource.ThisNode) { NODE_PROFILE_MESSAGE }
             val launch = CoreConfig.build(profile, current, paths, scripts::carrier)
             if (current.useAccountSessions) {
                 CookieStoreSeeder.seed(File(paths.cookieStore), profile, accounts.sessions.value)

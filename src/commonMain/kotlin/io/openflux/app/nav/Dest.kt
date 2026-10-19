@@ -115,11 +115,21 @@ sealed interface Dest {
         override val owner get() = Section.Servers
     }
 
-    /** A new node on a connected server; [quick] installs a direct-only node at once (spec 5.1). */
+    /**
+     * A new node on a connected server, or somewhere without one ([server] is then a [io.openflux.app.servers.NodePlacement]
+     * id: a command to run by hand, another device, this one); [quick] installs a direct-only node at once (spec 5.1).
+     * [forProfile] is a profile that exists already and gets the node: it is kept, not made again.
+     */
     @Serializable @SerialName("new-node")
-    data class NewNode(val server: String, val quick: Boolean = false) : Dest {
+    data class NewNode(val server: String, val quick: Boolean = false, val forProfile: String = "") : Dest {
         override val owner get() = Section.Servers
         override val serverId get() = server
+    }
+
+    /** Where a new node will live: a server, a command for a machine of the person's own, another device, this one. */
+    @Serializable @SerialName("node-where")
+    data class NodeWhere(val forProfile: String = "") : Dest {
+        override val owner get() = Section.Servers
     }
 
     /** A node on an ordinary web hosting, made without a server (spec 5.4). */

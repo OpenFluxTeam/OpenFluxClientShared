@@ -73,14 +73,18 @@ fun ServersRoot(selected: Dest? = null) {
     val profiles by container.profiles.profiles.collectAsState()
     val state by container.connection.state.collectAsState()
     val hostings = profiles.filter { it.phpNode != null }
+    // Nodes the app has no SSH to: the owner's profile is all there is of them.
+    val kitNodes = profiles.filter { it.kitNode != null }
     ScreenScaffold("Серверы", actions = { IconAction(Icons.Rounded.Add, "Добавить сервер", { navigator.open(Dest.AddServer) }) }) {
-        if (settings.knownServers.isEmpty() && hostings.isEmpty()) {
+        if (settings.knownServers.isEmpty() && hostings.isEmpty() && kitNodes.isEmpty()) {
             Text(
-                "Своих серверов пока нет. Подключите сервер (VDS) по SSH или поставьте ноду на обычный хостинг.",
+                "Своих серверов пока нет. Подключите сервер (VDS) по SSH, поставьте ноду на обычный хостинг или сделайте ноду без SSH: " +
+                    "командой для своего компьютера либо на другом устройстве.",
                 style = AppTheme.type.body, color = AppTheme.colors.textSecondary,
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                 PrimaryButton("Добавить сервер", { navigator.open(Dest.AddServer) }, leading = Icons.Rounded.Dns)
+                SecondaryButton("Нода без SSH", { navigator.open(Dest.NodeWhere()) }, leading = Icons.Rounded.Devices)
                 SecondaryButton("Без сервера", { navigator.open(Dest.NewHosting) }, leading = Icons.Rounded.Cloud)
             }
         } else {
@@ -103,6 +107,27 @@ fun ServersRoot(selected: Dest? = null) {
                         )
                     }
                 }
+            }
+            Section(if (kitNodes.isEmpty()) null else "Ноды без SSH") {
+                for (p in kitNodes) {
+                    val kit = p.kitNode ?: continue
+                    val place = NodePlacement.of(kit.delivery)
+                    RowItem(
+                        p.name,
+                        subtitle = place.title,
+                        leading = { Icon(Icons.Rounded.Devices, contentDescription = null, tint = AppTheme.colors.textSecondary) },
+                        trailing = { Chevron() },
+                        selected = selected == Dest.Node(place.id ?: "", kit.channel),
+                        onClick = { navigator.open(Dest.Node(place.id ?: return@RowItem, kit.channel)) },
+                    )
+                }
+                RowItem(
+                    "Новая нода без SSH…",
+                    subtitle = "Команда для своего компьютера, другое устройство, это устройство",
+                    leading = { Icon(Icons.Rounded.Add, contentDescription = null, tint = AppTheme.colors.textSecondary) },
+                    trailing = { Chevron() },
+                    onClick = { navigator.open(Dest.NodeWhere()) },
+                )
             }
             if (hostings.isNotEmpty()) {
                 Section("Без сервера") {

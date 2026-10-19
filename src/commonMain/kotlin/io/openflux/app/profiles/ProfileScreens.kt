@@ -78,6 +78,9 @@ import io.openflux.desktop.model.NodeTransports
 import io.openflux.desktop.model.PhpHosts
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.TransportType
+import io.openflux.app.servers.NodePlacement
+import io.openflux.desktop.model.needsNode
+import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.ValueKind
 import io.openflux.desktop.model.editableNode
 import io.openflux.desktop.model.isActive
@@ -155,13 +158,23 @@ fun ProfileScreen(dest: Dest.Profile) {
         },
     ) {
         FlowRow(Modifier.appear(), horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-            if (running) SecondaryButton("Отключить", { container.connection.disconnect() }, leading = Icons.Rounded.Stop)
+            if (p.source == ProfileSource.ThisNode) {
+                // A node's own profile is not a way to connect: this device runs it as the node.
+                SecondaryButton("Запустить как ноду", { container.settings.update { it.copy(selectedProfileId = p.id) }; navigator.open(Dest.ThisDevice) }, leading = Icons.Rounded.PlayArrow)
+            } else if (running) SecondaryButton("Отключить", { container.connection.disconnect() }, leading = Icons.Rounded.Stop)
             else SecondaryButton("Подключить", { actions.connect(p) }, leading = Icons.Rounded.PlayArrow)
             if (!p.managed) SecondaryButton("Изменить", { navigator.open(Dest.ProfileEdit(p.id)) }, leading = Icons.Rounded.Edit)
             if (actions.canShare(p)) SecondaryButton("Поделиться", { navigator.open(Dest.Give(p.id)) }, leading = Icons.Rounded.Share)
         }
         if (p.managed) Banner("Приходит с подпиской, менять её нельзя", Tone.Info, Modifier.appear(delayMillis = 60), action = "Подписка", onAction = { navigator.open(Dest.Account) })
         p.problems().firstOrNull()?.let { Banner(it, Tone.Danger, Modifier.appear(delayMillis = 60)) }
+        if (p.needsNode(scripts)) {
+            Banner(
+                "Этому подключению нужна нода: без неё не с кем соединяться. Её можно сделать на сервере, на другом устройстве или командой на своём компьютере.",
+                Tone.Warning, Modifier.appear(delayMillis = 60), action = "Создать ноду", onAction = { navigator.open(Dest.NodeWhere(p.id)) },
+            )
+        }
+        if (p.source == ProfileSource.ThisNode) Banner("Это профиль ноды: устройство запускает его как ноду, подключаться им нельзя.", Tone.Info, Modifier.appear(delayMillis = 60))
         Section("Транспорты") {
             p.carriers.forEachIndexed { i, c ->
                 val name = if (c.type == TransportType.SCRIPT) scripts.firstOrNull { it.id == c.scriptId }?.name ?: c.type.title else c.type.title
@@ -188,7 +201,9 @@ fun ProfileScreen(dest: Dest.Profile) {
         }
         if (p.isOwnNode) {
             val server = serverOf(p, settings.knownServers)
+            val kit = p.kitNode
             if (p.phpNode != null) RowItem("Открыть ноду на хостинге", onClick = { navigator.open(Dest.Hosting(p.id)) })
+            else if (kit != null) RowItem("Открыть ноду", subtitle = NodePlacement.of(kit.delivery).title, onClick = { navigator.open(Dest.Node(NodePlacement.of(kit.delivery).id ?: return@RowItem, kit.channel)) })
             else if (server != null) RowItem("Открыть сервер", onClick = { navigator.open(Dest.Server(server)) })
         }
     }

@@ -7,6 +7,8 @@ import androidx.compose.runtime.setValue
 import io.openflux.app.nav.Dest
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ProfileSource
+import io.openflux.desktop.model.ProfileTransfer
+import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.model.ShareConfig
 import io.openflux.desktop.model.ShareLinkCodec
 import io.openflux.desktop.model.SubStatus
@@ -31,6 +33,8 @@ sealed interface KeyResult {
         val canAdd: Boolean get() = preview.document.status == SubStatus.ACTIVE
     }
     data class Profile(val config: ShareConfig, val link: String) : KeyResult
+    /** A profile another device of the person handed over ([ProfileTransfer]): for connecting through a node, or to be the node. */
+    data class Transfer(val received: ProfileTransfer.Received, val note: String? = null) : KeyResult
     /** A connection link from the OpenFlux bot: what it resolved to now. */
     data class Bot(val link: String, val connection: io.openflux.desktop.service.BotConnection) : KeyResult
     data class Invalid(val message: String) : KeyResult
@@ -64,7 +68,7 @@ class AddKeyModel(private val container: AppContainer, private val scope: Corout
         val t = firstLine(value)
         result = when {
             t.isEmpty() -> KeyResult.Empty
-            t.startsWith(ShareLinkCodec.PREFIX) || SubscriptionInvite.looksLike(t) || OpenFluxBot.looksLike(t) -> KeyResult.Checking
+            t.startsWith(ShareLinkCodec.PREFIX) || SubscriptionInvite.looksLike(t) || OpenFluxBot.looksLike(t) || ProfileTransfer.isTransfer(t) -> KeyResult.Checking
             else -> KeyResult.Invalid("Это не ключ подписки, не ссылка openflux:// и не ссылка из бота")
         }
         if (result !is KeyResult.Checking) return
@@ -72,6 +76,7 @@ class AddKeyModel(private val container: AppContainer, private val scope: Corout
             delay(250) // typing, not pasting: wait for the end of it
             result = try {
                 when {
+                    ProfileTransfer.isTransfer(t) -> transfer(t)
                     OpenFluxBot.looksLike(t) -> KeyResult.Bot(t, container.botApi.resolve(OpenFluxBot.connectToken(t)!!))
                     SubscriptionInvite.looksLike(t) -> KeyResult.Subscription(container.subscription.previewKey(t))
                     else -> KeyResult.Profile(container.shareCodec.decode(t), t)
@@ -86,6 +91,30 @@ class AddKeyModel(private val container: AppContainer, private val scope: Corout
                 KeyResult.Invalid(e.message ?: "Не удалось прочитать ссылку")
             }
         }
+    }
+
+    /**
+     * A profile from another device: read, and checked against what this device has. The script transports it names
+     * must be installed here under the author's key it names - that is the code that will run with its secrets.
+     */
+    private fun transfer(line: String): KeyResult {
+        val got = try {
+            ProfileTransfer.decode(line)
+        } catch (e: IllegalArgumentException) {
+            return KeyResult.Invalid(e.message ?: "Профиль не прочитан")
+        }
+        val installed = container.scripts.scripts.value
+        for (c in got.profile.carriers.filter { it.type == TransportType.SCRIPT }) {
+            val here = installed.firstOrNull { it.id == c.scriptId }
+                ?: return KeyResult.Invalid("Нужен JS-транспорт «${c.scriptId}»: установите его в Настройки → Транспорты и вставьте профиль снова")
+            val wanted = got.scriptKeys[c.scriptId]
+            if (wanted != null && !wanted.equals(here.pubkeyHex, ignoreCase = true)) {
+                return KeyResult.Invalid("JS-транспорт «${c.scriptId}» на этом устройстве подписан другим автором, чем на том, откуда пришёл профиль: так его не запустить")
+            }
+        }
+        val needsScripts = got.profile.carriers.any { it.type == TransportType.SCRIPT }
+        val note = if (needsScripts && !container.settings.settings.value.experimental) "Включите «Экспериментальные функции» в Настройках: без них JS-транспорты не работают" else null
+        return KeyResult.Transfer(got, note)
     }
 
     fun paste() {
@@ -126,6 +155,17 @@ class AddKeyModel(private val container: AppContainer, private val scope: Corout
             container.profiles.upsert(p)
             container.settings.update { it.copy(selectedProfileId = p.id) }
             Dest.Profile(p.id)
+        }
+        is KeyResult.Transfer -> {
+            val node = r.received.role == ProfileTransfer.Role.Node
+            val p = r.received.profile.copy(
+                id = container.profiles.newId(), createdAt = container.platform.now(),
+                source = if (node) ProfileSource.ThisNode else source,
+            )
+            container.profiles.upsert(p)
+            container.settings.update { it.copy(selectedProfileId = p.id) }
+            // A node's profile is run, not connected through: its screen is the device's node.
+            if (node) Dest.ThisDevice else Dest.Profile(p.id)
         }
         is KeyResult.Bot -> {
             busy = true

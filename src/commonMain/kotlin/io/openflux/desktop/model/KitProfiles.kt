@@ -68,3 +68,18 @@ fun Profile.installedKit(): InstalledChannel? {
     val kit = kitNode ?: return null
     return InstalledChannel(kit.channel, state = "", port = 0, context = context, transports = nodeTransports(), mode = kit.mode, key = secret)
 }
+
+/**
+ * A profile of a script transport whose two ends are set up together (MAX: two accounts) that has no node yet: made
+ * by hand, so with no channel key of its own. Nothing on the other end waits for it, so it cannot connect until a node
+ * exists (a profile with a key typed in is the person's own business: they run the node).
+ */
+fun Profile.needsNode(scripts: List<InstalledScript>): Boolean =
+    source == ProfileSource.Manual && secret.isEmpty() && !stream &&
+        carriers.any { c -> c.type == TransportType.SCRIPT && scripts.any { it.id == c.scriptId && it.setupPage } }
+
+/** What the connection says when [needsNode] stops it. */
+const val NEEDS_NODE_MESSAGE = "Этому подключению нужна нода: без неё не с кем соединяться. Создайте её в «Серверах» или нажмите «Создать ноду» на карточке профиля."
+
+/** What the connection says of a node's own profile ([ProfileSource.ThisNode]) when it is asked to connect as a client. */
+const val NODE_PROFILE_MESSAGE = "Это профиль ноды, подключаться им нельзя: запустите его на экране «Это устройство»."

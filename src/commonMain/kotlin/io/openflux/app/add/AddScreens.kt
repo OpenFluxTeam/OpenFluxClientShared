@@ -37,6 +37,7 @@ import io.openflux.app.shell.rememberScreenModel
 import io.openflux.app.text.Fmt
 import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.Profile
+import io.openflux.desktop.model.ProfileTransfer
 import io.openflux.desktop.model.SubStatus
 import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.model.managed
@@ -60,11 +61,15 @@ fun AddKeyScreen(scan: Boolean = false) {
         onBack = { navigator.back() },
         bottomBar = {
             val r = m.result
-            val ok = (r is KeyResult.Profile) || (r is KeyResult.Bot) || (r is KeyResult.Subscription && r.canAdd)
+            val ok = (r is KeyResult.Profile) || (r is KeyResult.Transfer) || (r is KeyResult.Bot) || (r is KeyResult.Subscription && r.canAdd)
             if (ok) {
                 androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().padding(AppTheme.spacing.page)) {
                     PrimaryButton(
-                        if (r is KeyResult.Subscription) "Подключить подписку" else "Добавить профиль",
+                        when {
+                            r is KeyResult.Subscription -> "Подключить подписку"
+                            r is KeyResult.Transfer && r.received.role == ProfileTransfer.Role.Node -> "Добавить как ноду"
+                            else -> "Добавить профиль"
+                        },
                         { m.add()?.let(navigator::replaceTop) },
                         Modifier.fillMaxWidth(),
                         enabled = !m.busy,
@@ -73,7 +78,7 @@ fun AddKeyScreen(scan: Boolean = false) {
             }
         },
     ) {
-        Field(m.text, { m.onText(it) }, "Ключ подписки или ссылка openflux://", singleLine = false, mono = true)
+        Field(m.text, { m.onText(it) }, "Ключ подписки, ссылка openflux:// или профиль с другого устройства", singleLine = false, mono = true)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             SecondaryButton("Вставить", m::paste, leading = Icons.Rounded.ContentPaste)
             SecondaryButton("Файл", m::fromFile, leading = Icons.Rounded.Description)
@@ -87,6 +92,17 @@ fun AddKeyScreen(scan: Boolean = false) {
                 ValueRow("Название", r.config.name.ifBlank { "без названия" })
                 ValueRow("Транспорты", r.config.transports.mapNotNull { TransportType.fromCli(it.type)?.title }.distinct().joinToString(", ").ifEmpty { "—" })
                 ValueRow("Шифрование", if (r.config.secret.isNotEmpty()) "AES-256-GCM" else "нет ключа")
+            }
+            is KeyResult.Transfer -> {
+                val node = r.received.role == ProfileTransfer.Role.Node
+                Section(if (node) "Профиль ноды с другого устройства" else "Профиль с другого устройства") {
+                    ValueRow("Название", r.received.profile.name.ifBlank { "без названия" })
+                    ValueRow("Для чего", if (node) "это устройство станет нодой" else "подключаться через ноду")
+                    ValueRow("Транспорты", r.received.profile.carriers.map { c -> if (c.type == TransportType.SCRIPT) c.scriptId.ifBlank { c.type.title } else c.type.title }.distinct().joinToString(", ").ifEmpty { "—" })
+                    ValueRow("Шифрование", "AES-256-GCM")
+                }
+                r.note?.let { Banner(it, Tone.Warning) }
+                if (node) Banner("После добавления откройте «Это устройство» и запустите ноду: оно будет принимать подключения, пока работает.", Tone.Info)
             }
             is KeyResult.Bot -> Section("Подключение из бота OpenFlux") {
                 ValueRow("Название", r.connection.name.ifBlank { "OpenFlux" })

@@ -66,7 +66,7 @@ fun NodeScreen(dest: Dest.Node) {
     val container = LocalAppContainer.current
     val link = LocalServerLink.current
     val m = rememberScreenModel { NodeEditorModel(container, link, dest.server, dest.channel, it) }
-    LaunchedEffect(m) { if (m.installed == null && link.hasAccess(dest.server)) m.load() }
+    LaunchedEffect(m) { if (m.installed == null && (m.kit || link.hasAccess(dest.server))) m.load() }
     NodeEditor(m, dest.server)
 }
 
@@ -76,7 +76,8 @@ fun NewNodeScreen(dest: Dest.NewNode) {
     val container = LocalAppContainer.current
     val link = LocalServerLink.current
     val navigator = LocalNavigator.current
-    val m = rememberScreenModel { NodeEditorModel(container, link, dest.server, null, it) }
+    val forProfile = remember(dest.forProfile) { dest.forProfile.takeIf { it.isNotEmpty() }?.let { id -> container.profiles.profiles.value.firstOrNull { it.id == id } } }
+    val m = rememberScreenModel { NodeEditorModel(container, link, dest.server, null, it, forProfile = forProfile) }
     LaunchedEffect(m) { if (dest.quick && m.busy == null && m.verifyFailed == null && m.done == null) m.install() }
     LaunchedEffect(m.done) { m.done?.let { navigator.replaceTop(it) } }
     NodeEditor(m, dest.server)
@@ -113,13 +114,13 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
                     IconAction(Icons.Rounded.MoreVert, "Ещё", { menu = true })
                     DropdownMenu(menu, { menu = false }) {
                         DropdownMenuItem({ Text("Обновить состояние") }, { menu = false; m.load() })
-                        if (info.transportTypes.any { it == TransportType.VYANDEX || it == TransportType.YANDEX }) {
+                        if (!m.kit && info.transportTypes.any { it == TransportType.VYANDEX || it == TransportType.YANDEX }) {
                             DropdownMenuItem({ Text("Передать вход Яндекса ноде") }, { menu = false; m.pushYandexSignIn() })
                         }
-                        if (info.transportTypes.any { it == TransportType.MAILRU }) {
+                        if (!m.kit && info.transportTypes.any { it == TransportType.MAILRU }) {
                             DropdownMenuItem({ Text("Передать вход Mail.ru ноде") }, { menu = false; m.pushMailruSignIn() })
                         }
-                        DropdownMenuItem({ Text("Удалить с сервера", color = AppTheme.colors.danger) }, { menu = false; removeAsk = true })
+                        DropdownMenuItem({ Text(if (m.kit) "Убрать ноду" else "Удалить с сервера", color = AppTheme.colors.danger) }, { menu = false; removeAsk = true })
                     }
                 }
             }
@@ -137,8 +138,8 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
                             }
                         }
                         else -> {
-                            (m.error ?: d.problem())?.let { Text(it, style = AppTheme.type.bodySmall, color = if (m.error != null) AppTheme.colors.danger else AppTheme.colors.warning) }
-                            PrimaryButton("Установить", m::install, Modifier.fillMaxWidth(), enabled = d.problem() == null)
+                            (m.error ?: m.installProblem)?.let { Text(it, style = AppTheme.type.bodySmall, color = if (m.error != null) AppTheme.colors.danger else AppTheme.colors.warning) }
+                            PrimaryButton(if (m.kit) "Создать ноду" else "Установить", m::install, Modifier.fillMaxWidth(), enabled = m.installProblem == null)
                         }
                     }
                 }
@@ -147,29 +148,33 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
             }
         },
     ) {
-        if (!link.hasAccess(serverId)) {
+        if (!m.kit && !link.hasAccess(serverId)) {
             Banner("Нет доступа к серверу: войдите на нём заново", Tone.Warning, action = "Открыть сервер", onAction = { navigator.open(Dest.Server(serverId)) })
             return@ScreenScaffold
         }
         if (info != null) {
             val local = m.localProfile
             val through = local != null && state.isActive && state.profile?.id == local.id
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
+            if (!m.kit) Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                 StatusDot(if (info.running) Status.On else Status.Error)
                 Text(nodeStateText(info.state).replaceFirstChar { it.uppercase() } + " · " + info.id, style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
             }
-            Section(null) {
-                ValueRow("Адрес", "${m.serverHost}:${info.port}", mono = true, onCopy = {
-                    container.platform.setClipboardText("${m.serverHost}:${info.port}")
-                    toaster.show("Адрес скопирован")
-                })
-            }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-                if (through) SecondaryButton("Отключить", { container.connection.disconnect() }, leading = Icons.Rounded.Stop)
-                else SecondaryButton("Подключить себе", m::connectHere, leading = Icons.Rounded.PlayArrow, enabled = busy == null)
-                SecondaryButton("Поделиться", {
-                    scope.launch { runCatching { m.adopt() }.onSuccess { navigator.open(Dest.Give(it.id)) }.onFailure { toaster.show(it.message ?: "Не получилось") } }
-                }, leading = Icons.Rounded.Share, enabled = busy == null)
+            if (m.kit) {
+                KitNodePanel(m, connected = through, onConnect = m::connectHere, onDisconnect = { container.connection.disconnect() })
+            } else {
+                Section(null) {
+                    ValueRow("Адрес", "${m.serverHost}:${info.port}", mono = true, onCopy = {
+                        container.platform.setClipboardText("${m.serverHost}:${info.port}")
+                        toaster.show("Адрес скопирован")
+                    })
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
+                    if (through) SecondaryButton("Отключить", { container.connection.disconnect() }, leading = Icons.Rounded.Stop)
+                    else SecondaryButton("Подключить себе", m::connectHere, leading = Icons.Rounded.PlayArrow, enabled = busy == null)
+                    SecondaryButton("Поделиться", {
+                        scope.launch { runCatching { m.adopt() }.onSuccess { navigator.open(Dest.Give(it.id)) }.onFailure { toaster.show(it.message ?: "Не получилось") } }
+                    }, leading = Icons.Rounded.Share, enabled = busy == null)
+                }
             }
         } else if (!m.creating) {
             busy?.let { ProgressLine(it) }
@@ -178,7 +183,10 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
             return@ScreenScaffold
         }
 
-        if (m.creating) Text("На сервере ${m.serverHost}", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
+        if (m.creating) Text(
+            if (m.kit) m.placement.title + ". " + m.placement.about else "На сервере ${m.serverHost}",
+            style = AppTheme.type.body, color = AppTheme.colors.textSecondary,
+        )
         val editable = busy == null
         Section("Транспорты") {
             val runnable = installedScripts.filter(NodeTransports::nodeCanRun)
@@ -293,10 +301,15 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
     }
     if (removeAsk) {
         ConfirmDialog(
-            title = "Удалить ноду?",
-            text = "Нода остановится и пропадёт с сервера вместе с ключом. Ссылки, которые вы раздавали, перестанут работать. " +
-                "Её профиль на этом устройстве тоже удалится.",
-            confirm = "Удалить",
+            title = if (m.kit) "Убрать ноду?" else "Удалить ноду?",
+            text = if (m.kit) {
+                "С этого устройства уйдёт профиль ноды и всё, что нужно, чтобы её изменить. Сама нода там, где её запустили, " +
+                    "продолжит работать: остановите её на той машине или устройстве."
+            } else {
+                "Нода остановится и пропадёт с сервера вместе с ключом. Ссылки, которые вы раздавали, перестанут работать. " +
+                    "Её профиль на этом устройстве тоже удалится."
+            },
+            confirm = if (m.kit) "Убрать" else "Удалить",
             onConfirm = { removeAsk = false; m.remove { navigator.back() } },
             onDismiss = { removeAsk = false },
             danger = true,

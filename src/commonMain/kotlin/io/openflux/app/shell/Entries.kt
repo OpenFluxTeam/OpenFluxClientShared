@@ -22,6 +22,7 @@ import io.openflux.app.servers.AddServerScreen
 import io.openflux.app.servers.HostingScreen
 import io.openflux.app.servers.NewHostingScreen
 import io.openflux.app.servers.NewNodeScreen
+import io.openflux.app.servers.NodeWhereScreen
 import io.openflux.app.servers.NodeScreen
 import io.openflux.app.servers.ServerScreen
 import io.openflux.app.servers.ServersRoot
@@ -41,6 +42,7 @@ fun appEntry(dest: Dest, navigator: AppNavigator): NavEntry<Dest> = when (dest) 
     is Dest.Server -> destEntry(dest, ListDetail.detail(Section.Servers)) { ServerScreen(dest) }
     is Dest.Node -> destEntry(dest, ListDetail.detail(Section.Servers)) { NodeScreen(dest) }
     is Dest.NewNode -> destEntry(dest) { NewNodeScreen(dest) }
+    is Dest.NodeWhere -> destEntry(dest) { NodeWhereScreen(dest) }
     Dest.NewHosting -> destEntry(dest) { NewHostingScreen() }
     is Dest.Hosting -> destEntry(dest, ListDetail.detail(Section.Servers)) { HostingScreen(dest) }
     Dest.ThisDevice -> destEntry(dest, ListDetail.detail(Section.Servers)) { ThisDeviceScreen() }
