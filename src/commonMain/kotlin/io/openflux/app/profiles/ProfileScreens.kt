@@ -1,5 +1,12 @@
 package io.openflux.app.profiles
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,6 +69,7 @@ import io.openflux.app.servers.title
 import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.shell.rememberScreenModel
 import io.openflux.app.theme.AppTheme
+import io.openflux.app.theme.appear
 import io.openflux.desktop.model.Codec
 import io.openflux.desktop.model.DocumentKind
 import io.openflux.desktop.model.ExtraTransport
@@ -91,16 +99,30 @@ val io.openflux.desktop.model.AccountKind.where: String
 
 /** What carries the traffic, in one line under a transport's name. */
 fun TransportType.blurb(): String = when (this) {
-    TransportType.VYANDEX -> "Документ Яндекса, по ссылке на редактирование"
-    TransportType.YANDEX -> "Файл на Яндекс Диске"
-    TransportType.BOARDS -> "Доска Яндекса"
-    TransportType.MAILRU -> "Публичный файл Облака Mail.ru"
-    TransportType.CUPSONLINE -> "Комнаты cups.online, код выдаёт нода"
-    TransportType.TELEMOST -> "Конференция Яндекс Телемоста, по ссылке-приглашению"
-    TransportType.AVITO -> "Комнаты Avito Code, код выдаёт нода"
-    TransportType.ONEME -> "Звонок в MAX, нужен токен MAX Web"
-    TransportType.DIRECT -> "Прямое TCP-соединение с нодой"
+    TransportType.VYANDEX -> "Яндекс Документы (Волга)"
+    TransportType.YANDEX -> "Яндекс Диск"
+    TransportType.BOARDS -> "Яндекс Доска"
+    TransportType.MAILRU -> "Облако Mail.ru"
+    TransportType.CUPSONLINE -> "Cups.online"
+    TransportType.TELEMOST -> "Яндекс Телемост"
+    TransportType.AVITO -> "Avito Code"
+    TransportType.ONEME -> "MAX (звонок)"
+    TransportType.DIRECT -> "Прямое TCP"
     TransportType.SCRIPT -> "JS-транспорт"
+}
+
+/** A longer explanation, for the transport picker. */
+fun TransportType.detail(): String = when (this) {
+    TransportType.VYANDEX -> "Документ по ссылке на редактирование"
+    TransportType.YANDEX -> "Файл на Яндекс Диске"
+    TransportType.BOARDS -> "Данные через доску"
+    TransportType.MAILRU -> "Публичный файл в облаке"
+    TransportType.CUPSONLINE -> "Комнаты, код выдаёт нода"
+    TransportType.TELEMOST -> "Конференция по ссылке-приглашению"
+    TransportType.AVITO -> "Комнаты, код выдаёт нода"
+    TransportType.ONEME -> "Нужен токен MAX Web"
+    TransportType.DIRECT -> "Соединение напрямую с нодой"
+    TransportType.SCRIPT -> "Дополнительный скриптовый транспорт"
 }
 
 /** A profile (spec 6.2): what it is made of, and what can be done with it. */
@@ -132,16 +154,16 @@ fun ProfileScreen(dest: Dest.Profile) {
             }
         },
     ) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
+        FlowRow(Modifier.appear(), horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             if (running) SecondaryButton("Отключить", { container.connection.disconnect() }, leading = Icons.Rounded.Stop)
             else SecondaryButton("Подключить", { actions.connect(p) }, leading = Icons.Rounded.PlayArrow)
             if (!p.managed) SecondaryButton("Изменить", { navigator.open(Dest.ProfileEdit(p.id)) }, leading = Icons.Rounded.Edit)
             if (actions.canShare(p)) SecondaryButton("Поделиться", { navigator.open(Dest.Give(p.id)) }, leading = Icons.Rounded.Share)
         }
-        if (p.managed) Banner("Приходит с подпиской, менять её нельзя", Tone.Info, action = "Подписка", onAction = { navigator.open(Dest.Account) })
-        p.problems().firstOrNull()?.let { Banner(it, Tone.Danger) }
+        if (p.managed) Banner("Приходит с подпиской, менять её нельзя", Tone.Info, Modifier.appear(delayMillis = 60), action = "Подписка", onAction = { navigator.open(Dest.Account) })
+        p.problems().firstOrNull()?.let { Banner(it, Tone.Danger, Modifier.appear(delayMillis = 60)) }
         Section("Транспорты") {
-            for (c in p.carriers) {
+            p.carriers.forEachIndexed { i, c ->
                 val name = if (c.type == TransportType.SCRIPT) scripts.firstOrNull { it.id == c.scriptId }?.name ?: c.type.title else c.type.title
                 val hidden = p.managed || c.type.kind == ValueKind.Token
                 val value = when {
@@ -149,15 +171,19 @@ fun ProfileScreen(dest: Dest.Profile) {
                     c.type.kind == ValueKind.Token -> "токен скрыт" + if (c.uid.isNotBlank()) " · ${c.uid}" else ""
                     else -> c.value.ifBlank { "—" }
                 }
-                RowItem(name, subtitle = value + if (p.session && p.carriers.size > 1) " · приоритет ${c.priority}" else "", trailing = if (hidden || c.value.isBlank()) null else ({
+                val subtitle = buildString {
+                    append(c.type.blurb())
+                    if (!hidden && c.value.isNotBlank()) append(" · ${value}")
+                    if (p.session && p.carriers.size > 1) append(" · #${c.priority}")
+                }
+                RowItem(name, Modifier.appear(delayMillis = i * 50), subtitle = subtitle, trailing = if (hidden || c.value.isBlank()) null else ({
                     IconAction(io.openflux.app.components.CopyIcon, "Копировать", { container.platform.setClipboardText(c.value); toaster.show("Скопировано") })
                 }))
             }
         }
         Section("Параметры") {
-            ValueRow("Режим", p.editMode.label)
+            if (p.stream) ValueRow("Режим", "Без сервера")
             ValueRow("Шифрование", if (p.secret.isNotEmpty()) "AES-256-GCM" else "нет ключа")
-            if (!p.session && !p.stream) ValueRow("Кодек", p.codec.label)
             ValueRow("Источник", p.source.label)
         }
         if (p.isOwnNode) {
@@ -220,12 +246,11 @@ fun ProfileEditScreen(dest: Dest.ProfileEdit) {
         Field(d.name, { v -> m.edit { it.copy(name = v) } }, "Название", placeholder = "Например, Нода в Нидерландах")
         Section("Режим") {
             Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-                Segmented(EditMode.entries, d.editMode, m::setMode, label = { it.label })
+                Segmented(listOf(EditMode.Session, EditMode.Stream), d.editMode, m::setMode, label = { it.label })
                 Text(
                     when (d.editMode) {
-                        EditMode.Classic -> "Один транспорт."
-                        EditMode.Session -> "Несколько транспортов, переключение по приоритету. Нода должна работать в режиме Session."
                         EditMode.Stream -> "Нода на PHP-хостинге, без ключа. Проще создать через ＋ → «Без сервера»."
+                        else -> "Несколько транспортов, переключение по приоритету."
                     },
                     style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
                 )
@@ -234,26 +259,20 @@ fun ProfileEditScreen(dest: Dest.ProfileEdit) {
         d.carriers.forEachIndexed { i, _ ->
             TransportBlock(m, i)
         }
-        if (d.session) SecondaryButton("Добавить транспорт", m::addTransport, leading = Icons.Rounded.Add)
+        if (!d.stream) SecondaryButton("Добавить транспорт", m::addTransport, leading = Icons.Rounded.Add)
         if (!d.stream) {
             SecretField(d.secret, { v -> m.edit { it.copy(secret = v.trim()) } }, "Ключ шифрования")
             TextAction("Сгенерировать ключ", m::newKey)
             when {
-                d.secret.isBlank() && !d.session -> Banner("Без ключа трафик виден владельцу площадки (Яндекс, Mail.ru). Задайте ключ, как на ноде.", Tone.Warning)
+                d.secret.isBlank() -> Banner("Без ключа трафик виден владельцу площадки (Яндекс, Mail.ru). Задайте ключ, как на ноде.", Tone.Warning)
                 d.secret.isNotBlank() && d.secret.length < 24 -> Banner("Короткий ключ можно подобрать. Надёжнее сгенерированный.", Tone.Info)
             }
         }
-        if ((!d.session && !d.stream) || d.session) {
+        if (!d.stream) {
             Section(null) {
                 Collapsible("Дополнительно") {
                     Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
-                        if (!d.session && !d.stream) {
-                            Text("Кодек", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
-                            Segmented(Codec.entries, d.codec, { c -> m.edit { it.copy(codec = c) } }, label = { it.label })
-                        }
-                        if (d.session) {
-                            Field(d.context, { v -> m.edit { it.copy(context = v.trim()) } }, "Контекст шифрования", placeholder = "Пусто: адрес главного документа")
-                        }
+                        Field(d.context, { v -> m.edit { it.copy(context = v.trim()) } }, "Контекст шифрования", placeholder = "Пусто: адрес главного документа")
                     }
                 }
             }
@@ -285,7 +304,7 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
     val script = if (c.type == TransportType.SCRIPT) scripts.firstOrNull { it.id == c.scriptId } else null
     var pick by remember { mutableStateOf(false) }
     val android = container.platform.kind == PlatformKind.Android
-    Section(if (!d.session) "Транспорт" else if (index == 0) "Основной транспорт" else "Транспорт ${index + 1}") {
+    Section(if (index == 0) "Основной транспорт" else "Транспорт ${index + 1}") {
         RowItem(
             script?.name ?: c.type.title,
             subtitle = if (c.type == TransportType.SCRIPT && script == null) "JS-транспорт выключен" else c.type.blurb(),
@@ -301,11 +320,25 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
             if (c.type == TransportType.SCRIPT && !settings.experimental) {
                 Text("Экспериментальные функции выключены: с этим транспортом профиль не подключится.", style = AppTheme.type.bodySmall, color = AppTheme.colors.warning)
             }
-            val param = script?.primaryParam
-            val noField = c.type == TransportType.SCRIPT && script != null && param == null
-            if (!noField) {
+            if (c.type == TransportType.SCRIPT) {
+                val param = script?.primaryParam
+                if (script != null && script.hasSettings) {
+                    TextAction("Настройки транспорта", {
+                        val current = c.settings + (param?.key?.let { mapOf(it to c.value) } ?: emptyMap())
+                        container.scriptSettings.open(script.id, current) { saved ->
+                            val v = param?.key?.let { saved[it] } ?: c.value
+                            val rest = param?.key?.let { saved - it } ?: saved
+                            m.editTransport(index) { it.copy(value = v, settings = rest) }
+                        }
+                    })
+                }
+                if (c.value.isBlank() && c.settings.isEmpty()) {
+                    Text("Не настроен — параметры будут запрошены при подключении.", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
+                } else {
+                    Text("Настроен", style = AppTheme.type.bodySmall, color = AppTheme.colors.success)
+                }
+            } else {
                 val label = when {
-                    c.type == TransportType.SCRIPT -> param?.label?.ifBlank { null } ?: "Параметр"
                     c.type.kind == ValueKind.DocumentUrl -> when {
                         d.stream && c.type == TransportType.CUPSONLINE -> "Адрес комнаты cups.online"
                         c.type == TransportType.CUPSONLINE || c.type == TransportType.AVITO -> "Код комнат"
@@ -319,43 +352,37 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
                     d.stream && c.type == TransportType.MAILRU -> if (NodeTransports.cleanMailru(c.value) == null) "Нужна публичная ссылка на документ Mail.ru" else null
                     else -> Profile.carrierProblem(c)?.takeIf { c.type.kind != ValueKind.Token }
                 }
-                if (c.type.kind == ValueKind.Token || param?.type == "secret") {
+                if (c.type.kind == ValueKind.Token) {
                     SecretField(c.value, { v -> m.editTransport(index) { it.copy(value = v.trim()) } }, label, error = error)
                 } else {
-                    Field(c.value, { v -> m.editTransport(index) { it.copy(value = v.trim()) } }, label, placeholder = if (c.type == TransportType.SCRIPT) param?.type else c.type.valueHint, error = error, mono = true)
+                    Field(c.value, { v -> m.editTransport(index) { it.copy(value = v.trim()) } }, label, placeholder = c.type.valueHint, error = error, mono = true)
                 }
-            }
-            if (script != null && script.hasSettings) {
-                TextAction("Настройки транспорта", {
-                    val current = c.settings + (param?.key?.let { mapOf(it to c.value) } ?: emptyMap())
-                    container.scriptSettings.open(script.id, current) { saved ->
-                        val v = param?.key?.let { saved[it] } ?: c.value
-                        val rest = param?.key?.let { saved - it } ?: saved
-                        m.editTransport(index) { it.copy(value = v, settings = rest) }
+                if (c.type == TransportType.ONEME) Field(c.uid, { v -> m.editTransport(index) { it.copy(uid = v.trim()) } }, "ID пользователя MAX", placeholder = "Число из адреса звонка")
+                AnimatedVisibility(
+                    visible = m.busyIndex == index,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically(),
+                ) {
+                    ProgressLine("Создаю…")
+                }
+                AnimatedVisibility(
+                    visible = m.busyIndex != index,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically(),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.xs)) {
+                        DocumentKind.of(c.type)?.let { kind ->
+                            TextAction("Создать ${kind.label} в ${kind.account.where}", { m.makeDocument(index) })
+                        }
+                        if (c.type == TransportType.CUPSONLINE && !d.stream) TextAction("Сгенерировать комнаты", { m.makeRooms(index) })
                     }
-                })
-            }
-            if (c.type == TransportType.ONEME) Field(c.uid, { v -> m.editTransport(index) { it.copy(uid = v.trim()) } }, "ID пользователя MAX", placeholder = "Число из адреса звонка")
-            if (m.busyIndex == index) ProgressLine("Создаю…")
-            else {
-                DocumentKind.of(c.type)?.let { kind ->
-                    TextAction("Создать ${kind.label} в ${kind.account.where}", { m.makeDocument(index) })
                 }
-                if (c.type == TransportType.CUPSONLINE && !d.stream) TextAction("Сгенерировать комнаты", { m.makeRooms(index) })
-            }
-            if (m.error != null && m.busyIndex == null) Text(m.error!!, style = AppTheme.type.bodySmall, color = AppTheme.colors.danger)
-            if (d.session) {
-                Row(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
-                    Field(
-                        c.priority.toString(),
-                        { v -> v.filter(Char::isDigit).take(3).toIntOrNull()?.let { p -> m.editTransport(index) { it.copy(priority = p) } } },
-                        "Приоритет", keyboardType = KeyboardType.Number, modifier = Modifier.width(120.dp),
-                    )
-                }
-                val networks = NetworkKind.entries.filter { !android || it != NetworkKind.Ethernet }
-                Text("Сеть", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-                    for (n in networks) io.openflux.app.components.Chip(n.label, c.network == n, { m.editTransport(index) { it.copy(network = n) } })
+                AnimatedVisibility(
+                    visible = m.error != null && m.busyIndex == null,
+                    enter = fadeIn() + expandVertically(spring(stiffness = Spring.StiffnessMediumLow)),
+                    exit = fadeOut() + shrinkVertically(),
+                ) {
+                    m.error?.let { Text(it, style = AppTheme.type.bodySmall, color = AppTheme.colors.danger) }
                 }
             }
         }
@@ -364,23 +391,31 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
         Sheet(onDismiss = { pick = false }, title = "Транспорт") {
             val builtIn = when {
                 d.stream -> PhpHosts.carriers
-                d.session -> TransportType.entries.filter { it != TransportType.SCRIPT }
-                else -> TransportType.entries.filter { !it.sessionOnly }
+                else -> TransportType.entries.filter { it != TransportType.SCRIPT }
             }
-            for (t in builtIn) {
-                RowItem(t.title, subtitle = t.blurb(), selected = c.type == t, onClick = {
-                    m.editTransport(index) { it.copy(type = t, scriptId = "") }
-                    pick = false
-                })
-            }
-            if (settings.experimental && !d.stream && d.session) {
+            var idx = 0
+            if (settings.experimental && !d.stream && scripts.isNotEmpty()) {
                 for (s in scripts) {
-                    RowItem(s.name, subtitle = "JS-транспорт", selected = c.scriptId == s.id, onClick = {
+                    RowItem(s.name, Modifier.appear(delayMillis = idx * 40), subtitle = "JS-транспорт", selected = c.scriptId == s.id, onClick = {
                         m.editTransport(index) { it.copy(type = TransportType.SCRIPT, scriptId = s.id) }
                         pick = false
                     })
+                    idx++
                 }
                 TextAction("Управлять транспортами", { pick = false; navigator.open(Dest.Scripts) })
+            }
+            Text(
+                "ЛЕГАСИ",
+                style = AppTheme.type.label,
+                color = AppTheme.colors.textSecondary,
+                modifier = Modifier.padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.s),
+            )
+            for (t in builtIn) {
+                RowItem(t.title, Modifier.appear(delayMillis = idx * 40), subtitle = t.detail(), selected = c.type == t && c.scriptId.isBlank(), onClick = {
+                    m.editTransport(index) { it.copy(type = t, scriptId = "") }
+                    pick = false
+                })
+                idx++
             }
         }
     }

@@ -119,9 +119,7 @@ data class Profile(
             val where = if (index == 0) "Основной транспорт" else "Транспорт ${index + 1}"
             carrierProblem(carrier)?.let { add("$where: $it") }
         }
-        if (session && secret.length < MIN_SECRET) add("Для режима Session нужен ключ не короче $MIN_SECRET символов")
-        if (!session && secret.isNotEmpty() && secret.length < MIN_SECRET) add("Ключ должен быть не короче $MIN_SECRET символов")
-        if (!session && transport.sessionOnly) add("${transport.label} работает только в режиме Session")
+        if (secret.isNotEmpty() && secret.length < MIN_SECRET) add("Ключ должен быть не короче $MIN_SECRET символов")
     }
 
     /** What keeps a stream-mode profile from connecting, null when nothing does. */

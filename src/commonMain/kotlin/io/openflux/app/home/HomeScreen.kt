@@ -87,6 +87,7 @@ import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.shell.LocalOpenAdd
 import io.openflux.app.text.Fmt
 import io.openflux.app.theme.AppTheme
+import io.openflux.app.theme.appear
 import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.ExitAddress
@@ -185,12 +186,12 @@ private fun StartPanel(hasSubscription: Boolean, preparing: Boolean, botSignedIn
         Banner("В подписке пока нет локаций", Tone.Info, action = "Открыть подписку", onAction = { navigator.open(Dest.Account) })
         return
     }
-    Text("Приступим", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
-    Text("Все способы — под кнопкой ＋", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
+    Text("Приступим", Modifier.appear(), style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
+    Text("Все способы — под кнопкой ＋", Modifier.appear(delayMillis = 60), style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
     Section(null) {
-        RowItem("Войти в аккаунт OpenFlux", subtitle = "По почте или через Telegram; подписка и подключение появятся сами", onClick = { navigator.open(Dest.Auth) })
-        RowItem("Ключ или ссылка", subtitle = "От друга или из сервиса", onClick = { navigator.open(Dest.AddKey) })
-        RowItem("Свой сервер", subtitle = "VDS по SSH: нода поставится сама", onClick = { navigator.open(Dest.AddServer) })
+        RowItem("Войти в аккаунт OpenFlux", Modifier.appear(delayMillis = 120), subtitle = "По почте или через Telegram; подписка и подключение появятся сами", onClick = { navigator.open(Dest.Auth) })
+        RowItem("Ключ или ссылка", Modifier.appear(delayMillis = 180), subtitle = "От друга или из сервиса", onClick = { navigator.open(Dest.AddKey) })
+        RowItem("Свой сервер", Modifier.appear(delayMillis = 240), subtitle = "VDS по SSH: нода поставится сама", onClick = { navigator.open(Dest.AddServer) })
     }
 }
 
@@ -400,8 +401,8 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
                     )
                 }
             }
-            for (p in list) {
-                ProfileRow(p, selected = p.id == chosen?.id, dot = profileDot(state, p.id), touch = touch, onChoose = { m.choose(p); onChosen() })
+            list.forEachIndexed { i, p ->
+                ProfileRow(p, Modifier.appear(delayMillis = i * 40), selected = p.id == chosen?.id, dot = profileDot(state, p.id), touch = touch, onChoose = { m.choose(p); onChosen() })
             }
         }
     }
@@ -409,7 +410,7 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
 }
 
 @Composable
-private fun ProfileRow(p: Profile, selected: Boolean, dot: Status, touch: Boolean, onChoose: () -> Unit) {
+private fun ProfileRow(p: Profile, modifier: Modifier = Modifier, selected: Boolean, dot: Status, touch: Boolean, onChoose: () -> Unit) {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
     val toaster = LocalToaster.current
@@ -419,6 +420,7 @@ private fun ProfileRow(p: Profile, selected: Boolean, dot: Status, touch: Boolea
     var deleteAsk by remember { mutableStateOf(false) }
     RowItem(
         p.name,
+        modifier,
         subtitle = profileLine(p),
         leading = { IconBubble(profileIcon(p), status = dot) },
         selected = selected,

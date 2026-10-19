@@ -49,6 +49,7 @@ import io.openflux.app.nav.LocalInPane
 import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.text.Fmt
 import io.openflux.app.theme.AppTheme
+import io.openflux.app.theme.appear
 import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.AuthStatus
 import io.openflux.desktop.model.CoreRepos
@@ -94,9 +95,10 @@ fun SettingsRoot(selected: Dest? = null) {
     val android = LocalAppContainer.current.platform.kind == PlatformKind.Android
     ScreenScaffold("Настройки") {
         Section(null) {
-            for (p in SettingsPage.entries) {
+            SettingsPage.entries.forEachIndexed { i, p ->
                 RowItem(
                     if (p == SettingsPage.Vpn && android) "VPN" else p.title,
+                    Modifier.appear(delayMillis = i * 35),
                     leading = { Icon(p.icon, contentDescription = null, tint = AppTheme.colors.textSecondary) },
                     trailing = { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = AppTheme.colors.textMuted) },
                     selected = selected == p.dest(),

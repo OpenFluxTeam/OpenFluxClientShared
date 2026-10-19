@@ -1,5 +1,14 @@
 package io.openflux.app.shell
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +46,8 @@ import io.openflux.app.components.TextAction
 import io.openflux.app.components.Tone
 import io.openflux.app.nav.Dest
 import io.openflux.app.theme.AppTheme
+import io.openflux.app.theme.Motion
+import io.openflux.app.theme.appear
 import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.AuthStatus
 import io.openflux.desktop.model.UpdateState
@@ -69,17 +80,18 @@ private fun BrowserOverlay(
             Surface(frame, color = c.surface, contentColor = c.text) {
                 Column(Modifier.fillMaxSize()) {
                     Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.appear(), verticalAlignment = Alignment.CenterVertically) {
                             Text(title, Modifier.weight(1f), style = AppTheme.type.title, color = c.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             TextAction(closeLabel, onClose, color = c.textSecondary)
                         }
-                        note?.let { Text(it, style = AppTheme.type.bodySmall, color = c.textSecondary) }
-                        error?.let { Banner(it, Tone.Danger) }
+                        note?.let { Text(it, Modifier.appear(delayMillis = 60), style = AppTheme.type.bodySmall, color = c.textSecondary) }
+                        error?.let { Banner(it, Tone.Danger, Modifier.appear(delayMillis = 120)) }
                         actions()
                     }
                     Box(
                         Modifier.weight(1f).fillMaxWidth().padding(horizontal = if (touch) 0.dp else AppTheme.spacing.l)
                             .padding(bottom = if (touch) 0.dp else AppTheme.spacing.l)
+                            .appear(delayMillis = 100)
                             .border(1.dp, c.border),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -120,9 +132,14 @@ fun PromptOverlay() {
         closeLabel = "Позже",
         error = current.error.ifBlank { null },
     ) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-            if (!setup) PrimaryButton(if (current.busy) "Передаю…" else "Готово", connection::submitPrompt, enabled = !current.busy && page != null)
-            SecondaryButton("Открыть заново", connection::openPrompt, enabled = !current.busy)
+        AnimatedVisibility(
+            visible = true,
+            enter = fadeIn(tween(300, 150)) + slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it / 3 },
+        ) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
+                if (!setup) PrimaryButton(if (current.busy) "Передаю…" else "Готово", connection::submitPrompt, enabled = !current.busy && page != null)
+                SecondaryButton("Открыть заново", connection::openPrompt, enabled = !current.busy)
+            }
         }
         if (!setup && sessions[AccountKind.Yandex]?.let { !it.expired && it.cookies.isNotEmpty() } != true) {
             TextAction("Не проходить каждый раз: войти в Яндекс", {
@@ -160,7 +177,7 @@ fun ScriptSettingsOverlay() {
     val current = state ?: return
     BrowserOverlay(
         title = "Настройки «${current.title}»",
-        note = "Измените и нажмите «Сохранить» на странице. Применится при следующем подключении.",
+        note = "Измените и нажмите «Сохранить» на странице. Пустые значения будут запрошены при подключении.",
         page = current.page,
         waiting = current.progress.ifEmpty { "Открываю настройки…" },
         onClose = service::close,

@@ -17,13 +17,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-/** How a profile carries traffic: one transport, several at once (Session), or a node on a hosting. */
+/** How a profile carries traffic: several transports at once (Session), or a node on a hosting. */
 enum class EditMode(val label: String) { Classic("Обычный"), Session("Session"), Stream("Без сервера") }
 
 val Profile.editMode: EditMode get() = when {
     stream -> EditMode.Stream
-    session -> EditMode.Session
-    else -> EditMode.Classic
+    else -> EditMode.Session
 }
 
 /**
@@ -37,7 +36,8 @@ class ProfileEditorModel(private val container: AppContainer, id: String?, priva
     val readOnly: Boolean = original?.managed == true
 
     var draft by mutableStateOf(
-        original ?: Profile(id = container.profiles.newId(), name = "", transport = TransportType.VYANDEX, createdAt = container.platform.now()),
+        original?.let { if (!it.stream) it.copy(session = true) else it }
+            ?: Profile(id = container.profiles.newId(), name = "", transport = TransportType.VYANDEX, session = true, createdAt = container.platform.now()),
     )
         private set
     private val initial = draft
@@ -59,19 +59,18 @@ class ProfileEditorModel(private val container: AppContainer, id: String?, priva
     }
 
     fun setMode(mode: EditMode) = edit {
+        val effective = if (mode == EditMode.Classic) EditMode.Session else mode
         val transport = when {
-            mode == EditMode.Stream && it.transport !in PhpHosts.carriers -> TransportType.CUPSONLINE
-            mode != EditMode.Session && mode != EditMode.Stream && it.transport.sessionOnly -> TransportType.VYANDEX
+            effective == EditMode.Stream && it.transport !in PhpHosts.carriers -> TransportType.CUPSONLINE
             else -> it.transport
         }
         it.copy(
-            session = mode == EditMode.Session,
-            stream = mode == EditMode.Stream,
+            session = effective != EditMode.Stream,
+            stream = effective == EditMode.Stream,
             transport = transport,
-            // A node on a hosting has no key: nothing of it may linger from the other modes.
-            secret = if (mode == EditMode.Stream) "" else it.secret,
-            context = if (mode == EditMode.Stream) "" else it.context,
-            extras = if (mode == EditMode.Session) it.extras else emptyList(),
+            secret = if (effective == EditMode.Stream) "" else it.secret,
+            context = if (effective == EditMode.Stream) "" else it.context,
+            extras = if (effective == EditMode.Stream) emptyList() else it.extras,
         )
     }
 

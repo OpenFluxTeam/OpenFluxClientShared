@@ -181,6 +181,27 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
         if (m.creating) Text("На сервере ${m.serverHost}", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
         val editable = busy == null
         Section("Транспорты") {
+            val runnable = installedScripts.filter(NodeTransports::nodeCanRun)
+            val onNode = d.scripts.map { it.id }.toSet()
+            for (script in runnable + d.scripts.filter { s -> runnable.none { it.id == s.id } }.map { s -> missingScript(s.id) }) {
+                val chosen = d.scripts.firstOrNull { it.id == script.id }
+                Toggle(
+                    script.name.ifBlank { script.id }, script.id in onNode,
+                    { on -> m.edit { it.copy(scripts = if (on) it.scripts + NodeScript(script.id) else it.scripts.filterNot { s -> s.id == script.id }) } },
+                    subtitle = if (script.fileName.isEmpty()) "не установлен на этом устройстве" else "JS-транспорт",
+                    enabled = editable && (script.fileName.isNotEmpty() || script.id in onNode),
+                )
+                val param = script.primaryParam
+                if (chosen != null && param != null) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.s)) {
+                        Field(chosen.value, { v -> m.edit { it.copy(scripts = it.scripts.map { s -> if (s.id == script.id) s.copy(value = v) else s }) } }, param.label.ifBlank { "Параметр" }, mono = true)
+                    }
+                }
+            }
+            if (settings.experimental) TextAction("Управлять транспортами", { navigator.open(Dest.Scripts) })
+            RowItem(TransportType.DIRECT.title, subtitle = "Всегда включено: запасной путь, если другие недоступны", enabled = false)
+        }
+        Section("Легаси") {
             Toggle(TransportType.VYANDEX.title, d.volga, { on -> m.edit { it.copy(volga = on) } }, enabled = editable)
             Toggle(TransportType.YANDEX.title, d.yandexDocs, { on -> m.edit { it.copy(yandexDocs = on) } }, enabled = editable)
             if (d.needsYandexDoc) {
@@ -230,25 +251,6 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
                     TextAction(if (d.avitoRooms.isEmpty()) "Создать комнаты" else "Новые комнаты", m::createAvitoRooms, enabled = editable)
                 }
             }
-            // Signed .flux packages installed here; the app sends each one to the node.
-            val runnable = installedScripts.filter(NodeTransports::nodeCanRun)
-            val onNode = d.scripts.map { it.id }.toSet()
-            for (script in runnable + d.scripts.filter { s -> runnable.none { it.id == s.id } }.map { s -> missingScript(s.id) }) {
-                val chosen = d.scripts.firstOrNull { it.id == script.id }
-                Toggle(
-                    "JS: " + script.name.ifBlank { script.id }, script.id in onNode,
-                    { on -> m.edit { it.copy(scripts = if (on) it.scripts + NodeScript(script.id) else it.scripts.filterNot { s -> s.id == script.id }) } },
-                    subtitle = if (script.fileName.isEmpty()) "не установлен на этом устройстве" else null,
-                    enabled = editable && (script.fileName.isNotEmpty() || script.id in onNode),
-                )
-                val param = script.primaryParam
-                if (chosen != null && param != null) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.s)) {
-                        Field(chosen.value, { v -> m.edit { it.copy(scripts = it.scripts.map { s -> if (s.id == script.id) s.copy(value = v) else s }) } }, param.label.ifBlank { "Параметр" }, mono = true)
-                    }
-                }
-            }
-            RowItem(TransportType.DIRECT.title, subtitle = "Всегда включено: запасной путь, если другие недоступны", enabled = false)
         }
         m.documentWarning?.let { Banner(it, Tone.Info) }
 
