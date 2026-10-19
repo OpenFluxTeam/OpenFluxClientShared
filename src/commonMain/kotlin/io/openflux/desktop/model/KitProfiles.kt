@@ -70,13 +70,29 @@ fun Profile.installedKit(): InstalledChannel? {
 }
 
 /**
- * A profile of a script transport whose two ends are set up together (MAX: two accounts) that has no node yet: made
- * by hand, so with no channel key of its own. Nothing on the other end waits for it, so it cannot connect until a node
- * exists (a profile with a key typed in is the person's own business: they run the node).
+ * Whether [carrier], a carrier of this script, has what the script declares it cannot run without: every required
+ * parameter filled, in its settings or, for the profile's own input, in its value. A script that declares nothing
+ * required is set up when it has any settings or value at all.
+ */
+fun InstalledScript.configured(carrier: ExtraTransport): Boolean {
+    val required = params.filter { it.required }
+    if (required.isEmpty()) return carrier.settings.isNotEmpty() || carrier.value.isNotBlank()
+    val primary = primaryParam?.key
+    return required.all { p -> (carrier.settings[p.key] ?: if (p.key == primary) carrier.value else null).orEmpty().isNotBlank() }
+}
+
+/**
+ * A profile made by hand of a script transport whose two ends are set up together (MAX: two accounts) that is not set
+ * up: nothing on the other end waits for it, and what the script's wizard asks is asked together with the node, not
+ * at connect time. It cannot connect until a node is made for it (the profile editor has given it a key already, so a
+ * key says nothing: the script's own settings do). A profile someone handed over, a node's own and one the person
+ * filled in themselves (they run the node) are not this.
  */
 fun Profile.needsNode(scripts: List<InstalledScript>): Boolean =
-    source == ProfileSource.Manual && secret.isEmpty() && !stream &&
-        carriers.any { c -> c.type == TransportType.SCRIPT && scripts.any { it.id == c.scriptId && it.setupPage } }
+    source == ProfileSource.Manual && !stream && carriers.any { c ->
+        val script = if (c.type == TransportType.SCRIPT) scripts.firstOrNull { it.id == c.scriptId } else null
+        script != null && script.setupPage && !script.configured(c)
+    }
 
 /** What the connection says when [needsNode] stops it. */
 const val NEEDS_NODE_MESSAGE = "Этому подключению нужна нода: без неё не с кем соединяться. Создайте её в «Серверах» или нажмите «Создать ноду» на карточке профиля."
