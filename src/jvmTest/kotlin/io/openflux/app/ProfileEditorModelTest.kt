@@ -49,8 +49,9 @@ class ProfileEditorModelTest {
         assertTrue(m.draft.stream)
     }
 
+    /** Every profile is a Session one now: the old "classic" mode is the same mode, so asking for it drops nothing. */
     @Test
-    fun sessionKeepsExtrasClassicDropsThemOnSave() = runTest {
+    fun theOldClassicModeIsSessionAndKeepsExtras() = runTest {
         val m = ProfileEditorModel(c, null, this)
         m.edit { it.copy(name = "x", value = doc, secret = "k".repeat(32)) }
         m.setMode(EditMode.Session)
@@ -58,17 +59,28 @@ class ProfileEditorModelTest {
         assertEquals(listOf(ExtraTransport(TransportType.DIRECT, priority = 110)), m.draft.extras)
         m.editTransport(1) { it.copy(value = "203.0.113.7:8445") }
         m.setMode(EditMode.Classic)
-        assertTrue(m.draft.extras.isEmpty())
+        assertEquals(1, m.draft.extras.size, "the extra carrier stays")
+        assertTrue(m.draft.session)
         assertEquals(TransportType.VYANDEX, m.draft.transport)
     }
 
     @Test
-    fun directMovesOffClassic() = runTest {
+    fun directStaysWhereEveryProfileIsSession() = runTest {
         val m = ProfileEditorModel(c, null, this)
         m.setMode(EditMode.Session)
         m.editTransport(0) { it.copy(type = TransportType.DIRECT) }
         m.setMode(EditMode.Classic)
-        assertEquals(TransportType.VYANDEX, m.draft.transport, "direct works only in Session")
+        assertEquals(TransportType.DIRECT, m.draft.transport, "direct works in Session, which is all there is")
+    }
+
+    @Test
+    fun aProfileSavedBeforeEveryProfileWasSessionOpensWithoutUnsavedChanges() = runTest {
+        c.profiles.upsert(Profile(id = "old", name = "Старый", value = doc, session = false))
+        val m = ProfileEditorModel(c, "old", this)
+        assertTrue(m.draft.session, "moved to Session in the draft")
+        assertFalse(m.hasUnsaved, "opening it is no edit")
+        m.edit { it.copy(name = "Новый") }
+        assertTrue(m.hasUnsaved)
     }
 
     @Test

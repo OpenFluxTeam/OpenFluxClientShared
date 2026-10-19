@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runComposeUiTest
 import io.openflux.app.nav.AppNavigator
 import io.openflux.app.nav.Dest
@@ -31,8 +32,10 @@ class NodeScreenTest {
         runBlocking { link.connect(SshTarget("a.example", 22, "root", password = "pw", hostKey = "SHA256:a.example")) }
         c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.Node("a.example:22:root", "of-x")) }.snapshot().encode()) }
         setContent { OpenFluxApp(c, NoScrollbars, Shortcuts(), NoBrowserViews, link) }
-        waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Cups.online")).fetchSemanticsNodes().isNotEmpty() }
-        onNodeWithText("Cups.online").performClick()
+        // The node is read from the server first: a switch touched before that is lost to the loaded draft.
+        waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Подключить себе")).fetchSemanticsNodes().isNotEmpty() }
+        // The legacy transports sit below the JS ones now: scroll to the switch before touching it.
+        onNodeWithText("Cups.online").performScrollTo().performClick()
         onNodeWithText("Изменено: 1").assertIsDisplayed()
         onNodeWithText("Применить").performClick()
         waitUntil(timeoutMillis = 5_000) { server.channels.getValue("of-x").transports.size == 2 }

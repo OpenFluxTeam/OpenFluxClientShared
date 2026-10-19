@@ -41,7 +41,9 @@ class ProfileEditorModel(private val container: AppContainer, id: String?, priva
     )
         private set
     private val initial = draft
-    private var saved by mutableStateOf(original)
+    // What counts as saved is the draft as opened: a profile saved before every profile was a Session one is already
+    // moved to Session in the draft, and opening it is no edit.
+    private var saved by mutableStateOf(if (original != null) initial else null)
     var showProblems by mutableStateOf(false)
         private set
     /** The transport whose document or rooms are being made. */
