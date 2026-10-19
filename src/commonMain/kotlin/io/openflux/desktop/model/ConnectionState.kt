@@ -89,8 +89,6 @@ data class TransportPrompt(
     val own: Boolean = html != null,
     /** The transport that asked, for the dialog's title. */
     val transport: String = "",
-    /** A sign-in window the script's page opened on top of itself (window.openfluxLogin); closing it goes back to the page. */
-    val nested: Boolean = false,
 )
 
 enum class LogLevel { Info, Success, Warning, Error, Debug }

@@ -187,12 +187,18 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
                 val chosen = d.scripts.firstOrNull { it.id == script.id }
                 Toggle(
                     script.name.ifBlank { script.id }, script.id in onNode,
-                    { on -> m.edit { it.copy(scripts = if (on) it.scripts + NodeScript(script.id) else it.scripts.filterNot { s -> s.id == script.id }) } },
-                    subtitle = if (script.fileName.isEmpty()) "не установлен на этом устройстве" else "JS-транспорт",
+                    { on -> m.edit { it.copy(scripts = if (on) it.scripts + NodeScript(script.id, wizard = script.setupPage) else it.scripts.filterNot { s -> s.id == script.id }) } },
+                    subtitle = when {
+                        script.fileName.isEmpty() -> "не установлен на этом устройстве"
+                        script.setupPage -> "JS-транспорт с мастером настройки"
+                        else -> "JS-транспорт"
+                    },
                     enabled = editable && (script.fileName.isNotEmpty() || script.id in onNode),
                 )
                 val param = script.primaryParam
-                if (chosen != null && param != null) {
+                if (chosen != null && script.setupPage) {
+                    WizardRow(script, chosen, editable) { m.setupScript(script.id) }
+                } else if (chosen != null && param != null) {
                     Column(Modifier.fillMaxWidth().padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.s)) {
                         Field(chosen.value, { v -> m.edit { it.copy(scripts = it.scripts.map { s -> if (s.id == script.id) s.copy(value = v) else s }) } }, param.label.ifBlank { "Параметр" }, mono = true)
                     }
@@ -295,6 +301,31 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
             onDismiss = { removeAsk = false },
             danger = true,
         )
+    }
+}
+
+/**
+ * A script with a setup wizard of its own under its switch: whether it is set up (its declared required params are
+ * filled on both sides: the client's here, the node's, when the ends differ, kept for the server) and the way to run
+ * the wizard. A node set up elsewhere has only its own side here: this device then needs only its sign-in.
+ */
+@Composable
+private fun WizardRow(script: InstalledScript, chosen: NodeScript, enabled: Boolean, onSetup: () -> Unit) {
+    fun filled(side: Map<String, String>): Boolean {
+        val required = script.params.filter { it.required }.map { it.key }
+        return if (required.isEmpty()) side.isNotEmpty() else required.all { side[it].orEmpty().isNotBlank() }
+    }
+    val clientReady = filled(chosen.settings)
+    val nodeReady = chosen.nodeSettings?.let(::filled) ?: clientReady
+    val c = AppTheme.colors
+    val (text, color, action) = when {
+        clientReady && nodeReady -> Triple("Настроен: оба аккаунта вошли, связь проверена", c.success, "Настроить заново")
+        nodeReady -> Triple("Нода настроена, на этом устройстве вход не выполнен", c.warning, "Войти в аккаунт")
+        else -> Triple("Нужно пройти мастер: он войдёт в аккаунты и проверит связь", c.textSecondary, "Настроить")
+    }
+    Column(Modifier.fillMaxWidth().padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.s)) {
+        Text(text, style = AppTheme.type.bodySmall, color = color)
+        TextAction(action, onSetup, enabled = enabled)
     }
 }
 

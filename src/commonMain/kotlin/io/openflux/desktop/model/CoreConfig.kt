@@ -96,7 +96,7 @@ object CoreConfig {
             appendLine("EncryptionKeyFile = ${confValue(paths.keyFile ?: error("Session requires a key"))}")
             appendLine("CookieStore = ${confValue(paths.cookieStore)}")
             // The core refuses Telemost under its TUN: the rest of the profile still connects.
-            val specs = profile.sessionSpecs().filterNot { exit && it.type == TransportType.DIRECT }
+            val specs = profile.sessionSpecs(exit).filterNot { exit && it.type == TransportType.DIRECT }
                 .filterNot { !exit && settings.fullTunnel && it.type == TransportType.TELEMOST }
             require(specs.isNotEmpty()) { TELEMOST_TUN }
             for (spec in specs) {
@@ -122,7 +122,7 @@ object CoreConfig {
                     // The profile param's own value rides along under its declared key too,
                     // mirroring the URL line above: a script that reads cfg.params[key]
                     // instead of cfg.url sees the one the profile editor's field saved.
-                    val merged = spec.settings + (carrier.primaryParamKey?.let { mapOf(it to spec.value) } ?: emptyMap())
+                    val merged = ScriptSettingsCodec.withPrimary(spec.settings, carrier.primaryParamKey, spec.value)
                     // The saved settings ride as one line: a .conf value ends at '#' or ';' and a setting may hold either.
                     if (merged.isNotEmpty()) appendLine("Params = ${ScriptSettingsCodec.encode(merged)}")
                 }

@@ -10,7 +10,38 @@ enum class ProfileSource(val label: String) {
     Subscription("Подписка"),
     /** A connection bought in the OpenFlux bot, from its short link: kept up to date like a subscription's. */
     Bot("Бот OpenFlux"),
+    /**
+     * The node's own side of a profile, handed over from the device that made the node (see [ProfileTransfer]):
+     * this device runs it as the exit ("Эта нода"), it is not a way to connect.
+     */
+    ThisNode("Нода на этом устройстве"),
 }
+
+/** How a node that is not on an SSH server is run. */
+@Serializable
+enum class KitDelivery(val label: String) {
+    /** A command the person runs on a machine of their own (B). */
+    Manual("Команда для своего компьютера"),
+    /** The node's profile goes to another device with the app (C). */
+    Device("Другое устройство"),
+    /** This device runs it. */
+    Here("Это устройство"),
+}
+
+/**
+ * The owner's record of a node made without SSH: what it takes to show its command again or hand its profile over
+ * again after the node's transports change. The channel's key is the profile's [Profile.secret], its transports
+ * are the profile's carriers (the node's side of them in [ExtraTransport.nodeSettings]).
+ */
+@Serializable
+data class KitNode(
+    /** The channel's name on the node (node-install.sh's "of-xxxxxx"). */
+    val channel: String,
+    val delivery: KitDelivery,
+    /** [NodeMode.cli]. */
+    val mode: String = NodeMode.L4.cli,
+    val autoUpdate: Boolean = true,
+)
 
 /** A profile of the subscription: read-only, its key and documents are not shown or shared. */
 val Profile.managed: Boolean get() = source == ProfileSource.Subscription || source == ProfileSource.Bot
@@ -53,6 +84,12 @@ data class ExtraTransport(
      * the wizard changes the one value a param stands for.
      */
     val settings: Map<String, String> = emptyMap(),
+    /**
+     * What the NODE runs this carrier with when that differs from [settings] (a transport whose two ends are
+     * different accounts, like MAX). Only the device that made the node keeps it, to run it as the exit here or to
+     * hand the node's side over; empty means both ends use [settings].
+     */
+    val nodeSettings: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -96,10 +133,14 @@ data class Profile(
     val stream: Boolean = false,
     /** Where this profile's node lives, to start it again; null when it was made without the wizard. */
     val phpNode: PhpNodeRef? = null,
+    /** The main carrier's [ExtraTransport.nodeSettings]. */
+    val nodeSettings: Map<String, String> = emptyMap(),
+    /** Set when this device made the node without SSH: see [KitNode]. */
+    val kitNode: KitNode? = null,
 ) {
     /** Every carrier of the profile, main first. */
     val carriers: List<ExtraTransport>
-        get() = listOf(ExtraTransport(transport, value, uid, priority, scriptId = scriptId, settings = settings, network = network)) + if (session) extras else emptyList()
+        get() = listOf(ExtraTransport(transport, value, uid, priority, scriptId = scriptId, settings = settings, network = network, nodeSettings = nodeSettings)) + if (session) extras else emptyList()
 
     val summary: String
         get() = when {
@@ -141,7 +182,7 @@ data class Profile(
      * that already sits on its documents: a second exit there takes and
      * answers its clients' packets, and neither works.
      */
-    fun exitProblem(): String? = if (source != ProfileSource.Node) null else
+    fun exitProblem(): String? = if (source != ProfileSource.Node || kitNode?.delivery == KitDelivery.Here) null else
         "«$name» — профиль ноды на сервере, её документы уже заняты этой нодой. Как выходная нода на этом устройстве " +
             "он перехватит трафик её клиентов. Чтобы подключиться к ноде, включите режим «Клиент»; для выходной ноды " +
             "здесь создайте отдельный профиль со своим документом."
@@ -151,7 +192,7 @@ data class Profile(
      * type-2, type-3 for repeats, so they match the exit's names (cookie
      * exchange is addressed by name).
      */
-    fun sessionSpecs(): List<SessionSpec> {
+    fun sessionSpecs(exit: Boolean = false): List<SessionSpec> {
         val seen = mutableMapOf<TransportType, Int>()
         return carriers.map { carrier ->
             val n = (seen[carrier.type] ?: 0) + 1
@@ -164,7 +205,8 @@ data class Profile(
                 priority = carrier.priority,
                 network = carrier.network,
                 scriptId = carrier.scriptId,
-                settings = carrier.settings,
+                // The exit runs a carrier with the node's side of it when the two ends differ.
+                settings = if (exit && carrier.nodeSettings.isNotEmpty()) carrier.nodeSettings else carrier.settings,
             )
         }
     }

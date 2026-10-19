@@ -6,6 +6,7 @@ import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodeTransport
 import io.openflux.desktop.model.NodeTransports
 import io.openflux.desktop.model.NodeWizardException
+import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ScriptSettingsCodec
 import io.openflux.desktop.model.TransportType
 
@@ -18,8 +19,26 @@ import io.openflux.desktop.model.TransportType
  * Cups.online and Avito rooms are made when the node is applied, so turning them on needs nothing typed.
  * JS transports are the packages installed on this device ([NodeScript]); the app sends each package to the node.
  */
-/** A JS transport on the node: the installed package [id], the value of its primary parameter and its other settings. */
-data class NodeScript(val id: String, val value: String = "", val settings: Map<String, String> = emptyMap())
+/**
+ * A JS transport on the node: the installed package [id], the value of its primary parameter and its other settings.
+ * [settings] are what the CLIENT runs it with (they end up in the person's profile). A transport whose two ends are
+ * set up together and differ (MAX: two accounts) also has [nodeSettings], what the NODE runs it with; null means both
+ * ends use [settings].
+ */
+data class NodeScript(
+    val id: String,
+    val value: String = "",
+    val settings: Map<String, String> = emptyMap(),
+    val nodeSettings: Map<String, String>? = null,
+    /** Its script has a setup wizard of its own: it is not usable before the wizard has handed back its sides. */
+    val wizard: Boolean = false,
+) {
+    /** What the node runs it with. */
+    val forNode: Map<String, String> get() = nodeSettings ?: settings
+
+    /** The ends differ: it was set up by the script's own wizard, which handed back both sides. */
+    val split: Boolean get() = nodeSettings != null
+}
 
 data class NodeDraft(
     val name: String = "",
@@ -48,7 +67,10 @@ data class NodeDraft(
         mailru && NodeTransports.cleanMailru(mailruLink) == null -> "Нужна публичная ссылка Mail.ru вида https://cloud.mail.ru/public/…/…"
         board && NodeTransports.cleanBoard(boardLink) == null -> "Нужна ссылка на доску вида https://boards.yandex.ru/whiteboard/?hash=…"
         telemost && NodeTransports.cleanTelemost(telemostLink) == null -> "Нужна ссылка на конференцию Телемоста вида https://telemost.yandex.ru/j/…"
-        else -> scripts.firstNotNullOfOrNull { s -> NodeTransports.scriptValueProblem(s.value)?.let { "JS-транспорт ${s.id}: параметр $it" } }
+        else -> scripts.firstNotNullOfOrNull { s ->
+            if (s.wizard && s.settings.isEmpty() && s.nodeSettings == null) "JS-транспорт ${s.id}: пройдите мастер настройки"
+            else NodeTransports.scriptValueProblem(s.value)?.let { "JS-транспорт ${s.id}: параметр $it" }
+        }
     }
 
     /**
@@ -77,7 +99,7 @@ data class NodeDraft(
             if (avito) add(NodeTransport(TransportType.AVITO.cliName, avitoRooms))
             if (cups) add(NodeTransport(TransportType.CUPSONLINE.cliName, cupsRooms))
             // The package, the key and the settings line come from this device's install (NodeEditorModel).
-            for (s in scripts) add(NodeTransport(TransportType.SCRIPT.cliName, s.value.trim(), script = s.id, params = ScriptSettingsCodec.encode(s.settings).takeIf { s.settings.isNotEmpty() }.orEmpty()))
+            for (s in scripts) add(NodeTransport(TransportType.SCRIPT.cliName, s.value.trim(), script = s.id, params = ScriptSettingsCodec.encode(s.forNode).takeIf { s.forNode.isNotEmpty() }.orEmpty()))
         }
     }
 
@@ -96,15 +118,65 @@ data class NodeDraft(
         if (avito != original.avito) n++ else if (avito && avitoRooms.trim() != original.avitoRooms.trim()) n++
         val before = original.scripts.associateBy { it.id }
         val after = scripts.associateBy { it.id }
-        n += (before.keys + after.keys).count { before[it]?.value?.trim() != after[it]?.value?.trim() || before[it]?.settings != after[it]?.settings }
+        n += (before.keys + after.keys).count {
+            before[it]?.value?.trim() != after[it]?.value?.trim() || before[it]?.settings != after[it]?.settings ||
+                before[it]?.nodeSettings != after[it]?.nodeSettings
+        }
         return n
     }
 
-    /** Something the server keeps changed (not just the name). */
-    fun serverChanged(original: NodeDraft): Boolean = copy(name = original.name).changes(original) > 0
+    /**
+     * Something the server keeps changed (not just the name). The client's side of a transport whose ends differ stays
+     * on this device, so changing only that is no change for the server.
+     */
+    fun serverChanged(original: NodeDraft): Boolean {
+        val keepClientSide = scripts.map { s ->
+            val was = original.scripts.firstOrNull { it.id == s.id }
+            if (s.split && was != null) s.copy(settings = was.settings) else s
+        }
+        return copy(name = original.name, scripts = keepClientSide).changes(original) > 0
+    }
 
     companion object {
-        fun of(info: InstalledChannel, name: String): NodeDraft {
+        /**
+         * The draft for a node made for a profile that exists already: its carriers are the start, so what the person
+         * set up there (documents, a script's own settings) is not asked for again. [wizardScripts] are the ids of the
+         * scripts with a setup wizard of their own; the profile's settings of those are the client's side.
+         */
+        fun fromProfile(profile: Profile, wizardScripts: Set<String> = emptySet()): NodeDraft {
+            var d = NodeDraft(name = profile.name)
+            for (c in profile.carriers) {
+                val v = c.value.trim()
+                d = when (c.type) {
+                    TransportType.VYANDEX -> d.copy(volga = true, yandexDoc = d.yandexDoc.ifEmpty { v })
+                    TransportType.YANDEX -> d.copy(yandexDocs = true, yandexDoc = d.yandexDoc.ifEmpty { v })
+                    TransportType.MAILRU -> d.copy(mailru = true, mailruLink = v)
+                    TransportType.BOARDS -> d.copy(board = true, boardLink = v)
+                    TransportType.CUPSONLINE -> d.copy(cups = true, cupsRooms = v)
+                    TransportType.TELEMOST -> d.copy(telemost = true, telemostLink = v)
+                    TransportType.AVITO -> d.copy(avito = true, avitoRooms = v)
+                    TransportType.SCRIPT ->
+                        if (c.scriptId.isEmpty()) d
+                        else d.copy(scripts = d.scripts + NodeScript(c.scriptId, v, c.settings, c.nodeSettings.takeIf { it.isNotEmpty() }, wizard = c.scriptId in wizardScripts))
+                    // direct is the node's own, and the token transport is not one a node can run
+                    TransportType.DIRECT, TransportType.ONEME -> d
+                }
+            }
+            return d
+        }
+
+        /**
+         * The draft of an installed node. The server keeps only the node's side of a transport; [clientSides] are what
+         * this device kept of the client's side by script id (from the node's profile here), and [splitScripts] the
+         * scripts whose ends differ: for those the server's settings are the node's side and the client's come from
+         * [clientSides] (none: the person has not set up this device's side yet).
+         */
+        fun of(
+            info: InstalledChannel,
+            name: String,
+            clientSides: Map<String, Map<String, String>> = emptyMap(),
+            splitScripts: Set<String> = emptySet(),
+        ): NodeDraft {
             fun url(type: TransportType) = info.transports.firstOrNull { it.type == type.cliName }?.url
             val volga = url(TransportType.VYANDEX)
             val docs = url(TransportType.YANDEX)
@@ -124,7 +196,11 @@ data class NodeDraft(
                 avito = url(TransportType.AVITO) != null,
                 avitoRooms = url(TransportType.AVITO).orEmpty(),
                 scripts = info.transports.filter { it.type == TransportType.SCRIPT.cliName && it.script.isNotEmpty() }
-                    .map { NodeScript(it.script, it.url, ScriptSettingsCodec.decode(it.params)) },
+                    .map {
+                        val onServer = ScriptSettingsCodec.decode(it.params)
+                        if (it.script in splitScripts) NodeScript(it.script, it.url, clientSides[it.script].orEmpty(), onServer, wizard = true)
+                        else NodeScript(it.script, it.url, onServer)
+                    },
                 mode = info.nodeMode,
             )
         }

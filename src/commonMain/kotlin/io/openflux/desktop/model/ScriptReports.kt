@@ -20,6 +20,7 @@ fun InstalledScript.withTrustReport(report: JsonObject): InstalledScript = copy(
     // An update may declare new settings: the record follows the file.
     params = if (report["params"] != null) parseScriptParams(report["params"]) else params,
     settingsPage = report["settingsPage"]?.jsonPrimitive?.booleanOrNull == true,
+    setupPage = report["setupPage"]?.jsonPrimitive?.booleanOrNull == true,
     packageId = report["id"]?.jsonPrimitive?.contentOrNull.orEmpty(),
     wire = report["wire"]?.jsonPrimitive?.intOrNull ?: 1,
     updateUrls = (report["update"] as? JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),

@@ -122,7 +122,6 @@ fun PromptOverlay() {
             else -> "Яндекс просит пройти проверку"
         },
         note = when {
-            current.nested -> "Войдите в аккаунт на этой странице: окно закроется само, когда вход будет выполнен."
             setup -> "Заполните страницу и нажмите её кнопку: OpenFlux передаст данные сам."
             current.remote -> "Страница открыта через ноду. Пройдите проверку и нажмите «Готово»."
             else -> "Пройдите проверку и нажмите «Готово»."
@@ -130,7 +129,7 @@ fun PromptOverlay() {
         page = page,
         waiting = current.progress.ifEmpty { "Открываю страницу…" },
         onClose = connection::dismissPrompt,
-        closeLabel = if (current.nested) "Назад" else "Позже",
+        closeLabel = "Позже",
         error = current.error.ifBlank { null },
     ) {
         AnimatedVisibility(
@@ -177,8 +176,9 @@ fun ScriptSettingsOverlay() {
     val state by service.state.collectAsState()
     val current = state ?: return
     BrowserOverlay(
-        title = "Настройки «${current.title}»",
-        note = "Измените и нажмите «Сохранить» на странице. Пустые значения будут запрошены при подключении.",
+        title = if (current.setup) "Настройка «${current.title}»" else "Настройки «${current.title}»",
+        note = if (current.setup) "Пройдите шаги на странице и нажмите «Готово»: данные вернутся в мастер ноды."
+        else "Измените и нажмите «Сохранить» на странице. Пустые значения будут запрошены при подключении.",
         page = current.page,
         waiting = current.progress.ifEmpty { "Открываю настройки…" },
         onClose = service::close,

@@ -299,6 +299,18 @@ interface PlatformServices {
     fun scriptSettings(data: ByteArray, sig: ByteArray, pubkeyHex: String, valuesJson: String, lang: String): String =
         """{"ok":false,"code":"failed","error":"script transports not supported on this platform"}"""
 
+    /**
+     * Runs the setup wizard (Transport.setup) of the installed script at [path] with the real host - sockets, http,
+     * an httpserver of its own: a wizard signs in to a service and checks what it was given - and returns the core's
+     * JSON reply {ok, url | html, reason, error}: the page to show. One wizard runs at a time; [scriptSetupStop] ends
+     * it. Blocking: call off the UI thread.
+     */
+    fun scriptSetupStart(path: String, pubkeyHex: String, valuesJson: String): String =
+        """{"ok":false,"error":"Мастер настройки здесь недоступен"}"""
+
+    /** Ends the wizard [scriptSetupStart] started; harmless when none runs. */
+    fun scriptSetupStop() {}
+
     /** SHA-256 (hex) of an author public key, "" if it can't be decoded. */
     fun scriptFingerprint(pubkeyHex: String): String = ""
 

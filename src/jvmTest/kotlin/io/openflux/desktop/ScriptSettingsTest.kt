@@ -141,6 +141,10 @@ class ScriptSettingsTest {
             submit = onSubmit
             return Page(html).also { opened += it }
         }
+        override suspend fun openOwn(url: String, onStep: (String) -> Unit, onSubmit: (String) -> Unit): BrowserPage {
+            submit = onSubmit
+            return Page("own:$url").also { opened += it }
+        }
         override fun close(page: BrowserPage) { closed += page }
     }
 
@@ -226,6 +230,97 @@ class ScriptSettingsTest {
         // whichever pages were opened, only the last is left open
         assertEquals(host.opened.size - 1, host.closed.size)
         assertTrue(host.opened.last() === service.state.value?.page)
+    }
+
+    // ---- the setup wizard: the script runs with the real host, the page is its own server ----
+
+    private class SetupPlatform(val reply: String) {
+        val starts = mutableListOf<List<String>>()
+        var stops = 0
+        val platform: PlatformServices = Proxy.newProxyInstance(PlatformServices::class.java.classLoader, arrayOf(PlatformServices::class.java)) { _, method, args ->
+            when (method.name) {
+                "scriptSetupStart" -> { starts += listOf(args[0] as String, args[1] as String, args[2] as String); reply }
+                "scriptSetupStop" -> { stops++; null }
+                else -> error("unexpected ${method.name}")
+            }
+        } as PlatformServices
+    }
+
+    private class DirRepo(installed: InstalledScript) : io.openflux.desktop.service.ScriptRepository {
+        private val flow = kotlinx.coroutines.flow.MutableStateFlow(listOf(installed))
+        override val scripts: kotlinx.coroutines.flow.StateFlow<List<InstalledScript>> = flow
+        override val dirPath = "/data/scripts"
+        override fun upsert(script: InstalledScript) { flow.value = flow.value.filterNot { it.id == script.id } + script }
+        override fun delete(id: String) { flow.value = flow.value.filterNot { it.id == id } }
+        override fun setEnabled(id: String, enabled: Boolean) {}
+    }
+
+    @Test
+    fun aSetupWizardRunsTheInstalledFileAndHandsBackBothSides() {
+        val fake = SetupPlatform("""{"ok":true,"url":"http://127.0.0.1:41000/","reason":"Мастер"}""")
+        val host = FakeHost()
+        val service = ScriptSettingsService(DirRepo(script(page = true)), fake.platform, host, CoroutineScope(SupervisorJob() + Dispatchers.Default))
+        val done = mutableListOf<io.openflux.desktop.service.SetupAnswer>()
+        service.openSetup("demo", mapOf("uid" to "7")) { done += it }
+        assertTrue(service.state.value?.setup == true)
+        await { service.state.value?.page != null }
+        assertEquals(listOf(listOf("/data/scripts/demo.js", "aa", """{"uid":"7"}""")), fake.starts, "the installed file, its pinned key, what is known")
+        assertEquals("own:http://127.0.0.1:41000/", (service.state.value?.page as FakeHost.Page).html)
+
+        host.submit!!("""{"client":{"token":"a","uid":"7"},"node":{"token":"b"}}""")
+        assertEquals(listOf(io.openflux.desktop.service.SetupAnswer(mapOf("token" to "a", "uid" to "7"), mapOf("token" to "b"))), done)
+        assertNull(service.state.value, "the dialog closes with the answer")
+        await { fake.stops == 1 }
+        assertEquals(1, host.closed.size)
+    }
+
+    @Test
+    fun aFlatSetupAnswerHasNoNodeSide() {
+        val fake = SetupPlatform("""{"ok":true,"url":"http://127.0.0.1:41000/"}""")
+        val host = FakeHost()
+        val service = ScriptSettingsService(DirRepo(script(page = true)), fake.platform, host, CoroutineScope(SupervisorJob() + Dispatchers.Default))
+        val done = mutableListOf<io.openflux.desktop.service.SetupAnswer>()
+        service.openSetup("demo", emptyMap()) { done += it }
+        await { service.state.value?.page != null }
+        host.submit!!("""{"token":"a","room":3}""")
+        assertEquals(listOf(io.openflux.desktop.service.SetupAnswer(mapOf("token" to "a", "room" to "3"), null)), done)
+    }
+
+    @Test
+    fun aWizardThatDoesNotStartSaysWhyAndLeavesNothingRunning() {
+        val fake = SetupPlatform("""{"ok":false,"error":"Transport.setup(): boom"}""")
+        val host = FakeHost()
+        val service = ScriptSettingsService(DirRepo(script(page = true)), fake.platform, host, CoroutineScope(SupervisorJob() + Dispatchers.Default))
+        service.openSetup("demo", emptyMap()) { error("must not be called") }
+        await { service.state.value?.error?.isNotEmpty() == true }
+        assertEquals("Transport.setup(): boom", service.state.value!!.error)
+        assertTrue(host.opened.isEmpty())
+        await { fake.stops >= 1 }
+    }
+
+    @Test
+    fun closingTheDialogEndsTheWizardBehindIt() {
+        val fake = SetupPlatform("""{"ok":true,"url":"http://127.0.0.1:41000/"}""")
+        val host = FakeHost()
+        val service = ScriptSettingsService(DirRepo(script(page = true)), fake.platform, host, CoroutineScope(SupervisorJob() + Dispatchers.Default))
+        service.openSetup("demo", emptyMap()) { error("must not be called") }
+        await { service.state.value?.page != null }
+        service.close()
+        await { fake.stops == 1 }
+        assertEquals(1, host.closed.size)
+        assertNull(service.state.value)
+        // a submit that arrives after closing is not heard
+        host.submit!!("""{"client":{"token":"a"}}""")
+    }
+
+    @Test
+    fun aWizardPageWithoutAnOwnServerFallsBackToInlineHtml() {
+        val fake = SetupPlatform("""{"ok":true,"html":"<p>inline</p>"}""")
+        val host = FakeHost()
+        val service = ScriptSettingsService(DirRepo(script(page = true)), fake.platform, host, CoroutineScope(SupervisorJob() + Dispatchers.Default))
+        service.openSetup("demo", emptyMap()) {}
+        await { service.state.value?.page != null }
+        assertEquals("<p>inline</p>", (service.state.value?.page as FakeHost.Page).html)
     }
 
     @Test

@@ -26,6 +26,14 @@ interface SettingsPageHost {
      */
     suspend fun open(html: String, onStep: (String) -> Unit, onSubmit: (String) -> Unit): BrowserPage
 
+    /**
+     * Opens the script's own server page at [url] (an address on 127.0.0.1: a setup wizard run with the real host)
+     * as [open] does an inline one. The page may ask for a sign-in window (window.openfluxLogin) where the platform
+     * has one.
+     */
+    suspend fun openOwn(url: String, onStep: (String) -> Unit, onSubmit: (String) -> Unit): BrowserPage =
+        throw UnsupportedOperationException("На этой платформе мастер настройки не открывается")
+
     /** Closes a page [open] returned. */
     fun close(page: BrowserPage)
 }
@@ -46,7 +54,15 @@ data class ScriptSettingsState(
     /** The built-in browser getting ready (first-run download). */
     val progress: String = "Открываю настройки…",
     val error: String = "",
+    /** The page is the script's setup wizard (run for a node), not its settings. */
+    val setup: Boolean = false,
 )
+
+/**
+ * What a setup wizard handed back: the client's side of the transport and, when the two ends differ (two accounts),
+ * the node's side. A wizard that answered with a flat object has none: both ends use [client].
+ */
+data class SetupAnswer(val client: Map<String, String>, val node: Map<String, String>?)
 
 /**
  * The "Настройки" of an installed script transport. The core builds the page
@@ -69,6 +85,8 @@ class ScriptSettingsService(
 
     private var token = 0
     private var onSave: ((Map<String, String>) -> Unit)? = null
+    private var onSetup: ((SetupAnswer) -> Unit)? = null
+    private var setupRunning = false
 
     /**
      * Opens scriptId's wizard prefilled from currentValues - the carrier's own
@@ -113,6 +131,59 @@ class ScriptSettingsService(
         }
     }
 
+    /**
+     * Runs scriptId's own setup wizard (Transport.setup) - it needs the real host, unlike the settings page - and
+     * shows its page. [known] is what is known so far (it goes to the script). What the page submits is read as
+     * {client, node} or flat ([SetupPages.flattenScoped]) and passed to [onDone]; the wizard and the dialog close.
+     * Closing the dialog first ends the wizard without calling [onDone].
+     */
+    fun openSetup(scriptId: String, known: Map<String, String>, onDone: (SetupAnswer) -> Unit) {
+        val script = scripts.byId(scriptId) ?: return
+        close()
+        val mine = ++token
+        onSetup = onDone
+        setupRunning = true
+        _state.value = ScriptSettingsState(scriptId, script.name, progress = "Запускаю мастер…", setup = true)
+        scope.launch {
+            val reply = withContext(Dispatchers.IO) {
+                if (scripts.dirPath.isEmpty() || script.fileName.isEmpty()) return@withContext SetupReply(error = "файл скрипта не найден")
+                val values = JsonObject(known.mapValues { JsonPrimitive(it.value) })
+                SetupReply.parse(platform.scriptSetupStart("${scripts.dirPath}/${script.fileName}", script.pubkeyHex, values.toString()))
+            }
+            if (token != mine) return@launch
+            if (!reply.ok) {
+                setupRunning = false
+                withContext(Dispatchers.IO) { platform.scriptSetupStop() }
+                _state.update { it?.copy(progress = "", error = reply.error.ifBlank { "Мастер не запустился" }) }
+                return@launch
+            }
+            val opened = runCatching {
+                val step = { text: String -> if (token == mine) _state.update { it?.copy(progress = text) } }
+                val submit = { json: String -> if (token == mine) finishSetup(json) }
+                if (reply.url.isNotEmpty()) host.openOwn(reply.url, step, submit) else host.open(reply.html, step, submit)
+            }
+            if (token != mine) {
+                opened.getOrNull()?.let(host::close)
+                return@launch
+            }
+            opened.onSuccess { page -> _state.update { it?.copy(page = page, progress = "") } }
+                .onFailure { e -> _state.update { it?.copy(progress = "", error = e.message ?: "Не удалось открыть мастер") } }
+        }
+    }
+
+    /** What the wizard handed over: read as {client, node} or flat, passed to [onSetup]; the wizard and the dialog close. */
+    private fun finishSetup(json: String) {
+        val answer = try {
+            SetupPages.flattenScoped(json).let { SetupAnswer(it.client, it.node) }
+        } catch (e: IllegalArgumentException) {
+            _state.update { it?.copy(error = e.message.orEmpty()) }
+            return
+        }
+        val done = onSetup
+        close()
+        done?.invoke(answer)
+    }
+
     /** What the wizard's Save handed over: passed to [onSave], the dialog closes. */
     private fun save(json: String, declared: Set<String>) {
         val values = try {
@@ -127,12 +198,30 @@ class ScriptSettingsService(
         close()
     }
 
-    /** Closes the dialog and its page. */
+    /** Closes the dialog and its page (and the setup wizard behind it, if one runs). */
     fun close() {
         token++
         onSave = null
+        onSetup = null
         val current = _state.value
         _state.value = null
         current?.page?.let(host::close)
+        if (setupRunning) {
+            setupRunning = false
+            scope.launch(Dispatchers.IO) { platform.scriptSetupStop() }
+        }
+    }
+}
+
+/** The core's reply to starting a setup wizard: the page to show or why there is none. */
+private data class SetupReply(val ok: Boolean = false, val url: String = "", val html: String = "", val error: String = "") {
+    companion object {
+        fun parse(json: String): SetupReply = try {
+            val o = Json.parseToJsonElement(json) as JsonObject
+            fun str(k: String) = (o[k] as? JsonPrimitive)?.takeIf { it.isString }?.content.orEmpty()
+            SetupReply((o["ok"] as? JsonPrimitive)?.content == "true", str("url"), str("html"), str("error"))
+        } catch (e: Exception) {
+            SetupReply(error = "ответ ядра не прочитан")
+        }
     }
 }

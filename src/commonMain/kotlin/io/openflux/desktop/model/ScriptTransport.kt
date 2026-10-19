@@ -75,6 +75,12 @@ data class InstalledScript(
     val params: List<ScriptParam> = emptyList(),
     /** The script brings a settings page of its own (Transport.settings), so it has settings even with none declared. */
     val settingsPage: Boolean = false,
+    /**
+     * The script brings a setup wizard of its own (Transport.setup) that needs the real host, run before a node exists
+     * ([io.openflux.desktop.service.ScriptSetupService]): its two ends are set up together, so what it hands back is
+     * the client's side and the node's side apart.
+     */
+    val setupPage: Boolean = false,
     val source: ScriptSource = ScriptSource.File,
     /** URL or repo reference it was added from, for updates and display. */
     val origin: String = "",

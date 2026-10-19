@@ -49,6 +49,8 @@ class NodeEditorModel(
     private val mailruCookies: () -> String = {
         AccountCookies.header(container.accounts.validSession(AccountKind.Mailru)?.cookies.orEmpty())
     },
+    /** The profile this node is made for, when it exists already: it starts the draft and is kept (not made again) by [install]. */
+    private val forProfile: Profile? = null,
 ) {
     val creating: Boolean get() = channelId == null && installedId == null
 
@@ -58,7 +60,7 @@ class NodeEditorModel(
         private set
     var original by mutableStateOf<NodeDraft?>(null)
         private set
-    var draft by mutableStateOf(NodeDraft(name = defaultName(null)))
+    var draft by mutableStateOf(forProfile?.let { NodeDraft.fromProfile(it, wizardScripts()) } ?: NodeDraft(name = defaultName(null)))
         private set
 
     private var busyText by mutableStateOf<String?>(null)
@@ -111,6 +113,28 @@ class NodeEditorModel(
             }
         }
 
+    /** The installed scripts that bring a setup wizard of their own: their two ends are set up together. */
+    private fun wizardScripts(): Set<String> = container.scripts.scripts.value.filter { it.setupPage }.map { it.id }.toSet()
+
+    /** What a profile keeps of the client's side of each script it carries, by script id. */
+    private fun clientSidesOf(p: Profile?): Map<String, Map<String, String>> =
+        p?.carriers.orEmpty().filter { it.type == TransportType.SCRIPT && it.scriptId.isNotEmpty() }.associate { it.scriptId to it.settings }
+
+    /**
+     * What a script's node side says that is no secret (MAX: the node's user id): the start of a device's own side
+     * when this device did not set the node up and the server keeps only the node's.
+     */
+    private fun publicOf(id: String, nodeSide: Map<String, String>): Map<String, String> {
+        val secrets = container.scripts.byId(id)?.params.orEmpty().filter { it.type == "secret" }.map { it.key }.toSet()
+        return nodeSide.filterKeys { it !in secrets }
+    }
+
+    /** The draft of an installed node, the client's side of its wizard scripts from [local] (this device's profile of it). */
+    private fun draftOf(info: InstalledChannel, name: String, local: Profile?): NodeDraft {
+        val d = NodeDraft.of(info, name, clientSidesOf(local), wizardScripts())
+        return d.copy(scripts = d.scripts.map { s -> if (s.wizard && s.settings.isEmpty()) s.copy(settings = publicOf(s.id, s.nodeSettings.orEmpty())) else s })
+    }
+
     fun edit(transform: (NodeDraft) -> NodeDraft) {
         draft = transform(draft)
         error = null
@@ -132,7 +156,7 @@ class NodeEditorModel(
         val id = installedId ?: return@run
         val info = link.call(serverId, retry = true) { showChannel(id, sudo()) }
         installed = info
-        val o = NodeDraft.of(info, localProfile?.name ?: defaultName(id))
+        val o = draftOf(info, localProfile?.name ?: defaultName(id), localProfile)
         original = o
         draft = o
     }
@@ -154,8 +178,9 @@ class NodeEditorModel(
             val now = link.call(serverId) { setTransports(id, transports, sudo(), cookiesFor(ready), ready.mode) }
             pendingCookies = ""
             installed = now
-            refreshProfile(now, ready.name)
-            val fresh = NodeDraft.of(now, ready.name)
+            refreshProfile(now, ready.name, ready.scripts)
+            val fresh = NodeDraft.of(now, ready.name, ready.scripts.associate { it.id to it.settings }, wizardScripts())
+                .let { d -> d.copy(scripts = d.scripts.map { s -> if (s.wizard && s.settings.isEmpty()) s.copy(settings = publicOf(s.id, s.nodeSettings.orEmpty())) else s }) }
             original = fresh
             draft = fresh
             notice = "Применено"
@@ -221,9 +246,10 @@ class NodeEditorModel(
         if (info.key.isEmpty()) throw NodeWizardException("Сервер не отдал ключ ноды: откройте сервер заново")
         val name = draft.name.trim().ifEmpty { defaultName(info.id) }
         val text = link.call(serverId) { channelShareLink(name, info.key, host, info.port, info.transports, info.context) }
+        val sides = draftOf(info, name, null).scripts
         val made = Profile.fromShare(container.shareCodec.decode(text), container.profiles.newId(), container.platform.now(), ProfileSource.Node)
             .copy(icon = "ic_terminal", name = name)
-            .withScripts(info.transports)
+            .withScripts(info.transports, sides)
         container.profiles.upsert(made)
         return made
     }
@@ -253,9 +279,10 @@ class NodeEditorModel(
             installedId = ch.id
             val name = ready.name.trim().ifEmpty { defaultName(ch.id) }
             val text = link.call(serverId) { shareLink(name, ch.key, host, plan.port, transports) }
-            val p = Profile.fromShare(container.shareCodec.decode(text), container.profiles.newId(), container.platform.now(), ProfileSource.Node)
-                .copy(icon = "ic_terminal", name = name)
-                .withScripts(transports)
+            val made = Profile.fromShare(container.shareCodec.decode(text), forProfile?.id ?: container.profiles.newId(), forProfile?.createdAt ?: container.platform.now(), ProfileSource.Node)
+                .copy(icon = forProfile?.icon ?: "ic_terminal", name = if (forProfile != null) name.ifBlank { forProfile.name } else name)
+                .withScripts(transports, ready.scripts)
+            val p = if (forProfile != null) made.keepingCarrierChoices(forProfile) else made
             container.profiles.upsert(p)
             container.settings.update { it.copy(selectedProfileId = p.id) }
             candidate = p
@@ -295,6 +322,27 @@ class NodeEditorModel(
             done = Dest.Node(serverId, installedId ?: return)
         } catch (e: NodeWizardException) {
             verifyFailed = e.message ?: "Проверка не прошла"
+        }
+    }
+
+    // ---- a script's own wizard ----
+
+    /**
+     * Runs the setup wizard of the script [id] (it signs the accounts in and checks them) and takes both sides of what
+     * it hands back: the client's into the draft's settings of the script, the node's into its nodeSettings. A script
+     * already set up on the node but not here (the server keeps only the node's side) is asked only for this side.
+     */
+    fun setupScript(id: String) {
+        val current = draft.scripts.firstOrNull { it.id == id }
+        // The node's side is there but this device's is not (a node set up elsewhere): the wizard only signs this side in.
+        val required = container.scripts.byId(id)?.params.orEmpty().filter { it.required }.map { it.key }
+        val clientReady = current != null && (if (required.isEmpty()) current.settings.isNotEmpty() else required.all { current.settings[it].orEmpty().isNotBlank() })
+        val known = current?.takeIf { !clientReady }?.nodeSettings?.get("uid")?.takeIf { it.isNotBlank() }?.let { mapOf("uid" to it) } ?: emptyMap()
+        container.scriptSettings.openSetup(id, known) { answer ->
+            edit { d ->
+                val set = NodeScript(id, current?.value.orEmpty(), answer.client, answer.node ?: current?.nodeSettings, wizard = true)
+                d.copy(scripts = if (current != null) d.scripts.map { if (it.id == id) set else it } else d.scripts + set)
+            }
         }
     }
 
@@ -400,8 +448,11 @@ class NodeEditorModel(
                 ?: throw NodeWizardException("JS-транспорт ${t.script} не установлен на этом устройстве как подписанный пакет .flux")
             val bytes = container.scripts.packageBytes(t.script)?.first
                 ?: throw NodeWizardException("Пакет JS-транспорта ${installed.name.ifBlank { t.script }} не читается: переустановите его")
-            var settings = ScriptSettingsCodec.decode(t.params) + (installed.primaryParam?.key?.let { mapOf(it to t.url) } ?: emptyMap())
-            if (nodeParams != null && nodeParams.first == t.script) {
+            var settings = ScriptSettingsCodec.withPrimary(ScriptSettingsCodec.decode(t.params), installed.primaryParam?.key, t.url)
+            // The node half a live setup page left behind (consumeNodeParams) is for a script the editor's own wizard
+            // did not set up: a script that was has its node side in the draft already.
+            val wizardSetUp = draft.scripts.firstOrNull { it.id == t.script }?.split == true
+            if (nodeParams != null && nodeParams.first == t.script && !wizardSetUp) {
                 settings = settings + nodeParams.second
             }
             t.copy(
@@ -412,19 +463,32 @@ class NodeEditorModel(
         }
     }
 
-    /** The link cannot carry a JS transport: the node's profile gets them here, as the node runs them. */
-    private fun Profile.withScripts(ts: List<NodeTransport>): Profile {
+    /**
+     * The link cannot carry a JS transport: the node's profile gets them here. A transport whose ends differ gets the
+     * CLIENT's side from [sides] (the node's side stays on the server); one with the same settings at both ends gets
+     * what the node runs it with.
+     */
+    private fun Profile.withScripts(ts: List<NodeTransport>, sides: List<NodeScript>): Profile {
         val scripts = ts.filter { it.type == TransportType.SCRIPT.cliName && it.script.isNotEmpty() }
         if (scripts.isEmpty()) return this
         val installed = scripts.associate { it.script to container.scripts.byId(it.script) }
         val extras = scripts.map { t ->
             val primary = installed[t.script]?.primaryParam?.key
+            val side = sides.firstOrNull { it.id == t.script }
+            val settings = if (side != null && (side.split || side.wizard)) side.settings else ScriptSettingsCodec.decode(t.params)
             ExtraTransport(
                 TransportType.SCRIPT, t.url, priority = SCRIPT_PRIORITY, scriptId = t.script,
-                settings = ScriptSettingsCodec.decode(t.params).filterKeys { it != primary },
+                settings = settings.filterKeys { it != primary },
             )
         }
         return copy(session = true, extras = this.extras.filterNot { it.type == TransportType.SCRIPT } + extras)
+    }
+
+    /** What the person chose for a carrier of the profile this node was made for (its network) survives the rebuild. */
+    private fun Profile.keepingCarrierChoices(old: Profile): Profile {
+        fun net(c: ExtraTransport) = old.carriers.firstOrNull { it.type == c.type && it.scriptId == c.scriptId && it.value == c.value }?.network ?: c.network
+        val main = carriers.first()
+        return copy(network = net(main), extras = extras.map { it.copy(network = net(it)) })
     }
 
     /**
@@ -449,13 +513,14 @@ class NodeEditorModel(
         if (name.isNotBlank() && p.name != name.trim()) container.profiles.upsert(p.copy(name = name.trim()))
     }
 
-    private suspend fun refreshProfile(now: InstalledChannel, name: String) {
+    private suspend fun refreshProfile(now: InstalledChannel, name: String, sides: List<NodeScript>) {
         val p = localProfile ?: return
         val key = now.key.ifEmpty { p.secret }
         val text = link.call(serverId) { channelShareLink(name.trim().ifEmpty { p.name }, key, host, now.port, now.transports, now.context) }
         val fresh = Profile.fromShare(container.shareCodec.decode(text), p.id, p.createdAt, p.source)
             .copy(icon = p.icon, name = name.trim().ifEmpty { p.name })
-            .withScripts(now.transports)
+            .withScripts(now.transports, sides)
+            .keepingCarrierChoices(p)
         container.profiles.upsert(fresh)
     }
 

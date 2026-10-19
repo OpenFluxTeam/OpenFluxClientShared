@@ -43,6 +43,7 @@ fun testContainer(
     bot: io.openflux.desktop.service.BotApi = io.openflux.desktop.service.NoBotApi,
     signIn: io.openflux.desktop.service.SignInSupport = io.openflux.desktop.service.NoSignIn,
     scripts: io.openflux.desktop.service.ScriptRepository = io.openflux.desktop.service.InMemoryScriptRepository(),
+    settingsPageHost: io.openflux.desktop.service.SettingsPageHost = io.openflux.desktop.service.NoSettingsPageHost,
 ): AppContainer = AppContainer(
     TestProfiles(), TestSettings(), connection, platform, FakeShareLinkCodec(), node,
     testAccounts(CoroutineScope(Dispatchers.Unconfined)),
@@ -51,6 +52,7 @@ fun testContainer(
     botApi = bot,
     signIn = signIn,
     scripts = scripts,
+    settingsPageHost = settingsPageHost,
 )
 
 class TestSettings : SettingsRepository {
@@ -121,6 +123,16 @@ class TestPlatform : PlatformServices {
     override fun deleteSecret(key: String) { vault.remove(key) }
     var secrets = 0
     override fun newSecret() = "%064x".format(++secrets)
+
+    /** A setup wizard run for a script: the paths it was started with and what the core answers. */
+    val setupStarts = mutableListOf<Triple<String, String, String>>()
+    var setupStops = 0
+    var setupReply = """{"ok":true,"url":"http://127.0.0.1:41000/","reason":"Мастер"}"""
+    override fun scriptSetupStart(path: String, pubkeyHex: String, valuesJson: String): String {
+        setupStarts += Triple(path, pubkeyHex, valuesJson)
+        return setupReply
+    }
+    override fun scriptSetupStop() { setupStops++ }
 }
 
 /** No server in these tests: any call is a test defect. */
@@ -142,4 +154,21 @@ class NoServer : NodeWizardService {
     override suspend fun createDocument(fileName: String, onStep: (String) -> Unit): YandexDocument = no()
     override fun cancelDocument() = Unit
     override fun close() = Unit
+}
+
+/** The page host of the script settings dialog, for tests: remembers what was opened and lets the test answer as the page. */
+class FakeSettingsPageHost : io.openflux.desktop.service.SettingsPageHost {
+    class Page(val what: String) : BrowserPage
+    val opened = mutableListOf<Page>()
+    val closed = mutableListOf<BrowserPage>()
+    @Volatile var submit: ((String) -> Unit)? = null
+    override suspend fun open(html: String, onStep: (String) -> Unit, onSubmit: (String) -> Unit): BrowserPage {
+        submit = onSubmit
+        return Page("html:$html").also { opened += it }
+    }
+    override suspend fun openOwn(url: String, onStep: (String) -> Unit, onSubmit: (String) -> Unit): BrowserPage {
+        submit = onSubmit
+        return Page("own:$url").also { opened += it }
+    }
+    override fun close(page: BrowserPage) { closed += page }
 }
