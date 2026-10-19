@@ -1,6 +1,8 @@
 package io.openflux.app
 
 import io.openflux.desktop.model.InstalledChannel
+import io.openflux.desktop.model.KitTransport
+import io.openflux.desktop.model.NodeKit
 import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.LogLine
 import io.openflux.desktop.model.NewChannel
@@ -71,9 +73,28 @@ class FakeNodeService(vararg servers: FakeServer) : NodeWizardService {
     }
 
     override suspend fun newChannel(): NewChannel {
-        here("newChannel")
+        // The key is made here, not on the server: a node without SSH asks without a connection.
+        if (connected != null) here("newChannel")
         next++
         return NewChannel("of-n$next", "k".repeat(64))
+    }
+
+    /** What kits were asked for, by channel. */
+    val kits = mutableListOf<Pair<NewChannel, List<NodeTransport>>>()
+    var failKit: String? = null
+
+    /** As the core: the carriers by its priorities, the highest-priority document as the context. */
+    override suspend fun kit(channel: NewChannel, transports: List<NodeTransport>, autoUpdate: Boolean, mode: NodeMode, source: NodeCoreSource): NodeKit {
+        failKit?.let { throw NodeWizardException(it) }
+        kits += channel to transports
+        val priority = mapOf("vyandex" to 100, "yandex" to 95, "mailru" to 90, "telemost" to 85, "boards" to 80, "avito" to 75, "cupsonline" to 70, "script" to 60)
+        val sorted = transports.sortedByDescending { priority[it.type] ?: 0 }
+        val doc = sorted.firstOrNull { it.type != "script" && it.type != "cupsonline" && it.url.isNotEmpty() }?.url
+        return NodeKit(
+            script = "#!/bin/sh\n# channel ${channel.id}\n", paste = "sudo sh <<'KIT'\n# channel ${channel.id}\nKIT\n",
+            context = doc ?: "placeholder",
+            transports = sorted.map { KitTransport(it.type, it.url, priority[it.type] ?: 0, it.script) },
+        )
     }
 
     override suspend fun plan(channel: String, transports: List<NodeTransport>, withCookies: Boolean, autoUpdate: Boolean, mode: NodeMode): NodePlan {

@@ -6,6 +6,7 @@ import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.LogLine
 import io.openflux.desktop.model.NewChannel
 import io.openflux.desktop.model.NodeCoreSource
+import io.openflux.desktop.model.NodeKit
 import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodePlan
 import io.openflux.desktop.model.NodeTransport
@@ -112,6 +113,18 @@ class CoreNodeWizard(
             put("sudoPassword", sudoPassword)
             put("cookies", cookieHeader)
         }
+    }
+
+    override suspend fun kit(channel: NewChannel, transports: List<NodeTransport>, autoUpdate: Boolean, mode: NodeMode, source: NodeCoreSource): NodeKit {
+        val reply = call("kit", "channel=${channel.id} ${transports.names()} autoUpdate=$autoUpdate mode=${mode.cli}") {
+            put("source", source.id)
+            put("mode", mode.cli)
+            put("channel", channel.id)
+            put("key", channel.key)
+            put("transports", transports.json())
+            put("autoUpdate", autoUpdate)
+        }
+        return json.decodeFromJsonElement(NodeKit.serializer(), reply.getValue("kit"))
     }
 
     override suspend fun remove(channel: String, sudoPassword: String) {

@@ -9,6 +9,15 @@ import io.openflux.desktop.model.AccountCookies
 import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.DocumentKind
 import io.openflux.desktop.model.InstalledChannel
+import io.openflux.desktop.model.KitDelivery
+import io.openflux.desktop.model.KitScriptSides
+import io.openflux.desktop.model.NewChannel
+import io.openflux.desktop.model.NodeKit
+import io.openflux.desktop.model.NodeMode
+import io.openflux.desktop.model.ProfileTransfer
+import io.openflux.desktop.model.installedKit
+import io.openflux.desktop.model.nodeTransports
+import io.openflux.desktop.model.ownerOfKit
 import io.openflux.desktop.model.NodeDocuments
 import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.Profile
@@ -21,6 +30,7 @@ import io.openflux.desktop.model.ScriptSettingsCodec
 import kotlin.io.encoding.Base64
 import io.openflux.desktop.service.AccountException
 import io.openflux.desktop.service.AppContainer
+import io.openflux.desktop.service.NodeWizardService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -54,6 +64,10 @@ class NodeEditorModel(
 ) {
     val creating: Boolean get() = channelId == null && installedId == null
 
+    /** Where the node lives; anything but a server is made from a kit and needs no SSH. */
+    val placement: NodePlacement = NodePlacement.of(serverId)
+    val kit: Boolean get() = placement.kit
+
     private var installedId: String? = channelId
 
     var installed by mutableStateOf<InstalledChannel?>(null)
@@ -85,7 +99,7 @@ class NodeEditorModel(
 
     /** The sudo password typed on this screen; the login password is used when the server takes it. */
     var sudoInput by mutableStateOf("")
-    val needsSudo: Boolean get() = link.needsSudo(serverId)
+    val needsSudo: Boolean get() = !kit && link.needsSudo(serverId)
 
     /** The Yandex sign-in the document was made with, and that document: the sign-in goes to the node only with it. */
     private var pendingCookies = ""
@@ -102,10 +116,19 @@ class NodeEditorModel(
     val applyProblem: String? get() = original?.let { draft.applyProblem(it) }
     val hasUnsaved: Boolean get() = changes > 0
 
+    /**
+     * Why "Установить" cannot run now; null when it can. A node without SSH has no direct address of its own, so
+     * it needs at least one transport to be reached at all.
+     */
+    val installProblem: String?
+        get() = draft.problem() ?: if (kit && !draft.hasTransport) "Включите хотя бы один транспорт: у этой ноды нет прямого адреса" else null
+
     /** This node's profile on this device: the one with its key, or one dialing its address. */
     val localProfile: Profile?
         get() {
             val info = installed ?: return null
+            // A node without SSH is its owner's profile: the one that records its channel.
+            if (kit) return container.profiles.profiles.value.firstOrNull { it.kitNode?.channel == info.id }
             val dials = setOf("$host:${info.port}", "[$host]:${info.port}")
             return container.profiles.profiles.value.firstOrNull { p ->
                 (info.key.isNotEmpty() && p.secret == info.key) ||
@@ -152,8 +175,18 @@ class NodeEditorModel(
 
     // ---- an installed node ----
 
-    fun load() = run("Читаю ноду на сервере…") {
+    fun load() = run(if (kit) "Читаю ноду…" else "Читаю ноду на сервере…") {
         val id = installedId ?: return@run
+        if (kit) {
+            val p = container.profiles.profiles.value.firstOrNull { it.kitNode?.channel == id }
+                ?: throw NodeWizardException("Профиль этой ноды удалён: ноду больше нечем изменить с этого устройства")
+            val info = p.installedKit() ?: throw NodeWizardException("Профиль не описывает ноду")
+            installed = info
+            val o = draftOf(info, p.name, p)
+            original = o
+            draft = o
+            return@run
+        }
         val info = link.call(serverId, retry = true) { showChannel(id, sudo()) }
         installed = info
         val o = draftOf(info, localProfile?.name ?: defaultName(id), localProfile)
@@ -164,6 +197,7 @@ class NodeEditorModel(
     fun apply() {
         val o = original ?: return
         val d = draft
+        if (kit) return applyKit(o, d)
         if (!d.serverChanged(o)) {
             renameHere(d.name)
             original = o.copy(name = d.name)
@@ -190,6 +224,7 @@ class NodeEditorModel(
     /** Gives the node the Yandex sign-in saved in the app (Settings → Сервисы), for its Yandex document. */
     fun pushYandexSignIn() {
         val info = installed ?: return
+        if (kit) { error = NO_SIGN_IN_PUSH; return }
         val cookies = yandexCookies()
         if (!NodeDocuments.signedIn(cookies)) { error = "Сначала войдите в Яндекс: Настройки → Сервисы"; return }
         if (info.transportTypes.none { it == TransportType.VYANDEX || it == TransportType.YANDEX }) {
@@ -217,6 +252,7 @@ class NodeEditorModel(
     /** Gives the node the Mail.ru sign-in saved in the app (Settings → Сервисы): Mail.ru opens its document only for a signed-in user. */
     fun pushMailruSignIn() {
         val info = installed ?: return
+        if (kit) { error = NO_SIGN_IN_PUSH; return }
         val cookies = mailruCookies()
         if (!NodeDocuments.signedInMailru(cookies)) { error = "Сначала войдите в Mail.ru: Настройки → Сервисы"; return }
         if (info.transportTypes.none { it == TransportType.MAILRU }) {
@@ -231,9 +267,14 @@ class NodeEditorModel(
     }
 
     /** Deletes the node from the server, and its profile here (it would only fail to connect). */
-    fun remove(onGone: () -> Unit) = run("Удаляю ноду с сервера…") {
+    fun remove(onGone: () -> Unit) = run(if (kit) "Убираю ноду…" else "Удаляю ноду с сервера…") {
         val id = installedId ?: return@run
         val local = localProfile
+        if (kit) {
+            // Nothing of it is on a server this app can reach: only the profile here goes, the machine keeps what it ran.
+            local?.let { container.profiles.delete(it.id) }
+            return@run onGone()
+        }
         link.call(serverId) { remove(id, sudo()) }
         local?.let { container.profiles.delete(it.id) }
         onGone()
@@ -242,6 +283,7 @@ class NodeEditorModel(
     /** This node's profile here, made from the server's key when there is none yet. */
     suspend fun adopt(): Profile {
         localProfile?.let { return it }
+        if (kit) throw NodeWizardException("Профиль этой ноды удалён")
         val info = installed ?: throw NodeWizardException("Нода ещё не прочитана")
         if (info.key.isEmpty()) throw NodeWizardException("Сервер не отдал ключ ноды: откройте сервер заново")
         val name = draft.name.trim().ifEmpty { defaultName(info.id) }
@@ -264,7 +306,8 @@ class NodeEditorModel(
     // ---- a new node ----
 
     fun install() {
-        draft.problem()?.let { error = it; return }
+        installProblem?.let { error = it; return }
+        if (kit) return createKit()
         run("Готовлю ноду…") {
             val ch = link.call(serverId) { newChannel() }
             val ready = withRooms(draft)
@@ -346,6 +389,107 @@ class NodeEditorModel(
         }
     }
 
+    // ---- a node without SSH ----
+
+    /** The command for this node, once asked for ([showKit]); null while hidden. */
+    var kitShown by mutableStateOf<NodeKit?>(null)
+        private set
+
+    fun hideKit() {
+        kitShown = null
+    }
+
+    private fun primaryKey(id: String) = container.scripts.byId(id)?.primaryParam?.key
+
+    /** Both sides of each script of [scripts]; the primary parameter's key stays out (it is the carrier's value). */
+    private fun sidesOf(scripts: List<NodeScript>): Map<String, KitScriptSides> = scripts.associate { s ->
+        val primary = primaryKey(s.id)
+        s.id to KitScriptSides(s.settings.filterKeys { it != primary }, s.nodeSettings?.filterKeys { it != primary })
+    }
+
+    /**
+     * Makes the node: the key (the profile's own when it is one a node can use), the kit the core makes of the channel,
+     * and the owner's profile of it - made again for [forProfile], which keeps its id, name and icon. Nothing is
+     * installed: the node starts when its kit is run, or its profile taken to the device that will be the node.
+     */
+    private fun createKit() = run("Готовлю ноду…") {
+        val old = forProfile
+        val minted = container.nodeWizard.newChannel()
+        val ch = old?.secret?.takeIf { HEX_KEY.matches(it) }?.let { NewChannel(minted.id, it) } ?: minted
+        val ready = withRooms(draft)
+        val transports = withPackages(ready.toTransports())
+        val kit = container.nodeWizard.kit(ch, transports, ready.autoUpdate, ready.mode)
+        val name = ready.name.trim().ifEmpty { defaultName(ch.id) }
+        val made = Profile.ownerOfKit(
+            id = old?.id ?: container.profiles.newId(),
+            name = if (old != null) name.ifBlank { old.name } else name,
+            icon = old?.icon ?: "ic_terminal",
+            createdAt = old?.createdAt ?: container.platform.now(),
+            channel = ch, kit = kit, delivery = placement.delivery ?: throw NodeWizardException("Нода без места"),
+            mode = ready.mode, autoUpdate = ready.autoUpdate, scripts = sidesOf(ready.scripts),
+        ).let { if (old != null) it.keepingCarrierChoices(old) else it }
+        container.profiles.upsert(made)
+        container.settings.update { it.copy(selectedProfileId = made.id) }
+        installedId = ch.id
+        done = Dest.Node(placement.id ?: throw NodeWizardException("Нода без места"), ch.id)
+    }
+
+    /**
+     * The same channel with the transports of [d]: a new kit (and the node's profile for another device), the
+     * channel's key and context as they were - a node that runs the new kit keeps its clients.
+     */
+    private fun applyKit(o: NodeDraft, d: NodeDraft) {
+        val p = localProfile ?: run { error = "Профиль этой ноды удалён"; return }
+        val record = p.kitNode ?: return
+        if (!d.serverChanged(o)) {
+            renameHere(d.name)
+            original = o.copy(name = d.name)
+            notice = "Сохранено"
+            return
+        }
+        d.applyProblem(o)?.let { error = it; return }
+        run("Собираю набор…") {
+            val ready = withRooms(d)
+            val transports = withPackages(ready.toTransports())
+            val ch = NewChannel(record.channel, p.secret)
+            val kit = container.nodeWizard.kit(ch, transports, record.autoUpdate, ready.mode)
+            val fresh = Profile.ownerOfKit(
+                p.id, ready.name.trim().ifEmpty { p.name }, p.icon, p.createdAt, ch,
+                kit.copy(context = p.context.ifEmpty { kit.context }), record.delivery, ready.mode, record.autoUpdate, sidesOf(ready.scripts),
+            ).keepingCarrierChoices(p)
+            container.profiles.upsert(fresh)
+            val info = fresh.installedKit() ?: throw NodeWizardException("Профиль не описывает ноду")
+            installed = info
+            val now = draftOf(info, fresh.name, fresh)
+            original = now
+            draft = now
+            kitShown = null
+            notice = when (record.delivery) {
+                KitDelivery.Manual -> "Набор обновлён: выполните команду на ноде ещё раз"
+                KitDelivery.Device -> "Профиль ноды обновлён: передайте его на устройство ещё раз"
+                KitDelivery.Here -> "Применено: перезапустите ноду на этом устройстве"
+            }
+        }
+    }
+
+    /** The command that installs this node (or changes it, when it is on the machine already), as the core renders it now. */
+    fun showKit() = run("Собираю команду…") {
+        val p = localProfile ?: throw NodeWizardException("Профиль этой ноды удалён")
+        val record = p.kitNode ?: throw NodeWizardException("Эта нода не из набора")
+        val transports = withPackages(p.nodeTransports())
+        kitShown = container.nodeWizard.kit(NewChannel(record.channel, p.secret), transports, record.autoUpdate, NodeMode.of(record.mode))
+    }
+
+    /**
+     * The node's profile for another device of the person, as a line (QR, link): [ProfileTransfer.Role.Node] for the
+     * device that will be the node, [ProfileTransfer.Role.Client] for one that connects through it.
+     */
+    fun transferLine(role: ProfileTransfer.Role): String? {
+        val p = localProfile ?: return null
+        val keys = p.carriers.mapNotNull { c -> c.scriptId.takeIf { it.isNotEmpty() }?.let { id -> container.scripts.byId(id)?.let { id to it.pubkeyHex } } }.toMap()
+        return ProfileTransfer.encode(p, role, keys)
+    }
+
     // ---- documents ----
 
     /** Makes the node's Yandex document in the built-in browser (signing in to Yandex there) and checks it. */
@@ -392,13 +536,13 @@ class NodeEditorModel(
 
     /** New Avito Code rooms now (made by the server, as on applying), so their code can be seen, copied or kept. */
     fun createAvitoRooms() = run("Создаю комнаты Avito…") {
-        val rooms = link.call(serverId) { this.createAvitoRooms() }
+        val rooms = host { this.createAvitoRooms() }
         draft = draft.copy(avito = true, avitoRooms = rooms)
     }
 
     /** New cups.online rooms now, the same way. */
     fun createCupsRooms() = run("Создаю комнаты cups.online…") {
-        val rooms = link.call(serverId) { this.createCupsRooms() }
+        val rooms = host { this.createCupsRooms() }
         draft = draft.copy(cups = true, cupsRooms = rooms)
     }
 
@@ -409,6 +553,10 @@ class NodeEditorModel(
     }
 
     // ---- helpers ----
+
+    /** Runs [block] on the wizard: through the SSH connection to the server, or at once for a node without one. */
+    private suspend fun <T> host(block: suspend NodeWizardService.() -> T): T =
+        if (kit) container.nodeWizard.block() else link.call(serverId, block = block)
 
     private fun sudo(): String {
         if (sudoInput.isNotEmpty()) link.setSudo(serverId, sudoInput)
@@ -421,13 +569,13 @@ class NodeEditorModel(
         var r = d
         if (r.cups && r.cupsRooms.isEmpty()) {
             busyText = "Создаю комнаты cups.online…"
-            val rooms = link.call(serverId) { this.createCupsRooms() }
+            val rooms = host { this.createCupsRooms() }
             r = r.copy(cupsRooms = rooms)
             draft = draft.copy(cupsRooms = rooms)
         }
         if (r.avito && r.avitoRooms.isEmpty()) {
             busyText = "Создаю комнаты Avito…"
-            val rooms = link.call(serverId) { this.createAvitoRooms() }
+            val rooms = host { this.createAvitoRooms() }
             r = r.copy(avitoRooms = rooms)
             draft = draft.copy(avitoRooms = rooms)
         }
@@ -525,7 +673,7 @@ class NodeEditorModel(
     }
 
     private fun defaultName(id: String?): String {
-        val base = "Нода $host"
+        val base = if (kit) "Нода (${placement.short})" else "Нода $host"
         val taken = container.profiles.profiles.value.any { it.name == base }
         return if (taken && id != null) "$base · $id" else base
     }
@@ -556,5 +704,7 @@ class NodeEditorModel(
     private companion object {
         /** The node's priority for its JS transports (provision.transportPriority). */
         const val SCRIPT_PRIORITY = 60
+        val HEX_KEY = Regex("[0-9a-f]{64}")
+        const val NO_SIGN_IN_PUSH = "Вход нельзя передать ноде, до которой у приложения нет SSH: он уходит вместе с новым набором для ноды"
     }
 }

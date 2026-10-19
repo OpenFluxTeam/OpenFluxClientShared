@@ -61,6 +61,29 @@ enum class NodeMode(val cli: String, val label: String, val about: String) {
     }
 }
 
+/**
+ * What the core made of a channel for a node the app has no SSH to ([io.openflux.desktop.service.NodeWizardService.kit]):
+ * the installation as a script to run by hand, and what the client's profile needs of the channel when there is no
+ * server to ask.
+ */
+@Serializable
+data class NodeKit(
+    /** The file to run as root on the machine that will host the node. */
+    val script: String,
+    /** The same as one block to paste into a terminal. */
+    val paste: String = "",
+    /** The encryption context both ends derive for these carriers. */
+    val context: String = "",
+    /** The carriers besides direct, best first, with the core's own priorities. */
+    val transports: List<KitTransport> = emptyList(),
+) {
+    override fun toString() = "NodeKit(${transports.joinToString(",") { it.type }})"
+}
+
+/** One carrier of a [NodeKit]: [script] is the package id of a script carrier. */
+@Serializable
+data class KitTransport(val type: String, val url: String = "", val priority: Int = 0, val script: String = "")
+
 /** A new channel's name on the server and its encryption key. */
 data class NewChannel(val id: String, val key: String) {
     override fun toString() = "NewChannel($id)"

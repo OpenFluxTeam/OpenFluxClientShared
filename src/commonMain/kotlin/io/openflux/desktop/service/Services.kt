@@ -9,6 +9,7 @@ import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.CoreSource
 import io.openflux.desktop.model.NodeCoreSource
+import io.openflux.desktop.model.NodeKit
 import io.openflux.desktop.model.ExitAddress
 import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.LogLine
@@ -389,6 +390,14 @@ interface NodeWizardService {
      */
     suspend fun pushSignIn(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String): InstalledChannel =
         throw NodeWizardException("Передача входа ноде здесь не поддерживается")
+
+    /**
+     * The installation of [channel] as a script the person runs by hand on the machine that will host the node, for a
+     * machine this app has no SSH to; nothing connects. It is also what the client's profile needs of the channel
+     * (the carriers with the core's priorities, the encryption context) when there is no server to ask.
+     */
+    suspend fun kit(channel: NewChannel, transports: List<NodeTransport>, autoUpdate: Boolean, mode: NodeMode, source: NodeCoreSource = NodeCoreSource.Core): NodeKit =
+        throw NodeWizardException("Набор для ручной установки здесь не поддерживается")
 
     /** [shareLink] for a channel already on the server: the link keeps its [context]. */
     suspend fun channelShareLink(name: String, key: String, host: String, port: Int, transports: List<NodeTransport>, context: String): String =
