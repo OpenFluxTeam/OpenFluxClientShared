@@ -64,7 +64,7 @@ object SetupPages {
      * (the client half is delivered); strings, numbers and booleans become
      * strings; null, objects and arrays are dropped; nothing left is an error.
      */
-    fun flatten(json: String): Map<String, String> = flattenScoped(json).first
+    fun flatten(json: String): Map<String, String> = flattenScoped(json).client
 
     data class ScopedSubmission(val client: Map<String, String>, val node: Map<String, String>?)
 
