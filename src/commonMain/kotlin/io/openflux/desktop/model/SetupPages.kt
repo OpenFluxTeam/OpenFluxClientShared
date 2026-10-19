@@ -4,7 +4,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 
 /**
  * What both apps do with a script transport's own setup page (see
@@ -24,11 +26,26 @@ object SetupPages {
      * already there, so it can be put in twice: before the page's scripts
      * (an inline page) and again when the page has loaded (a page the
      * script serves itself, which cannot be edited on the way).
+     *
+     * With [callLogin] (the same kind of expression, e.g.
+     * `window.OpenFluxSubmit.login(j)`) the page also gets
+     * window.openfluxLogin(spec): see [LoginRequest]. Without it the
+     * function is absent, which is how a page tells that this app cannot open
+     * a sign-in window and falls back to asking for the data by hand.
      */
-    fun bridgeScript(callNative: String): String =
+    fun bridgeScript(callNative: String, callLogin: String? = null): String =
         "(function(){if(window.openfluxSubmit)return;" +
             "window.openfluxSubmit=function(p){try{var j=JSON.stringify(p);$callNative}catch(e){}};" +
+            (if (callLogin == null) "" else loginShim(callLogin)) +
             "setTimeout(function(){try{window.dispatchEvent(new Event('$READY_EVENT'))}catch(e){}},0)})();"
+
+    /** window.openfluxLogin(spec) -> Promise of the captured text; [loginResultScript] settles it. */
+    private fun loginShim(callLogin: String): String =
+        "var ls=0,lw={};" +
+            "window.openfluxLogin=function(s){return new Promise(function(ok,no){var id=String(++ls);lw[id]={ok:ok,no:no};" +
+            "try{var j=JSON.stringify(Object.assign({},s,{id:id}));$callLogin}catch(e){delete lw[id];no(e)}})};" +
+            "window.$LOGIN_DONE=function(id,r){var w=lw[id];if(!w)return;delete lw[id];" +
+            "if(r&&r.ok)w.ok(r.value);else w.no(new Error((r&&r.error)||'cancelled'))};"
 
     /**
      * Puts [snippet] (a script, no tags) into an HTML document where it runs
@@ -110,6 +127,73 @@ object SetupPages {
         if (port !in 1..65535) return null
         return "http://${m.groupValues[1]}:$port/"
     }
+
+    /** The page function [loginResultScript] calls; defined by [bridgeScript] when it has a login half. */
+    const val LOGIN_DONE = "__openfluxLoginDone"
+
+    /**
+     * A sign-in window a setup page asked for with
+     * window.openfluxLogin({url, title, capture: {localStorage: key}}): the
+     * app opens [url] (a site, https) on top of the page, the person signs
+     * in there, the app reads [storageKey] from that site's localStorage and
+     * hands its text back as the value of the page's promise (rejected when
+     * the person goes back or the window times out). Only that one key of the
+     * site the window was opened on is ever read, and only by the page's own
+     * request; the window's address is shown to the person like any other.
+     * This is for sites that keep their sign-in in localStorage instead of
+     * cookies (MAX does); cookie sign-ins still go through a check page.
+     */
+    data class LoginRequest(val id: String, val url: String, val title: String, val storageKey: String)
+
+    private const val MAX_LOGIN_TITLE = 120
+    private const val MAX_LOGIN_KEY = 128
+
+    /** The request's id, or "" when [json] is not even that: enough to reject the page's promise. */
+    fun loginId(json: String): String = try {
+        (Json.parseToJsonElement(json).jsonObject["id"] as? JsonPrimitive)?.content.orEmpty().take(32)
+    } catch (e: Exception) {
+        ""
+    }
+
+    /** What the page asked for; throws IllegalArgumentException (the person-facing reason) when it is not usable. */
+    fun parseLogin(json: String): LoginRequest {
+        val root = try {
+            Json.parseToJsonElement(json).jsonObject
+        } catch (e: Exception) {
+            throw IllegalArgumentException("Страница передала не JSON-объект")
+        }
+        fun text(el: kotlinx.serialization.json.JsonElement?) = (el as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content.orEmpty()
+        val id = text(root["id"])
+        require(id.isNotEmpty() && id.length <= 32) { "У запроса входа нет номера" }
+        val url = text(root["url"]).trim()
+        require(httpsOrigin(url) != null) { "Окно входа открывает только сайт по https без логина в адресе" }
+        val key = text((root["capture"] as? JsonObject)?.get("localStorage"))
+        require(key.isNotEmpty() && key.length <= MAX_LOGIN_KEY) { "Не сказано, что забрать после входа (capture.localStorage)" }
+        val title = text(root["title"]).take(MAX_LOGIN_TITLE).ifBlank { "Вход" }
+        return LoginRequest(id, url, title, key)
+    }
+
+    /** The script that settles the page's openfluxLogin promise [id]: [value] on success, else [error]. */
+    fun loginResultScript(id: String, ok: Boolean, value: String = "", error: String = ""): String {
+        val result = buildJsonObject {
+            put("ok", ok)
+            if (ok) put("value", value) else put("error", error)
+        }
+        return "window.$LOGIN_DONE&&window.$LOGIN_DONE(${JsonPrimitive(id)},$result);"
+    }
+
+    /** "https://host[:port]" of an https address (no login or password in it), the scope of what a sign-in window may read; null otherwise. */
+    fun httpsOrigin(url: String): String? {
+        val m = HTTPS.matchEntire(url.trim()) ?: return null
+        val port = m.groupValues[2]
+        if (port.isNotEmpty() && port.toIntOrNull()?.let { it in 1..65535 } != true) return null
+        return "https://" + m.groupValues[1].lowercase() + if (port.isEmpty()) "" else ":$port"
+    }
+
+    /** Whether [url] is on the same origin as [origin] (a result of [httpsOrigin]). */
+    fun isOn(origin: String, url: String): Boolean = httpsOrigin(url) == origin
+
+    private val HTTPS = Regex("""(?i)https://([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)(?::(\d{1,5}))?(?:[/?#].*)?""")
 
     private val LOOPBACK = Regex("""(?i)http://(127\.\d{1,3}\.\d{1,3}\.\d{1,3}|localhost|\[::1\]):(\d{1,5})(?:[/?#].*)?""")
 }

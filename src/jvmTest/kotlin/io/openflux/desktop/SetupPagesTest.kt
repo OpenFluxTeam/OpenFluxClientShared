@@ -37,6 +37,75 @@ class SetupPagesTest {
     }
 
     @Test
+    fun theLoginHalfOfTheBridgeIsOptional() {
+        val without = SetupPages.bridgeScript("native(j)")
+        assertFalse("openfluxLogin" in without)
+        val with = SetupPages.bridgeScript("native(j)", "login(j)")
+        assertTrue(with.startsWith("(function(){if(window.openfluxSubmit)return;"))
+        assertTrue("window.openfluxLogin=function(s)" in with && "login(j)" in with && SetupPages.LOGIN_DONE in with)
+        // the submit half is the same, and the page is told it is ready only after both exist
+        assertTrue("native(j)" in with)
+        assertTrue(with.indexOf("window.openfluxLogin=") < with.indexOf(SetupPages.READY_EVENT))
+    }
+
+    @Test
+    fun aLoginRequestIsAnHttpsSiteAndOneStorageKey() {
+        val ok = SetupPages.parseLogin("""{"id":"3","url":"https://web.max.ru","title":"Вход в MAX","capture":{"localStorage":"__oneme_auth"}}""")
+        assertEquals(SetupPages.LoginRequest("3", "https://web.max.ru", "Вход в MAX", "__oneme_auth"), ok)
+        // no title: a plain one; a long one is cut
+        assertEquals("Вход", SetupPages.parseLogin("""{"id":"1","url":"https://a.b/c?d#e","capture":{"localStorage":"k"}}""").title)
+        assertEquals(120, SetupPages.parseLogin("""{"id":"1","url":"https://a.b","title":"${"x".repeat(500)}","capture":{"localStorage":"k"}}""").title.length)
+        val bad = listOf(
+            "not json",
+            """{"url":"https://web.max.ru","capture":{"localStorage":"k"}}""",                       // no id
+            """{"id":"1","url":"http://web.max.ru","capture":{"localStorage":"k"}}""",               // not https
+            """{"id":"1","url":"javascript:alert(1)","capture":{"localStorage":"k"}}""",
+            """{"id":"1","url":"https://user:pw@web.max.ru","capture":{"localStorage":"k"}}""",      // login in the address
+            """{"id":"1","url":"https://web.max.ru@evil.com/","capture":{"localStorage":"k"}}""",
+            """{"id":"1","url":"https://web.max.ru:99999","capture":{"localStorage":"k"}}""",
+            """{"id":"1","url":"https://web.max.ru"}""",                                              // nothing to capture
+            """{"id":"1","url":"https://web.max.ru","capture":{"localStorage":""}}""",
+            """{"id":"1","url":"https://web.max.ru","capture":{"cookies":"all"}}""",
+        )
+        for (json in bad) assertFailsWith<IllegalArgumentException>(json) { SetupPages.parseLogin(json) }
+    }
+
+    @Test
+    fun theLoginIdSurvivesABadRequestSoThePromiseCanBeRejected() {
+        assertEquals("7", SetupPages.loginId("""{"id":"7","url":"ftp://x"}"""))
+        assertEquals("", SetupPages.loginId("nonsense"))
+        assertEquals("", SetupPages.loginId("""{"url":"https://x.y"}"""))
+    }
+
+    @Test
+    fun aSignInWindowMayOnlyReadTheSiteItWasOpenedOn() {
+        val origin = SetupPages.httpsOrigin("https://Web.MAX.ru/some/page?x=1")
+        assertEquals("https://web.max.ru", origin)
+        assertEquals("https://web.max.ru:8443", SetupPages.httpsOrigin("https://web.max.ru:8443/"))
+        assertTrue(SetupPages.isOn(origin!!, "https://web.max.ru/#/chat"))
+        assertFalse(SetupPages.isOn(origin, "https://web.max.ru.evil.com/"))
+        assertFalse(SetupPages.isOn(origin, "https://evil.com/web.max.ru"))
+        assertFalse(SetupPages.isOn(origin, "http://web.max.ru/"))
+        assertFalse(SetupPages.isOn(origin, "about:blank"))
+        assertNull(SetupPages.httpsOrigin("https://"))
+        assertNull(SetupPages.httpsOrigin("web.max.ru"))
+    }
+
+    @Test
+    fun theLoginResultReachesThePageAsPlainJsonWhateverTheValueHolds() {
+        // The value is the site's own localStorage text: quotes, newlines, a closing script tag.
+        val value = "{\"token\":\"a\\\"b\",\"note\":\"line1\\nline2 </script>\"}"
+        val js = SetupPages.loginResultScript("12", true, value)
+        assertTrue(js.startsWith("window.${SetupPages.LOGIN_DONE}&&window.${SetupPages.LOGIN_DONE}(\"12\","))
+        val arg = js.removePrefix("window.${SetupPages.LOGIN_DONE}&&window.${SetupPages.LOGIN_DONE}(\"12\",").removeSuffix(");")
+        val parsed = kotlinx.serialization.json.Json.parseToJsonElement(arg) as kotlinx.serialization.json.JsonObject
+        assertEquals("true", parsed["ok"].toString())
+        assertEquals(value, (parsed["value"] as kotlinx.serialization.json.JsonPrimitive).content)
+        val failed = SetupPages.loginResultScript("12", false, error = "Назад")
+        assertTrue("\"ok\":false" in failed && "Назад" in failed && "value" !in failed)
+    }
+
+    @Test
     fun onlyLoopbackHttpIsAnOwnServerAddress() {
         assertEquals("http://127.0.0.1:41234/", SetupPages.loopbackOrigin("http://127.0.0.1:41234/setup?a=1"))
         assertEquals("http://localhost:8080/", SetupPages.loopbackOrigin("HTTP://localhost:8080"))

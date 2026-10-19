@@ -122,6 +122,7 @@ fun PromptOverlay() {
             else -> "Яндекс просит пройти проверку"
         },
         note = when {
+            current.nested -> "Войдите в аккаунт на этой странице: окно закроется само, когда вход будет выполнен."
             setup -> "Заполните страницу и нажмите её кнопку: OpenFlux передаст данные сам."
             current.remote -> "Страница открыта через ноду. Пройдите проверку и нажмите «Готово»."
             else -> "Пройдите проверку и нажмите «Готово»."
@@ -129,7 +130,7 @@ fun PromptOverlay() {
         page = page,
         waiting = current.progress.ifEmpty { "Открываю страницу…" },
         onClose = connection::dismissPrompt,
-        closeLabel = "Позже",
+        closeLabel = if (current.nested) "Назад" else "Позже",
         error = current.error.ifBlank { null },
     ) {
         AnimatedVisibility(
