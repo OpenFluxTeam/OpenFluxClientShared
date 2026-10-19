@@ -12,6 +12,8 @@ import io.openflux.app.nav.Dest
 import io.openflux.app.servers.ServerLink
 import io.openflux.app.shell.OpenFluxApp
 import io.openflux.desktop.model.InstalledChannel
+import io.openflux.desktop.model.InstalledScript
+import io.openflux.desktop.service.InMemoryScriptRepository
 import io.openflux.desktop.model.NodeTransport
 import io.openflux.desktop.model.SshTarget
 import io.openflux.app.platform.NoBrowserViews
@@ -20,6 +22,7 @@ import io.openflux.app.platform.Shortcuts
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class NodeScreenTest {
@@ -41,5 +44,23 @@ class NodeScreenTest {
         waitUntil(timeoutMillis = 5_000) { server.channels.getValue("of-x").transports.size == 2 }
         assertEquals(listOf("vyandex", "cupsonline"), server.channels.getValue("of-x").transports.map { it.type })
         waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Изменено: 1")).fetchSemanticsNodes().isEmpty() }
+    }
+
+    /** A node that is not on an SSH server offers the JS transports; the legacy ones only while the switch is on. */
+    @Test
+    fun aNodeWithoutSshOffersTheJsTransportsAndKeepsLegacyBehindTheSwitch() = runComposeUiTest {
+        val repo = InMemoryScriptRepository().also {
+            it.upsert(InstalledScript(id = "mx", name = "MAX", pubkeyHex = "ab".repeat(32), fingerprint = "f", fileName = "mx.flux", setupPage = true))
+        }
+        val c = testContainer(scripts = repo)
+        c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.NewNode("kit:manual")) }.snapshot().encode()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts(), NoBrowserViews, ServerLink(c)) }
+        waitForIdle()
+        onNodeWithText("MAX").assertIsDisplayed()
+        assertTrue(onAllNodes(hasText("ЛЕГАСИ")).fetchSemanticsNodes().isEmpty(), "legacy is off: no section")
+        assertTrue(onAllNodes(hasText("Cups.online")).fetchSemanticsNodes().isEmpty())
+        c.settings.update { it.copy(legacy = true) }
+        waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Cups.online")).fetchSemanticsNodes().isNotEmpty() }
+        assertTrue(onAllNodes(hasText("ЛЕГАСИ")).fetchSemanticsNodes().isNotEmpty())
     }
 }

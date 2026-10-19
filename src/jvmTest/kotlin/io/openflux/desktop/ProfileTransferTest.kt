@@ -144,8 +144,8 @@ class ProfileTransferTest {
 
     @Test
     fun theNodeDeviceRunsTheNodesSideAsTheExitAndTheOwnerRunsItsOwnAsAClient() {
-        val settingsExit = AppSettings(experimental = true, mode = ConnectionMode.Exit)
-        val settingsClient = AppSettings(experimental = true, mode = ConnectionMode.Client)
+        val settingsExit = AppSettings(mode = ConnectionMode.Exit)
+        val settingsClient = AppSettings(mode = ConnectionMode.Client)
         val paths = CorePaths(keyFile = "/k", confFile = "/c", cookieStore = "/s", ipcSocket = null)
         val lookup = ScriptCarrierLookup("/mx.flux", authorKey, "mx")
         fun conf(p: Profile, s: AppSettings) = CoreConfig.build(p, s, paths) { lookup }.conf.orEmpty()

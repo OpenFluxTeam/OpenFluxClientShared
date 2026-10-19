@@ -15,9 +15,12 @@ import io.openflux.app.shell.OpenFluxApp
 import io.openflux.desktop.model.LogLevel
 import io.openflux.app.platform.NoScrollbars
 import io.openflux.app.platform.Shortcuts
+import io.openflux.app.settings.SettingsPage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class SettingsScreensTest {
@@ -66,13 +69,29 @@ class SettingsScreensTest {
         assertEquals(0, onAllNodes(hasText("Вышла версия 2.1.0")).fetchSemanticsNodes().size)
     }
 
+    /** The switch that was "Экспериментальные функции" is "Включить легаси" now, on the page that kept its old address working. */
+    @Test
+    fun theLegacySwitchIsTheOldExperimentalOneAndItsOldAddressStillOpensIt() = runComposeUiTest {
+        assertEquals(SettingsPage.Legacy, SettingsPage.of("experimental"))
+        assertEquals(SettingsPage.Legacy, SettingsPage.of("legacy"))
+        val c = testContainer()
+        c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.SettingsPage("experimental")) }.snapshot().encode()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
+        onNodeWithText("Включить легаси").assertIsDisplayed()
+        assertFalse(c.settings.settings.value.legacy)
+        onNodeWithText("Включить легаси").performClick()
+        waitForIdle()
+        assertTrue(c.settings.settings.value.legacy)
+        assertEquals(0, onAllNodes(hasText("Экспериментальные функции")).fetchSemanticsNodes().size)
+    }
+
     @Test
     fun shots() {
         val c = homeWorld()
         val pages = listOf(
             "settings" to Dest.Settings, "settings-connection" to Dest.SettingsPage("connection"), "settings-vpn" to Dest.SettingsPage("vpn"),
             "settings-services" to Dest.SettingsPage("services"), "settings-core" to Dest.SettingsPage("core"), "settings-look" to Dest.SettingsPage("look"),
-            "settings-experimental" to Dest.SettingsPage("experimental"), "settings-about" to Dest.SettingsPage("about"),
+            "settings-legacy" to Dest.SettingsPage("legacy"), "settings-about" to Dest.SettingsPage("about"),
             "journal" to Dest.Logs, "auth" to Dest.Auth, "account-none" to Dest.Account,
         )
         for ((name, dest) in pages) {

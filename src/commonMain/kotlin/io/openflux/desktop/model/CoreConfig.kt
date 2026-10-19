@@ -44,8 +44,6 @@ object CoreConfig {
     /** Why a profile with Telemost alone does not connect through the full tunnel. */
     const val TELEMOST_TUN = "Телемост пока не работает в режиме «Весь трафик»: выключите его в настройках или добавьте профилю другой транспорт"
 
-    /** Why a profile with a JS transport does not connect while the experimental features are off. */
-    const val SCRIPTS_OFF = "В профиле JS-транспорт, а экспериментальные функции выключены: включите их в настройках («Экспериментальные функции»)"
 
     /**
      * [scriptCarrier] resolves a SCRIPT carrier's installed script (by
@@ -63,7 +61,6 @@ object CoreConfig {
     ): CoreLaunch {
         val problems = profile.problems()
         require(problems.isEmpty()) { problems.first() }
-        require(settings.experimental || profile.carriers.none { it.type == TransportType.SCRIPT }) { SCRIPTS_OFF }
         val exit = settings.mode == ConnectionMode.Exit
         if (exit) profile.exitProblem()?.let { throw IllegalArgumentException(it) }
         val socks = "$LOOPBACK:${settings.socksPort}"

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.ListAlt
@@ -74,17 +75,20 @@ enum class SettingsPage(val id: String, val title: String, val icon: ImageVector
     Core("core", "Ядро", Icons.Rounded.Memory),
     Look("look", "Внешний вид", Icons.Rounded.DarkMode),
     Journal("journal", "Журнал", Icons.Rounded.ListAlt),
-    Experimental("experimental", "Экспериментальное", Icons.Rounded.Extension),
+    Transports("transports", "Транспорты", Icons.Rounded.Extension),
+    Legacy("legacy", "Легаси", Icons.Rounded.History),
     About("about", "О программе", Icons.Rounded.Info);
 
     companion object {
-        fun of(id: String) = entries.firstOrNull { it.id == id }
+        /** "experimental" was this page's name before the JS transports stopped being experimental. */
+        fun of(id: String) = entries.firstOrNull { it.id == id } ?: if (id == "experimental") Legacy else null
     }
 }
 
 private fun SettingsPage.dest(): Dest = when (this) {
     SettingsPage.Account -> Dest.Account
     SettingsPage.Journal -> Dest.Logs
+    SettingsPage.Transports -> Dest.Scripts
     else -> Dest.SettingsPage(id)
 }
 
@@ -122,9 +126,9 @@ fun SettingsPageScreen(dest: Dest.SettingsPage) {
             SettingsPage.Services -> ServicesPage()
             SettingsPage.Core -> CorePage()
             SettingsPage.Look -> LookPage()
-            SettingsPage.Experimental -> ExperimentalPage()
+            SettingsPage.Legacy -> LegacyPage()
             SettingsPage.About -> AboutPage()
-            SettingsPage.Account, SettingsPage.Journal -> Unit
+            SettingsPage.Account, SettingsPage.Journal, SettingsPage.Transports -> Unit
         }
     }
 }
@@ -375,19 +379,19 @@ private fun LookPage() {
 }
 
 @Composable
-private fun ExperimentalPage() {
+private fun LegacyPage() {
     val container = LocalAppContainer.current
-    val navigator = LocalNavigator.current
     val settings by container.settings.settings.collectAsState()
     Section(null) {
         Toggle(
-            "Экспериментальные функции", settings.experimental, { v -> container.settings.update { it.copy(experimental = v) } },
-            subtitle = if (settings.experimental) "Включены: профили с JS-транспортом подключаются" else "Выключены: профили с JS-транспортом не подключатся",
+            "Включить легаси", settings.legacy, { v -> container.settings.update { it.copy(legacy = v) } },
+            subtitle = if (settings.legacy) "Включено: старые транспорты можно выбрать при создании подключений и нод" else "Выключено: выбор строится на JS-транспортах",
         )
-        if (settings.experimental) RowItem("Транспорты на JS", subtitle = "Каталог: добавить, обновить, отключить", onClick = { navigator.open(Dest.Scripts) })
     }
     Text(
-        "Могут работать нестабильно и меняться от версии к версии. JS-транспорт — чужой код без песочницы, с полным доступом к сети: ставьте только от авторов, которым доверяете.",
+        "Легаси — первые транспорты: Яндекс Документы, Mail.ru, Яндекс Доска, Телемост, Cups.online, Avito Code и MAX по токену. " +
+            "Новые подключения и ноды делаются на JS-транспортах. Всё, что уже работает на старых, продолжает работать и показывается как есть, " +
+            "выключатель только открывает их для выбора в новых.",
         style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
     )
 }

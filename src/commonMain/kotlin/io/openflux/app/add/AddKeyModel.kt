@@ -112,8 +112,7 @@ class AddKeyModel(private val container: AppContainer, private val scope: Corout
                 return KeyResult.Invalid("JS-транспорт «${c.scriptId}» на этом устройстве подписан другим автором, чем на том, откуда пришёл профиль: так его не запустить")
             }
         }
-        val needsScripts = got.profile.carriers.any { it.type == TransportType.SCRIPT }
-        val note = if (needsScripts && !container.settings.settings.value.experimental) "Включите «Экспериментальные функции» в Настройках: без них JS-транспорты не работают" else null
+        val note: String? = null
         return KeyResult.Transfer(got, note)
     }
 

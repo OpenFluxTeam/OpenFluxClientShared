@@ -3,9 +3,11 @@ package io.openflux.app
 import io.openflux.app.nav.Dest
 import io.openflux.app.nav.NavState
 import io.openflux.app.nav.Section
+import io.openflux.app.nav.aliveIn
 import io.openflux.app.nav.rootOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -25,6 +27,21 @@ class DestTest {
         assertEquals(Section.Servers, Dest.Node("h:22:root", "of-a").owner)
         assertEquals(Section.Share, Dest.Give("p").owner)
         assertEquals("h:22:root", Dest.Node("h:22:root", "of-a").serverId)
+    }
+
+    /** A node that is not on a server has no server to be forgotten: its screens survive the check that drops those of a removed one. */
+    @Test
+    fun aNodeWithoutAServerIsNoScreenOfAForgottenOne() {
+        for (placement in listOf("kit:manual", "kit:device", "kit:here")) {
+            assertNull(Dest.NewNode(placement).serverId)
+            assertNull(Dest.Node(placement, "of-a").serverId)
+        }
+        assertEquals("h:22:root", Dest.NewNode("h:22:root").serverId)
+        val alive = aliveIn(testContainer())
+        assertTrue(alive(Dest.NewNode("kit:manual")))
+        assertTrue(alive(Dest.Node("kit:here", "of-a")))
+        assertFalse(alive(Dest.NewNode("h:22:root")), "a server that is not known")
+        assertFalse(alive(Dest.Node("h:22:root", "of-a")))
     }
 
     @Test

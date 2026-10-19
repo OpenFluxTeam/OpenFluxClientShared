@@ -281,11 +281,11 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     when (val b = m.banner(state, settings, chosen, status, subscription, now)) {
         is HomeBanner.Failed -> Banner(b.message, Tone.Danger, action = "Повторить", onAction = m::toggle, secondAction = "Журнал", onSecondAction = { navigator.open(Dest.Logs) })
         is HomeBanner.NeedsNode -> Banner(
-            "Для «${b.profile.name}» нужна нода: без неё MAX не с кем соединять. Её можно сделать на сервере, на другом устройстве или командой на своём компьютере.",
+            "Для «${b.profile.name}» нужна нода: без неё не с кем соединяться.",
             Tone.Warning, action = "Создать ноду", onAction = { navigator.open(Dest.NodeWhere(b.profile.id)) },
         )
         is HomeBanner.NodeProfile -> Banner(
-            "«${b.profile.name}» — профиль ноды: устройство запускает его как ноду, подключаться им нельзя.",
+            "«${b.profile.name}» — профиль ноды: подключаться им нельзя.",
             Tone.Info, action = "Запустить ноду", onAction = { container.settings.update { it.copy(selectedProfileId = b.profile.id) }; navigator.open(Dest.ThisDevice) },
         )
         HomeBanner.NeedsAdmin -> Banner(

@@ -170,7 +170,7 @@ fun ProfileScreen(dest: Dest.Profile) {
         p.problems().firstOrNull()?.let { Banner(it, Tone.Danger, Modifier.appear(delayMillis = 60)) }
         if (p.needsNode(scripts)) {
             Banner(
-                "Этому подключению нужна нода: без неё не с кем соединяться. Её можно сделать на сервере, на другом устройстве или командой на своём компьютере.",
+                "Этому подключению нужна нода: без неё не с кем соединяться.",
                 Tone.Warning, Modifier.appear(delayMillis = 60), action = "Создать ноду", onAction = { navigator.open(Dest.NodeWhere(p.id)) },
             )
         }
@@ -315,7 +315,7 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
     val all by container.scripts.scripts.collectAsState()
     val c = m.transport(index) ?: return
     val d = m.draft
-    val scripts = all.filter { it.enabled && settings.experimental }
+    val scripts = all.filter { it.enabled }
     val script = if (c.type == TransportType.SCRIPT) scripts.firstOrNull { it.id == c.scriptId } else null
     var pick by remember { mutableStateOf(false) }
     val android = container.platform.kind == PlatformKind.Android
@@ -332,9 +332,6 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
             onClick = { pick = true },
         )
         Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-            if (c.type == TransportType.SCRIPT && !settings.experimental) {
-                Text("Экспериментальные функции выключены: с этим транспортом профиль не подключится.", style = AppTheme.type.bodySmall, color = AppTheme.colors.warning)
-            }
             if (c.type == TransportType.SCRIPT) {
                 val param = script?.primaryParam
                 if (script != null && script.hasSettings) {
@@ -404,12 +401,17 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
     }
     if (pick) {
         Sheet(onDismiss = { pick = false }, title = "Транспорт") {
-            val builtIn = when {
-                d.stream -> PhpHosts.carriers
-                else -> TransportType.entries.filter { it != TransportType.SCRIPT }
-            }
             var idx = 0
-            if (settings.experimental && !d.stream && scripts.isNotEmpty()) {
+            if (d.stream) {
+                // A node on a hosting has only these two to meet in.
+                for (t in PhpHosts.carriers) {
+                    RowItem(t.title, Modifier.appear(delayMillis = idx * 40), subtitle = t.detail(), selected = c.type == t && c.scriptId.isBlank(), onClick = {
+                        m.editTransport(index) { it.copy(type = t, scriptId = "") }
+                        pick = false
+                    })
+                    idx++
+                }
+            } else {
                 for (s in scripts) {
                     RowItem(s.name, Modifier.appear(delayMillis = idx * 40), subtitle = "JS-транспорт", selected = c.scriptId == s.id, onClick = {
                         m.editTransport(index) { it.copy(type = TransportType.SCRIPT, scriptId = s.id) }
@@ -418,19 +420,33 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
                     idx++
                 }
                 TextAction("Управлять транспортами", { pick = false; navigator.open(Dest.Scripts) })
-            }
-            Text(
-                "ЛЕГАСИ",
-                style = AppTheme.type.label,
-                color = AppTheme.colors.textSecondary,
-                modifier = Modifier.padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.s),
-            )
-            for (t in builtIn) {
-                RowItem(t.title, Modifier.appear(delayMillis = idx * 40), subtitle = t.detail(), selected = c.type == t && c.scriptId.isBlank(), onClick = {
-                    m.editTransport(index) { it.copy(type = t, scriptId = "") }
-                    pick = false
-                })
-                idx++
+                // The node's own backup is no legacy; the first transports are, and are offered while they are switched on
+                // or the connection already uses one.
+                val usedLegacy = d.carriers.map { it.type }.filter { it.legacy }.toSet()
+                val offered = TransportType.entries.filter { it != TransportType.SCRIPT && (!it.legacy || settings.legacy || it in usedLegacy) }
+                for (t in offered.filter { !it.legacy }) {
+                    RowItem(t.title, Modifier.appear(delayMillis = idx * 40), subtitle = t.detail(), selected = c.type == t && c.scriptId.isBlank(), onClick = {
+                        m.editTransport(index) { it.copy(type = t, scriptId = "") }
+                        pick = false
+                    })
+                    idx++
+                }
+                val legacy = offered.filter { it.legacy }
+                if (legacy.isNotEmpty()) {
+                    Text(
+                        "ЛЕГАСИ",
+                        style = AppTheme.type.label,
+                        color = AppTheme.colors.textSecondary,
+                        modifier = Modifier.padding(horizontal = AppTheme.spacing.l, vertical = AppTheme.spacing.s),
+                    )
+                    for (t in legacy) {
+                        RowItem(t.title, Modifier.appear(delayMillis = idx * 40), subtitle = t.detail(), selected = c.type == t && c.scriptId.isBlank(), onClick = {
+                            m.editTransport(index) { it.copy(type = t, scriptId = "") }
+                            pick = false
+                        })
+                        idx++
+                    }
+                }
             }
         }
     }

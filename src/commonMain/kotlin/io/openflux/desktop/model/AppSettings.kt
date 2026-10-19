@@ -130,11 +130,12 @@ data class AppSettings(
     /** Exit mode: how the node forwards its clients' traffic. */
     val exitBackend: ExitBackend = ExitBackend.L4,
     /**
-     * "Экспериментальные функции": what is still being proved stays off until the user turns it on. Today that
-     * is every JS-engine feature: the «Транспорты» tab, installing, updating and configuring script transports,
-     * and connecting through one. Off, none of it is shown, started or fetched.
+     * "Включить легаси": the first transports (Яндекс Документы, Mail.ru, Доска, Телемост, Cups.online, Avito Code, the
+     * native MAX token) are for what was built on them; new connections and nodes are made of JS transports. Off, the
+     * lists of transports to pick from do not offer them (what already uses one keeps showing it); connecting through
+     * them is never blocked, whatever this says.
      */
-    val experimental: Boolean = false,
+    val legacy: Boolean = false,
     /** Set while OpenFlux has changed the Windows proxy; restored on exit or next start. */
     val savedSystemProxy: SavedSystemProxy? = null,
     val sidebarCollapsed: Boolean = false,

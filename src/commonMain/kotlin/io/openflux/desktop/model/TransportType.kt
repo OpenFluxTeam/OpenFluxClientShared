@@ -72,6 +72,13 @@ enum class TransportType(
     SCRIPT("script", "JS-транспорт", "JS", ValueKind.DocumentUrl,
         "см. параметры транспорта", "ic_code");
 
+    /**
+     * One of the first transports, kept for what was built on them: new connections and nodes are made of JS
+     * transports (and direct, the node's own backup). Hidden from the lists to pick from unless "Включить легаси"
+     * is on, or the thing being edited already uses it ([io.openflux.desktop.model.AppSettings.legacy]).
+     */
+    val legacy: Boolean get() = this != DIRECT && this != SCRIPT
+
     /** Whether an `openflux://` link can carry it (MAX tokens are per account). */
     val shareable: Boolean get() = this != ONEME && this != SCRIPT
 

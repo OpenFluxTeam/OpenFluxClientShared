@@ -37,7 +37,7 @@ class ProfileEditorModel(private val container: AppContainer, id: String?, priva
 
     var draft by mutableStateOf(
         original?.let { if (!it.stream) it.copy(session = true) else it }
-            ?: Profile(id = container.profiles.newId(), name = "", transport = TransportType.VYANDEX, session = true, createdAt = container.platform.now()),
+            ?: newProfile(),
     )
         private set
     private val initial = draft
@@ -51,6 +51,20 @@ class ProfileEditorModel(private val container: AppContainer, id: String?, priva
         private set
     var error by mutableStateOf<String?>(null)
         private set
+
+    /**
+     * A new connection starts from the first JS transport installed (the one the transport list opens with); only a
+     * build with none to start from falls back to a first transport.
+     */
+    private fun newProfile(): Profile {
+        val script = container.scripts.scripts.value.firstOrNull { it.enabled }
+        return Profile(
+            id = container.profiles.newId(), name = "",
+            transport = if (script != null) TransportType.SCRIPT else TransportType.VYANDEX,
+            scriptId = script?.id.orEmpty(),
+            session = true, createdAt = container.platform.now(),
+        )
+    }
 
     val problems: List<String> get() = draft.problems()
     val hasUnsaved: Boolean get() = !readOnly && draft != (saved ?: initial)

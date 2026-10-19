@@ -91,9 +91,7 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
     val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     val settings by container.settings.settings.collectAsState()
-    // JS transports are an experimental feature: offered while it is on (a node that already runs some shows them anyway).
-    val allScripts by container.scripts.scripts.collectAsState()
-    val installedScripts = if (settings.experimental) allScripts else emptyList()
+    val installedScripts by container.scripts.scripts.collectAsState()
     var leaveAsk by remember { mutableStateOf(false) }
     var removeAsk by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
@@ -212,10 +210,11 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
                     }
                 }
             }
-            if (settings.experimental) TextAction("Управлять транспортами", { navigator.open(Dest.Scripts) })
+            TextAction("Управлять транспортами", { navigator.open(Dest.Scripts) })
             RowItem(TransportType.DIRECT.title, subtitle = "Всегда включено: запасной путь, если другие недоступны", enabled = false)
         }
-        Section("Легаси") {
+        // The first transports are for what was built on them: offered while "Включить легаси" is on, or the node uses one.
+        if (settings.legacy || d.usesLegacy) Section("Легаси") {
             Toggle(TransportType.VYANDEX.title, d.volga, { on -> m.edit { it.copy(volga = on) } }, enabled = editable)
             Toggle(TransportType.YANDEX.title, d.yandexDocs, { on -> m.edit { it.copy(yandexDocs = on) } }, enabled = editable)
             if (d.needsYandexDoc) {

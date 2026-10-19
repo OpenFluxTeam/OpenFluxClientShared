@@ -32,6 +32,24 @@ class ProfileEditorModelTest {
     }
 
     @Test
+    fun aNewProfileStartsFromTheFirstJsTransportWhateverTheLegacySwitchSays() = runTest {
+        val repo = io.openflux.desktop.service.InMemoryScriptRepository().also {
+            it.upsert(io.openflux.desktop.model.InstalledScript(id = "off", name = "Off", pubkeyHex = "ab".repeat(32), fingerprint = "f", fileName = "off.flux", enabled = false))
+            it.upsert(io.openflux.desktop.model.InstalledScript(id = "mx", name = "MAX", pubkeyHex = "ab".repeat(32), fingerprint = "f", fileName = "mx.flux"))
+        }
+        for (legacy in listOf(false, true)) {
+            val withScripts = testContainer(scripts = repo)
+            withScripts.settings.update { it.copy(legacy = legacy) }
+            val m = ProfileEditorModel(withScripts, null, this)
+            assertEquals(TransportType.SCRIPT, m.draft.transport)
+            assertEquals("mx", m.draft.scriptId, "the first one that is on")
+            assertTrue(m.draft.session)
+        }
+        // a build with no script transport at all still opens on something that can be edited
+        assertEquals(TransportType.VYANDEX, ProfileEditorModel(c, null, this).draft.transport)
+    }
+
+    @Test
     fun aSubscriptionsLocationCannotBeEdited() = runTest {
         c.profiles.upsert(Profile(id = "s", name = "Амстердам", source = ProfileSource.Subscription))
         val m = ProfileEditorModel(c, "s", this)

@@ -14,8 +14,11 @@ import io.openflux.app.nav.Dest
 import io.openflux.app.shell.OpenFluxApp
 import io.openflux.app.platform.NoScrollbars
 import io.openflux.app.platform.Shortcuts
+import io.openflux.desktop.model.InstalledScript
+import io.openflux.desktop.service.InMemoryScriptRepository
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class ProfileScreensTest {
@@ -34,6 +37,26 @@ class ProfileScreensTest {
         waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("AES-256-GCM")).fetchSemanticsNodes().isNotEmpty() }
         assertEquals(listOf("Нода друга"), c.profiles.profiles.value.map { it.name })
         onNodeWithText("AES-256-GCM").assertIsDisplayed()
+    }
+
+    @Test
+    fun theTransportListIsJsFirstAndKeepsTheLegacyOnesBehindTheSwitch() = runComposeUiTest {
+        val repo = InMemoryScriptRepository().also {
+            it.upsert(InstalledScript(id = "mx", name = "MAX", pubkeyHex = "ab".repeat(32), fingerprint = "f", fileName = "mx.flux"))
+        }
+        val c = testContainer(scripts = repo)
+        c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.ProfileEdit()) }.snapshot().encode()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
+        // a new connection starts from the JS transport, not from a legacy one
+        waitForIdle()
+        onNodeWithText("ОСНОВНОЙ ТРАНСПОРТ").assertIsDisplayed()
+        onNodeWithText("MAX").performClick()
+        waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("Управлять транспортами")).fetchSemanticsNodes().isNotEmpty() }
+        assertTrue(onAllNodes(hasText("ЛЕГАСИ")).fetchSemanticsNodes().isEmpty(), "legacy is off: no section")
+        assertTrue(onAllNodes(hasText("Яндекс Документ")).fetchSemanticsNodes().isEmpty())
+        c.settings.update { it.copy(legacy = true) }
+        waitUntil(timeoutMillis = 5_000) { onAllNodes(hasText("ЛЕГАСИ")).fetchSemanticsNodes().isNotEmpty() }
+        assertTrue(onAllNodes(hasText("Яндекс Документ")).fetchSemanticsNodes().isNotEmpty())
     }
 
     @Test

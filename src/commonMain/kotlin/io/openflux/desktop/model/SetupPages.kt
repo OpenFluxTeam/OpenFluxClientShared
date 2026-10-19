@@ -182,6 +182,18 @@ object SetupPages {
         return "window.$LOGIN_DONE&&window.$LOGIN_DONE(${JsonPrimitive(id)},$result);"
     }
 
+    /**
+     * The script a sign-in window runs before the site's own, once per window: it removes [keys] from the site's
+     * localStorage, so the site starts signed out whatever an earlier window left behind. A site that kept the
+     * previous account's token would sign in with it at once, and the window would hand the wrong account back.
+     * The marker in sessionStorage (a window's own) keeps a reload after the sign-in from wiping the new token.
+     */
+    fun clearStorageScript(keys: List<String>): String {
+        val list = kotlinx.serialization.json.JsonArray(keys.map { JsonPrimitive(it) })
+        return "(function(){try{if(sessionStorage.getItem('__openflux_clean'))return;sessionStorage.setItem('__openflux_clean','1');" +
+            "var k=$list;for(var i=0;i<k.length;i++){localStorage.removeItem(k[i]);}}catch(e){}})();"
+    }
+
     /** "https://host[:port]" of an https address (no login or password in it), the scope of what a sign-in window may read; null otherwise. */
     fun httpsOrigin(url: String): String? {
         val m = HTTPS.matchEntire(url.trim()) ?: return null

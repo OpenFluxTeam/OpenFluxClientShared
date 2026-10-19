@@ -86,6 +86,9 @@ data class NodeDraft(
 
     val hasTransport: Boolean get() = volga || yandexDocs || mailru || board || cups || telemost || avito || scripts.isNotEmpty()
 
+    /** One of the first transports (legacy) is on: the editor shows them whatever "Включить легаси" says, so it can be turned off. */
+    val usesLegacy: Boolean get() = volga || yandexDocs || mailru || board || cups || telemost || avito
+
     /** The transports in priority order (the first is the main one), cleaned; direct is not listed. */
     fun toTransports(): List<NodeTransport> {
         problem()?.let { throw NodeWizardException(it) }

@@ -111,7 +111,6 @@ class AddKeyModelTest {
     @Test
     fun aClientProfileFromAnotherDeviceIsAddedForConnecting() = runTest {
         installMx()
-        c.settings.update { it.copy(experimental = true) }
         val m = AddKeyModel(c, this)
         m.onText(line(io.openflux.desktop.model.ProfileTransfer.Role.Client)); advanceUntilIdle()
         val r = assertIs<KeyResult.Transfer>(m.result)
@@ -149,14 +148,6 @@ class AddKeyModelTest {
         m.onText(line(io.openflux.desktop.model.ProfileTransfer.Role.Client)); advanceUntilIdle()
         assertTrue((m.result as KeyResult.Invalid).message.contains("другим автором"), "another author's script is not the code the secrets are meant for")
         assertTrue(c.profiles.profiles.value.isEmpty())
-    }
-
-    @Test
-    fun withoutExperimentalFeaturesTheProfileIsAddedWithAWarning() = runTest {
-        installMx()
-        val m = AddKeyModel(c, this)
-        m.onText(line(io.openflux.desktop.model.ProfileTransfer.Role.Client)); advanceUntilIdle()
-        assertTrue(assertIs<KeyResult.Transfer>(m.result).note.orEmpty().contains("Экспериментальные"))
     }
 
     @Test

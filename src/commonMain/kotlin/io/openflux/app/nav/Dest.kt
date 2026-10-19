@@ -1,5 +1,6 @@
 package io.openflux.app.nav
 
+import io.openflux.app.servers.NodePlacement
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -27,7 +28,10 @@ sealed interface Dest {
     /** The profile this screen shows; a screen whose profile is gone is dropped. */
     val profileId: String? get() = null
 
-    /** The server ("host:port:user") this screen shows; a screen of a forgotten server is dropped. */
+    /**
+     * The server ("host:port:user") this screen shows; a screen of a forgotten server is dropped. A node that is not on a
+     * server (see [NodePlacement]) has none, so nothing can make it a screen of a forgotten server.
+     */
     val serverId: String? get() = null
 
     @Serializable @SerialName("home")
@@ -106,7 +110,7 @@ sealed interface Dest {
     @Serializable @SerialName("node")
     data class Node(val server: String, val channel: String) : Dest {
         override val owner get() = Section.Servers
-        override val serverId get() = server
+        override val serverId get() = serverOf(server)
     }
 
     /** Connecting to a server not yet in the list (spec 5.1). No serverId: it has none until it connects. */
@@ -123,7 +127,7 @@ sealed interface Dest {
     @Serializable @SerialName("new-node")
     data class NewNode(val server: String, val quick: Boolean = false, val forProfile: String = "") : Dest {
         override val owner get() = Section.Servers
-        override val serverId get() = server
+        override val serverId get() = serverOf(server)
     }
 
     /** Where a new node will live: a server, a command for a machine of the person's own, another device, this one. */
@@ -185,6 +189,8 @@ fun rootOf(section: Section): Dest = when (section) {
 }
 
 private val json = Json { ignoreUnknownKeys = true; classDiscriminator = "type" }
+
+private fun serverOf(server: String): String? = server.takeUnless { NodePlacement.of(it).kit }
 
 /** Where the person is, saved: the section and each section's screens, first to last. */
 @Serializable

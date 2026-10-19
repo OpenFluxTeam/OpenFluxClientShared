@@ -152,7 +152,6 @@ fun ScriptsScreen() {
     var updateFor by remember { mutableStateOf<InstalledScript?>(null) }
     var deleteFor by remember { mutableStateOf<InstalledScript?>(null) }
     var rev by remember { mutableStateOf(0) }
-    LaunchedEffect(settings.experimental) { if (!settings.experimental) navigator.back() }
     ScreenScaffold("Транспорты на JS", onBack = { navigator.back() }) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             PrimaryButton("Импортировать", { addOpen = true })

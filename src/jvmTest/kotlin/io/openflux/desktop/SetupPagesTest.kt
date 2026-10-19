@@ -106,6 +106,16 @@ class SetupPagesTest {
     }
 
     @Test
+    fun aSignInWindowStartsSignedOutOnceWithAMarkerOfItsOwn() {
+        val js = SetupPages.clearStorageScript(listOf("__oneme_auth", "we\"ird"))
+        assertTrue("sessionStorage.getItem('__openflux_clean')" in js, "a reload after the sign-in must not wipe the new token")
+        assertTrue("localStorage.removeItem" in js)
+        // the keys travel as a JSON array, quotes escaped, so a key cannot break out of the script
+        assertTrue("""["__oneme_auth","we\"ird"]""" in js, js)
+        assertTrue(js.startsWith("(function(){") && js.endsWith("})();"))
+    }
+
+    @Test
     fun onlyLoopbackHttpIsAnOwnServerAddress() {
         assertEquals("http://127.0.0.1:41234/", SetupPages.loopbackOrigin("http://127.0.0.1:41234/setup?a=1"))
         assertEquals("http://localhost:8080/", SetupPages.loopbackOrigin("HTTP://localhost:8080"))

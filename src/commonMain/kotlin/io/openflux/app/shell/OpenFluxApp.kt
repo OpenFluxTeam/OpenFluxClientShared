@@ -55,9 +55,9 @@ fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shor
 @Composable
 internal fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shortcuts, browsers: BrowserViews, link: ServerLink?) {
     val settings by container.settings.settings.collectAsState()
-    // The app's own updates; the script transports' updates only with the experimental features on.
+    // The app's own updates, and the script transports'.
     LaunchedEffect(Unit) { container.updates.start() }
-    LaunchedEffect(settings.experimental) { if (settings.experimental) runCatching { container.scriptUpdater.autoCheck() } }
+    LaunchedEffect(Unit) { runCatching { container.scriptUpdater.autoCheck() } }
     val dark = when (settings.theme) {
         ThemeMode.System -> isSystemInDarkTheme()
         ThemeMode.Light -> false
