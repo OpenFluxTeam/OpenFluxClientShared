@@ -243,7 +243,7 @@ class CoreConnectionService(
             )
             val launch = CoreConfig.build(profile, current, paths, scripts::carrier)
             if (current.useAccountSessions) {
-                CookieStoreSeeder.seed(File(paths.cookieStore), profile, accounts.sessions.value)
+                CookieStoreSeeder.seed(File(paths.cookieStore), profile, accounts.sessions.value, scripts = scripts::byId)
             }
             if (launch.conf != null) {
                 confFile.writeText(launch.conf)

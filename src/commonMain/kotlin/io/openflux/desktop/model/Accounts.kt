@@ -69,6 +69,14 @@ enum class AccountKind(
 
     companion object {
         fun of(type: TransportType): AccountKind? = entries.firstOrNull { type in it.transports }
+
+        /** The account a script transport names in its info().auth ("yandex", "mailru", "max"). */
+        fun ofAccount(id: String): AccountKind? = when (id.trim().lowercase()) {
+            "yandex" -> Yandex
+            "mailru", "mail.ru" -> Mailru
+            "max" -> Max
+            else -> null
+        }
     }
 }
 
@@ -144,6 +152,9 @@ object AccountCookies {
         AccountKind.Max -> ""
     }
 
+    /** How the core names a script carrier's jar in its cookie store (main.go sessionCookieKey). */
+    fun scriptJarKey(scriptId: String, url: String): String = "script:$scriptId $url"
+
     /** "a=1; b=2" as a Cookie header sends them. */
     fun header(cookies: Map<String, String>): String = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
 
@@ -174,9 +185,27 @@ object AccountCookies {
         profile: Profile,
         sessions: Map<AccountKind, AccountSession>,
         key: (SessionSpec) -> String = { it.value },
+        scripts: (String) -> InstalledScript? = { null },
+        scriptKey: (SessionSpec, InstalledScript) -> String = { spec, script -> scriptJarKey(script.id, spec.value) },
     ): Map<String, Map<String, String>> {
         val out = store.toMutableMap()
         for (spec in profile.sessionSpecs()) {
+            if (spec.type == TransportType.SCRIPT) {
+                // A JS transport says itself which sign-in it needs and which of
+                // its cookies (info().auth): only those go into its jar.
+                val script = scripts(spec.scriptId) ?: continue
+                val auth = script.auth ?: continue
+                val kind = AccountKind.ofAccount(auth.account) ?: continue
+                val session = sessions[kind]?.takeUnless { it.expired || it.cookies.isEmpty() } ?: continue
+                val name = scriptKey(spec, script)
+                if (auth.opensSignedIn) {
+                    out[name] = out[name].orEmpty() + auth.filter(session.cookies)
+                } else {
+                    val kept = out[name]?.minus(session.cookies.keys) ?: continue
+                    if (kept.isEmpty()) out.remove(name) else out[name] = kept
+                }
+                continue
+            }
             val kind = AccountKind.of(spec.type) ?: continue
             val session = sessions[kind]?.takeUnless { it.expired || it.cookies.isEmpty() } ?: continue
             if (spec.value.isEmpty()) continue

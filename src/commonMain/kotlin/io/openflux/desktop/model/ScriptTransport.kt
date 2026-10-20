@@ -32,6 +32,37 @@ data class ScriptParam(
     val advanced: Boolean = false,
 )
 
+/**
+ * The sign-in a script transport declares in its info().auth (transport/script.Auth
+ * in the core): which account, where a person signs in, and which of the
+ * account's cookies the transport is given. The app makes the sign-in from
+ * it and hands the transport only [cookies] (all of them when empty).
+ */
+@Serializable
+data class ScriptAuth(
+    /** The account several transports share ("yandex" for yandex, vyandex, boards, telemost). */
+    val account: String,
+    val label: String = "",
+    /** "always" | "create" (only to create the document or room) | "optional". */
+    val need: String = "always",
+    val signInUrl: String = "",
+    val homeUrl: String = "",
+    val waitForHome: Boolean = false,
+    val finishUrl: String = "",
+    val finishCookie: String = "",
+    val cookieUrls: List<String> = emptyList(),
+    val loginCookie: String = "",
+    val loginNameCookie: String = "",
+    val cookies: List<String> = emptyList(),
+) {
+    /** Whether the transport opens its document as the signed-in user (and so gets the cookies). */
+    val opensSignedIn: Boolean get() = need != "create"
+
+    /** The account's cookies this transport is to be given. */
+    fun filter(jar: Map<String, String>): Map<String, String> =
+        if (cookies.isEmpty()) jar else jar.filterKeys { it in cookies }
+}
+
 /** Where an installed script came from; shown in its details. */
 @Serializable
 enum class ScriptSource(val label: String) {
@@ -85,6 +116,8 @@ data class InstalledScript(
     val wire: Int = 1,
     /** The https update.json addresses the package's manifest names; empty = nothing to check. */
     val updateUrls: List<String> = emptyList(),
+    /** The sign-in the transport needs (its info().auth); null when none. */
+    val auth: ScriptAuth? = null,
 ) {
     /** A signed package that says where its updates are. */
     val updatable: Boolean get() = fileName.endsWith(".flux") && updateUrls.isNotEmpty()
