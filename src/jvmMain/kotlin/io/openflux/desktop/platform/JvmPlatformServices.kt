@@ -367,10 +367,13 @@ class JvmPlatformServices(
         const val DESKTOP_TAG_PREFIX = "v"
         /** Nightly test builds are tagged nightly-<date>-<commit>, as prereleases. */
         const val NIGHTLY_TAG_PREFIX = "nightly-"
-        /** The OpenFlux project's own script-signing key - see transport/script.OfficialKeyHex. Public; safe to duplicate. */
         /** Largest answer [fetchBytes] returns; a downloaded transport is a few KB. */
         const val MAX_FETCH_BYTES = 4 * 1024 * 1024
-        const val OFFICIAL_SCRIPT_KEY = "d8bf9c958b994c2faab886cade5f28213f254911f87abe5e34756a289ae91354"
+        /**
+         * The key OpenFlux's own transports are signed with now (OpenFluxTeam) - see transport/script.OfficialKeyHex.
+         * The core still takes upstream's earlier key as official too. Public; safe to duplicate.
+         */
+        const val OFFICIAL_SCRIPT_KEY = "96df2b44fb8e6b539f4407f299ea483542afcd26e7429e60fabb5ca39ab86b1a"
     }
 }
 

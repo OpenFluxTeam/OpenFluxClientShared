@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
  * so a plain checkout's test run stays green.
  */
 class JvmPlatformServicesScriptTest {
-    private val officialKey = "d8bf9c958b994c2faab886cade5f28213f254911f87abe5e34756a289ae91354"
+    private val officialKey = io.openflux.desktop.platform.JvmPlatformServices.OFFICIAL_SCRIPT_KEY
 
     private fun platformOrSkip(): JvmPlatformServices? {
         // Gradle's Test task working directory does not reliably match the
