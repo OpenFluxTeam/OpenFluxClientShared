@@ -164,7 +164,7 @@ fun AccountScreen() {
             PurchaseContent(
                 buy.uiFor(bot.pendingInvoice),
                 PurchaseActions(
-                    onSelect = buy::select, onPay = buy::pay, onReopen = buy::reopen, onCheck = buy::check,
+                    onSelect = buy::select, onChooseGateway = buy::chooseGateway, onPay = buy::pay, onReopen = buy::reopen, onCheck = buy::check,
                     onAgain = buy::again, onDone = buy::done, onReload = buy::reload,
                 ),
                 platform.utcOffsetSeconds,

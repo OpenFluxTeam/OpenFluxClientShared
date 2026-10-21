@@ -7,13 +7,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
-/** Downloads the real fork and original core releases; OPENFLUX_LIVE=1 runs it. */
+/** Downloads the real core release; OPENFLUX_LIVE=1 runs it. */
 class CoreDownloadLiveTest {
     @Test
-    fun downloadsBothCores() {
+    fun downloadsTheCore() {
         if (System.getenv("OPENFLUX_LIVE") != "1") return
         val binary = CoreBinary()
-        for (source in listOf(CoreSource.Fork, CoreSource.Official)) {
+        for (source in listOf(CoreSource.Release)) {
             val tag = binary.download(source)
             println("$source: $tag -> ${binary.downloaded(source)}")
             assertEquals(tag, binary.downloadedTag(source))

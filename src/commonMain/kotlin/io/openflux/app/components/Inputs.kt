@@ -1,6 +1,30 @@
 package io.openflux.app.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import io.openflux.app.theme.MinTouch
+import io.openflux.app.theme.Motion
+import io.openflux.app.theme.accentBrush
+import io.openflux.app.theme.glow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,15 +35,11 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -113,8 +133,10 @@ fun SecretField(value: String, onValueChange: (String) -> Unit, label: String, m
     )
 }
 
-/** One of a few: L4 / L3, Пароль / Ключ. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * One of a few: L4 / L3, Пароль / Ключ, Клиент / Выходная нода. A track with the accent's gradient sliding under
+ * the chosen option.
+ */
 @Composable
 fun <T> Segmented(
     options: List<T>,
@@ -125,28 +147,46 @@ fun <T> Segmented(
     enabled: (T) -> Boolean = { true },
 ) {
     val c = AppTheme.colors
-    SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth()) {
-        options.forEachIndexed { i, option ->
-            SegmentedButton(
-                selected = option == selected,
-                onClick = { onSelect(option) },
-                shape = SegmentedButtonDefaults.itemShape(i, options.size),
-                enabled = enabled(option),
-                icon = {},
-                colors = SegmentedButtonDefaults.colors(
-                    activeContainerColor = c.accent, activeContentColor = c.onAccent, activeBorderColor = c.accent,
-                    inactiveContainerColor = c.surface, inactiveContentColor = c.text, inactiveBorderColor = c.border,
-                    disabledInactiveContentColor = c.textMuted, disabledInactiveBorderColor = c.border,
-                ),
-            ) {
-                // A narrow screen shrinks a long label rather than cutting it.
-                BasicText(
-                    label(option),
-                    style = AppTheme.type.body.copy(color = LocalContentColor.current),
-                    maxLines = 1,
-                    softWrap = false,
-                    autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = AppTheme.type.body.fontSize, stepSize = 0.5.sp),
+    val shape = RoundedCornerShape(AppTheme.shapes.medium)
+    val inner = RoundedCornerShape(AppTheme.shapes.medium - 3.dp)
+    val index = options.indexOf(selected).coerceAtLeast(0)
+    val height = if (AppTheme.touch) MinTouch else 42.dp
+    BoxWithConstraints(
+        modifier.fillMaxWidth().height(height).clip(shape).background(c.surface).border(1.dp, c.border, shape).padding(3.dp),
+    ) {
+        val cell = maxWidth / options.size.coerceAtLeast(1)
+        val x by animateDpAsState(cell * index, Motion.bouncy())
+        Box(
+            Modifier.offset(x = x).width(cell).fillMaxHeight()
+                .shadow(6.dp, inner, ambientColor = c.glow, spotColor = c.glow)
+                .background(c.accentBrush, inner),
+        )
+        Row(Modifier.fillMaxSize()) {
+            options.forEachIndexed { i, option ->
+                val on = i == index
+                val can = enabled(option)
+                val color by animateColorAsState(
+                    when {
+                        on -> c.onAccent
+                        !can -> c.textMuted
+                        else -> c.textSecondary
+                    },
                 )
+                Box(
+                    Modifier.weight(1f).fillMaxHeight().clip(inner)
+                        .selectable(on, enabled = can, role = Role.RadioButton, onClick = { onSelect(option) }),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // A narrow screen shrinks a long label rather than cutting it.
+                    BasicText(
+                        label(option),
+                        modifier = Modifier.padding(horizontal = AppTheme.spacing.s),
+                        style = AppTheme.type.body.copy(color = color, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium),
+                        maxLines = 1,
+                        softWrap = false,
+                        autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = AppTheme.type.body.fontSize, stepSize = 0.5.sp),
+                    )
+                }
             }
         }
     }
@@ -168,8 +208,9 @@ fun Toggle(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, 
                 onCheckedChange = onCheckedChange,
                 enabled = enabled,
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = c.onAccent, checkedTrackColor = c.accent,
+                    checkedThumbColor = c.onAccent, checkedTrackColor = c.accent, checkedBorderColor = c.accent,
                     uncheckedThumbColor = c.textSecondary, uncheckedTrackColor = c.surfaceHigh, uncheckedBorderColor = c.border,
+                    disabledCheckedTrackColor = c.accent.copy(alpha = 0.4f), disabledUncheckedTrackColor = c.surfaceHigh,
                 ),
             )
         },
@@ -183,13 +224,16 @@ fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifie
         selected = selected,
         onClick = onClick,
         modifier = modifier,
-        label = { Text(text, style = AppTheme.type.bodySmall, maxLines = 1) },
-        leadingIcon = leading?.let { { Icon(it, contentDescription = null, modifier = Modifier.size(18.dp)) } },
+        label = { Text(text, style = AppTheme.type.bodySmall.copy(fontWeight = FontWeight.Medium), maxLines = 1) },
+        // A chosen chip shows a tick that grows in; one with its own icon keeps it.
+        leadingIcon = (leading ?: Icons.Rounded.Check.takeIf { selected })?.let { icon ->
+            { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) }
+        },
         shape = RoundedCornerShape(AppTheme.shapes.large),
         colors = FilterChipDefaults.filterChipColors(
-            containerColor = c.surface, labelColor = c.text, iconColor = c.textSecondary,
-            selectedContainerColor = c.accent, selectedLabelColor = c.onAccent, selectedLeadingIconColor = c.onAccent,
+            containerColor = c.surface, labelColor = c.textSecondary, iconColor = c.textSecondary,
+            selectedContainerColor = c.accentSoft, selectedLabelColor = c.accentText, selectedLeadingIconColor = c.accentText,
         ),
-        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = selected, borderColor = c.border, selectedBorderColor = c.accent),
+        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = selected, borderColor = c.border, selectedBorderColor = c.accent.copy(alpha = 0.6f)),
     )
 }

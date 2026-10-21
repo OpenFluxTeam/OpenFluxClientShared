@@ -1,6 +1,11 @@
 package io.openflux.app.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -25,6 +30,8 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -32,6 +39,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.openflux.app.theme.AppTheme
 import io.openflux.app.theme.MinTouch
+import io.openflux.app.theme.accentBrush
+import io.openflux.app.theme.glow
+import io.openflux.app.theme.pressScale
 
 private val ButtonPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
 
@@ -51,34 +61,47 @@ private fun ButtonLabel(text: String, leading: ImageVector?) {
     )
 }
 
-/** The one main action of a screen. */
+/** The one main action of a screen: the accent's gradient with a soft light under it. */
 @Composable
 fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, leading: ImageVector? = null) {
     val c = AppTheme.colors
+    val shape = RoundedCornerShape(AppTheme.shapes.medium)
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val lift by androidx.compose.animation.core.animateDpAsState(if (enabled) (if (hovered) 14.dp else 8.dp) else 0.dp)
     Button(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = MinTouch),
+        modifier = modifier.defaultMinSize(minHeight = MinTouch).pressScale(interaction)
+            .shadow(lift, shape, ambientColor = c.glow, spotColor = c.glow)
+            .background(if (enabled) c.accentBrush else androidx.compose.ui.graphics.SolidColor(c.surfaceHigh), shape),
         enabled = enabled,
-        shape = RoundedCornerShape(AppTheme.shapes.medium),
+        shape = shape,
         colors = ButtonDefaults.buttonColors(
-            containerColor = c.accent, contentColor = c.onAccent,
-            disabledContainerColor = c.surfaceHigh, disabledContentColor = c.textMuted,
+            containerColor = Color.Transparent, contentColor = c.onAccent,
+            disabledContainerColor = Color.Transparent, disabledContentColor = c.textMuted,
         ),
         contentPadding = ButtonPadding,
+        interactionSource = interaction,
     ) { ButtonLabel(text, leading) }
 }
 
+/** A second action: a raised tile with a thin edge that brightens under the pointer. */
 @Composable
 fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, leading: ImageVector? = null) {
     val c = AppTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val fill by animateColorAsState(if (hovered && enabled) c.surfaceHigh else c.surface)
+    val edge by animateColorAsState(if (hovered && enabled) c.accent.copy(alpha = 0.55f) else c.border)
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = MinTouch),
+        modifier = modifier.defaultMinSize(minHeight = MinTouch).pressScale(interaction),
         enabled = enabled,
         shape = RoundedCornerShape(AppTheme.shapes.medium),
-        border = BorderStroke(1.dp, c.border),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = c.text, disabledContentColor = c.textMuted),
+        border = BorderStroke(1.dp, edge),
+        colors = ButtonDefaults.outlinedButtonColors(containerColor = fill, contentColor = c.text, disabledContentColor = c.textMuted),
         contentPadding = ButtonPadding,
+        interactionSource = interaction,
     ) { ButtonLabel(text, leading) }
 }
 
@@ -86,24 +109,31 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
 @Composable
 fun DangerButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val c = AppTheme.colors
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val fill by animateColorAsState(c.danger.copy(alpha = if (hovered && enabled) 0.18f else 0.08f))
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = MinTouch),
+        modifier = modifier.defaultMinSize(minHeight = MinTouch).pressScale(interaction),
         enabled = enabled,
         shape = RoundedCornerShape(AppTheme.shapes.medium),
-        border = BorderStroke(1.dp, c.danger),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = c.danger, disabledContentColor = c.textMuted),
+        border = BorderStroke(1.dp, c.danger.copy(alpha = if (enabled) 0.7f else 0.3f)),
+        colors = ButtonDefaults.outlinedButtonColors(containerColor = fill, contentColor = c.danger, disabledContentColor = c.textMuted),
         contentPadding = ButtonPadding,
+        interactionSource = interaction,
     ) { ButtonLabel(text, null) }
 }
 
 @Composable
-fun TextAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, color: Color = AppTheme.colors.accent) {
+fun TextAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, color: Color = AppTheme.colors.accentText) {
+    val interaction = remember { MutableInteractionSource() }
     TextButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.pressScale(interaction),
         enabled = enabled,
+        shape = RoundedCornerShape(AppTheme.shapes.small),
         colors = ButtonDefaults.textButtonColors(contentColor = color, disabledContentColor = AppTheme.colors.textMuted),
+        interactionSource = interaction,
     ) { Text(text, style = AppTheme.type.title, maxLines = 1) }
 }
 
@@ -113,10 +143,12 @@ fun TextAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
 fun IconAction(icon: ImageVector, description: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val c = AppTheme.colors
     val button = @Composable {
+        val interaction = remember { MutableInteractionSource() }
         IconButton(
             onClick = onClick,
-            modifier = modifier,
+            modifier = modifier.pressScale(interaction, pressed = 0.88f),
             enabled = enabled,
+            interactionSource = interaction,
             colors = IconButtonDefaults.iconButtonColors(contentColor = c.text, disabledContentColor = c.textMuted),
         ) { Icon(icon, contentDescription = description.substringBefore(" · ")) }
     }

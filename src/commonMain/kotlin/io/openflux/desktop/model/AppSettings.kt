@@ -36,31 +36,36 @@ fun ExitBackend.describe(needs: String?): String = when (this) {
 
 /**
  * Which core binary runs the connection: the one packed with the app, the
- * newest release downloaded from a core repository ([repo]), or a file of
- * the user's own.
+ * newest release downloaded from the core repository ([CoreRepos.CORE]), or a
+ * file of the user's own. Settings show [choices]; [Fork] and [Official] only
+ * keep settings saved by 3.8.1 and older readable, [migrated] turns them into [Release].
  */
 @Serializable
 enum class CoreSource(val label: String, val repo: String? = null) {
     Bundled("Встроенное"),
-    Fork("Форк", CoreRepos.FORK),
-    Official("Оригинал", CoreRepos.OFFICIAL),
+    Release("Выпуск с GitHub", CoreRepos.CORE),
     Custom("Свой файл"),
+    Fork("Выпуск с GitHub", CoreRepos.CORE),
+    Official("Выпуск с GitHub", CoreRepos.CORE);
+
+    companion object {
+        val choices = listOf(Bundled, Release, Custom)
+    }
 }
 
-/** The OpenFlux core repositories: this fork and the original. */
+/** The OpenFlux core repositories: the one the app's core is built from, and the original it was forked from. */
 object CoreRepos {
-    const val FORK = "meepo161/OpenFlux"
+    const val CORE = "OpenFluxTeam/OpenFlux"
     const val OFFICIAL = "p1neappleXpress/OpenFlux"
 }
 
 /**
- * Whose core the "Своя нода" wizard installs on the server; the node's
- * updater then follows that repository's releases. [id] is the core's
- * --node-wizard source.
+ * The core the "Своя нода" wizard installs on the server; the node's updater
+ * then follows that repository's releases. [id] is the core's --node-wizard
+ * source.
  */
-enum class NodeCoreSource(val id: String, val label: String, val repo: String) {
-    Fork("fork", "Форк", CoreRepos.FORK),
-    Official("official", "Оригинал", CoreRepos.OFFICIAL),
+enum class NodeCoreSource(val id: String, val repo: String) {
+    Core("fork", CoreRepos.CORE),
 }
 
 /** The Windows proxy settings found before OpenFlux changed them. */
@@ -154,5 +159,8 @@ data class AppSettings(
 )
 
 /** Settings from an older version, brought up to date once on load. */
-fun AppSettings.migrated(): AppSettings =
-    if (systemProxyDefaultOn) this else copy(systemProxy = true, systemProxyDefaultOn = true)
+fun AppSettings.migrated(): AppSettings {
+    val proxied = if (systemProxyDefaultOn) this else copy(systemProxy = true, systemProxyDefaultOn = true)
+    // The fork / original choice is gone: both mean the one core repository.
+    return if (proxied.coreSource == CoreSource.Fork || proxied.coreSource == CoreSource.Official) proxied.copy(coreSource = CoreSource.Release) else proxied
+}

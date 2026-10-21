@@ -306,7 +306,7 @@ private fun CorePage() {
         Section(null) { ValueRow("Встроенное ядро", platform.coreVersion) }
     } else {
         io.openflux.app.components.Group("Файл ядра") {
-            Segmented(CoreSource.entries, settings.coreSource, { s -> container.settings.update { it.copy(coreSource = s) } }, label = { it.label })
+            Segmented(CoreSource.choices, settings.coreSource, { s -> container.settings.update { it.copy(coreSource = s) } }, label = { it.label })
         }
         val repo = settings.coreSource.repo
         when {
@@ -442,8 +442,7 @@ private fun AboutPage() {
         Section(null) { RowItem("Поддержка", subtitle = "Чат в Telegram: вопросы, проблемы с подключением", onClick = { platform.openUrl(url) }) }
     }
     Section("Исходный код") {
-        RowItem("Ядро OpenFlux (форк)", subtitle = "github.com/${CoreRepos.FORK}", onClick = { platform.openUrl("https://github.com/${CoreRepos.FORK}") })
-        RowItem("Ядро OpenFlux (оригинал)", subtitle = "github.com/${CoreRepos.OFFICIAL}", onClick = { platform.openUrl("https://github.com/${CoreRepos.OFFICIAL}") })
+        RowItem("Исходный код ядра", subtitle = "github.com/${CoreRepos.OFFICIAL}", onClick = { platform.openUrl("https://github.com/${CoreRepos.OFFICIAL}") })
         RowItem("Это приложение", subtitle = "github.com/${platform.clientRepo}", onClick = { platform.openUrl("https://github.com/${platform.clientRepo}") })
     }
     Text(

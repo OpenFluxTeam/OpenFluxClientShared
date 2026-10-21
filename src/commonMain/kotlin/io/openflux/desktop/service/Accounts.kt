@@ -10,6 +10,7 @@ import io.openflux.desktop.model.MailruCloud
 import io.openflux.desktop.model.NodeDocuments
 import io.openflux.desktop.model.YandexDisk
 import io.openflux.desktop.model.YandexDocument
+import io.openflux.desktop.model.YandexTelemost
 import io.openflux.app.platform.BrowserPage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -122,17 +123,22 @@ class Accounts(
         _signingIn.value = kind.takeIf { inDialog }
         try {
             browser.open(kind, maker.startUrl, session.cookies) { set(kind, AuthStatus.Busy(it)) }
-            val deadline = now() + DISK_TIMEOUT_MS
+            val deadline = now() + maker.timeoutMs
             while (true) {
                 if (browser.closed) throw AccountException("Создание документа отменено", cancelled = true)
-                if (now() > deadline) throw AccountException("${maker.place} не открылся за 2 минуты")
+                if (now() > deadline) {
+                    throw AccountException(
+                        if (maker.hint != null) "${maker.place}: за ${maker.timeoutMs / 60_000} минут ${doc.label} так и не создали"
+                        else "${maker.place} не открылся за ${maker.timeoutMs / 60_000} минуты",
+                    )
+                }
                 val url = browser.url
                 if (maker.signInPages.any { it in url }) {
                     markExpired(kind)
                     throw AccountException("Сессия ${kind.label} истекла — войдите заново", expired = true)
                 }
                 if (!browser.loading && url.startsWith(maker.readyUrl)) {
-                    set(kind, AuthStatus.Busy("Создаю документ: ${maker.place}…"))
+                    set(kind, AuthStatus.Busy(maker.hint ?: "Создаю документ: ${maker.place}…"))
                     val raw = runCatching { browser.evaluate(maker.script(fileName)) }.getOrNull()
                     val result = raw?.let { runCatching { Json.parseToJsonElement(it).jsonObject }.getOrNull() }
                     when (result?.get("state")?.jsonPrimitive?.content) {
@@ -234,7 +240,6 @@ class Accounts(
 
     companion object {
         const val RECHECK_MS = 30 * 60 * 1000L
-        private const val DISK_TIMEOUT_MS = 2 * 60 * 1000L
     }
 }
 
@@ -249,6 +254,9 @@ internal class DocumentMaker(
     val signInPages: List<String>,
     val script: (String) -> String,
     val clean: (String) -> String?,
+    /** Said while [script] waits, when the person makes it on the page themselves (a Telemost conference). */
+    val hint: String? = null,
+    val timeoutMs: Long = 2 * 60 * 1000L,
 ) {
     companion object {
         fun of(doc: DocumentKind): DocumentMaker = when (doc) {
@@ -264,6 +272,11 @@ internal class DocumentMaker(
                 "Облако Mail", MailruCloud.HOME, MailruCloud.HOME,
                 // Cloud comes back with autologin=no when Mail did not let the session in.
                 listOf("account.mail.ru/login", "id.vk.ru", "login.vk.com", "autologin=no"), MailruCloud::script, MailruCloud::clean,
+            )
+            DocumentKind.TelemostConference -> DocumentMaker(
+                "Телемост", YandexTelemost.SITE, YandexTelemost.SITE,
+                listOf("passport.yandex"), YandexTelemost::script, YandexTelemost::clean,
+                hint = YandexTelemost.HINT, timeoutMs = 10 * 60 * 1000L,
             )
         }
     }

@@ -49,12 +49,17 @@ fun Sheet(onDismiss: () -> Unit, title: String? = null, content: @Composable Col
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = c.surface,
             contentColor = c.text,
+            scrimColor = c.scrim,
+            shape = RoundedCornerShape(topStart = AppTheme.shapes.large, topEnd = AppTheme.shapes.large),
+            dragHandle = { androidx.compose.material3.BottomSheetDefaults.DragHandle(color = c.border) },
         ) { body() }
     } else {
         Dialog(onDismissRequest = onDismiss) {
             Surface(
                 modifier = Modifier.widthIn(max = 480.dp),
                 shape = RoundedCornerShape(AppTheme.shapes.large),
+                border = androidx.compose.foundation.BorderStroke(1.dp, c.border),
+                shadowElevation = 24.dp,
                 color = c.surface,
                 contentColor = c.text,
             ) { Column(Modifier.padding(top = AppTheme.spacing.s)) { body() } }

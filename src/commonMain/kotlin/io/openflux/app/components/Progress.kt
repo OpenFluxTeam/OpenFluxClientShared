@@ -11,6 +11,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import io.openflux.app.theme.AppTheme
 
@@ -23,7 +28,7 @@ fun ProgressLine(text: String, modifier: Modifier = Modifier, onDetails: (() -> 
             Text(text, Modifier.weight(1f), style = AppTheme.type.bodySmall, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (onDetails != null) TextAction("Подробнее", onDetails, color = c.textSecondary)
         }
-        LinearProgressIndicator(Modifier.fillMaxWidth(), color = c.accent, trackColor = c.surfaceHigh)
+        LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)), color = c.accent, trackColor = c.surfaceHigh)
     }
 }
 
@@ -47,7 +52,9 @@ fun ChangesBar(
     val c = AppTheme.colors
     val sp = AppTheme.spacing
     Column(
-        modifier.fillMaxWidth().background(c.surface).padding(horizontal = sp.page, vertical = sp.m),
+        modifier.fillMaxWidth().background(c.surface)
+            .drawBehind { drawLine(c.border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
+            .padding(horizontal = sp.page, vertical = sp.m),
         verticalArrangement = Arrangement.spacedBy(sp.s),
     ) {
         if (busy != null) {

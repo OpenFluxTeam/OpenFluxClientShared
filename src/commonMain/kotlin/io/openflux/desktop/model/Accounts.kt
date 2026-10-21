@@ -76,6 +76,7 @@ enum class AccountKind(
 enum class DocumentKind(val account: AccountKind, val label: String) {
     YandexDocument(AccountKind.Yandex, "документ"),
     YandexBoard(AccountKind.Yandex, "доску"),
+    TelemostConference(AccountKind.Yandex, "конференцию"),
     MailruDocument(AccountKind.Mailru, "документ");
 
     companion object {
@@ -83,6 +84,7 @@ enum class DocumentKind(val account: AccountKind, val label: String) {
         fun of(type: TransportType): DocumentKind? = when (type) {
             TransportType.VYANDEX, TransportType.YANDEX -> YandexDocument
             TransportType.BOARDS -> YandexBoard
+            TransportType.TELEMOST -> TelemostConference
             TransportType.MAILRU -> MailruDocument
             else -> null
         }

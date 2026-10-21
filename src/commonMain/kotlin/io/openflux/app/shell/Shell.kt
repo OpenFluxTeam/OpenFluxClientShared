@@ -1,6 +1,34 @@
 package io.openflux.app.shell
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import io.openflux.app.home.statusLine
+import io.openflux.app.theme.Motion
+import io.openflux.app.theme.accentBrush
+import io.openflux.app.theme.appBackground
+import io.openflux.app.theme.glow
+import io.openflux.app.theme.pressScale
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +84,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -71,6 +100,7 @@ import io.openflux.app.nav.Section
 import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.isActive
+import io.openflux.desktop.model.profile
 import io.openflux.desktop.service.LocalAppContainer
 import io.openflux.app.platform.LocalShortcuts
 import io.openflux.app.platform.LocalTouchUi
@@ -88,7 +118,7 @@ fun widthClassOf(width: Dp): WidthClass = when {
 /** A list beside its detail needs this much room (spec 4.3). */
 private val WideContent = 900.dp
 private val RailCompact = 72.dp
-private val RailFull = 208.dp
+private val RailFull = 232.dp
 
 private val Section.icon: ImageVector
     get() = when (this) {
@@ -110,7 +140,7 @@ private val Section.shortcut: String
 fun Shell(navigator: AppNavigator, onAdd: () -> Unit, content: @Composable (wide: Boolean) -> Unit) {
     val touch = LocalTouchUi.current
     ShellShortcuts(navigator, onAdd, enabled = !touch)
-    BoxWithConstraints(Modifier.fillMaxSize().background(AppTheme.colors.background)) {
+    BoxWithConstraints(Modifier.fillMaxSize().appBackground()) {
         val window = maxWidth
         val widthClass = widthClassOf(window)
         if (widthClass == WidthClass.Phone) {
@@ -200,7 +230,11 @@ private fun connectionStatus(): Status? {
 private fun BottomBar(navigator: AppNavigator, onAdd: () -> Unit) {
     val c = AppTheme.colors
     val status = connectionStatus()
-    BoxWithConstraints(Modifier.fillMaxWidth().background(c.surface).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))) {
+    BoxWithConstraints(
+        Modifier.fillMaxWidth().background(c.sidebar)
+            .drawBehind { drawLine(c.border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
+    ) {
         // Too narrow for every label at this text size: only the chosen place keeps its label.
         val allLabels = maxWidth / 5 >= 76.dp * LocalDensity.current.fontScale
         Row(Modifier.fillMaxWidth().padding(vertical = AppTheme.spacing.xs), verticalAlignment = Alignment.CenterVertically) {
@@ -216,25 +250,45 @@ private fun BottomBar(navigator: AppNavigator, onAdd: () -> Unit) {
 private fun BarItem(section: Section, navigator: AppNavigator, status: Status?, label: Boolean, modifier: Modifier) {
     val c = AppTheme.colors
     val selected = navigator.section == section
-    val color = if (selected) c.accent else c.textSecondary
+    // The chosen place: a pill of the accent's wash grows behind its icon (2.x), the icon and label light up.
+    val pill by animateFloatAsState(if (selected) 1f else 0f, Motion.bouncy())
+    val color by animateColorAsState(if (selected) c.accentText else c.textSecondary)
+    val labelColor by animateColorAsState(if (selected) c.text else c.textSecondary)
+    val interaction = remember { MutableInteractionSource() }
     Column(
         modifier.heightIn(min = 56.dp).clip(RoundedCornerShape(AppTheme.shapes.medium))
-            .clickable(role = Role.Tab) { navigator.select(section) }
+            .clickable(interaction, indication = null, role = Role.Tab) { navigator.select(section) }
             .semantics { this.selected = selected; contentDescription = section.title }
             .padding(horizontal = 2.dp, vertical = AppTheme.spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box {
-            Icon(section.icon, contentDescription = null, tint = color)
-            if (status != null) StatusDot(status, Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-1).dp))
+        Box(
+            Modifier.width(56.dp).height(30.dp).pressScale(interaction, pressed = 0.9f)
+                .drawBehind {
+                    if (pill > 0f) {
+                        val w = size.width * (0.5f + 0.5f * pill)
+                        drawRoundRect(
+                            c.accentSoft.copy(alpha = (c.accentSoft.alpha * 1.4f * pill).coerceAtMost(1f)),
+                            topLeft = Offset((size.width - w) / 2, 0f),
+                            size = Size(w, size.height),
+                            cornerRadius = CornerRadius(size.height / 2),
+                        )
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box {
+                Icon(section.icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+                if (status != null) StatusDot(status, Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-2).dp))
+            }
         }
         if (label || selected) {
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(3.dp))
             // The chosen place's label alone may still be long on a tiny screen: it shrinks rather than gets cut.
             BasicText(
                 section.title,
-                style = AppTheme.type.caption.copy(color = color),
+                style = AppTheme.type.caption.copy(color = labelColor, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium),
                 maxLines = 1,
                 softWrap = false,
                 overflow = TextOverflow.Clip,
@@ -244,16 +298,23 @@ private fun BarItem(section: Section, navigator: AppNavigator, status: Status?, 
     }
 }
 
+/** ＋ in a circle of the accent's gradient, glowing a little. */
 @Composable
 private fun AddButton(onAdd: () -> Unit, modifier: Modifier = Modifier) {
     val c = AppTheme.colors
+    val interaction = remember { MutableInteractionSource() }
     Box(
-        modifier.size(48.dp).clip(CircleShape).background(c.accent)
-            .clickable(role = Role.Button, onClick = onAdd)
+        modifier.size(48.dp).pressScale(interaction, pressed = 0.9f, hovered = 1.06f)
+            .shadow(10.dp, CircleShape, ambientColor = c.glow, spotColor = c.glow)
+            .clip(CircleShape).background(c.accentBrush)
+            .clickable(interaction, ripple(color = c.onAccent), role = Role.Button, onClick = onAdd)
             .semantics { contentDescription = "Добавить" },
         contentAlignment = Alignment.Center,
     ) { Icon(Icons.Rounded.Add, contentDescription = null, tint = c.onAccent) }
 }
+
+private val RailItemHeight = 44.dp
+private val RailItemGap = 4.dp
 
 @Composable
 private fun SideRail(navigator: AppNavigator, onAdd: () -> Unit, labels: Boolean, modifier: Modifier) {
@@ -261,48 +322,136 @@ private fun SideRail(navigator: AppNavigator, onAdd: () -> Unit, labels: Boolean
     val sp = AppTheme.spacing
     val status = connectionStatus()
     Column(
-        modifier.background(c.surface).padding(vertical = sp.l, horizontal = sp.s),
+        modifier.background(c.sidebar).padding(vertical = sp.l, horizontal = sp.s),
         horizontalAlignment = if (labels) Alignment.Start else Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(sp.xs),
     ) {
+        RailBrand(labels)
+        Spacer(Modifier.height(sp.l))
         Hint("Добавить · Ctrl+N", enabled = !labels) {
             if (labels) {
+                // ＋ is a tonal button here: the filled accent belongs to the chosen place below it.
+                val interaction = remember { MutableInteractionSource() }
+                val hovered by interaction.collectIsHoveredAsState()
+                val fill by animateColorAsState(if (hovered) c.accent.copy(alpha = 0.26f) else c.accentSoft)
+                val shape = RoundedCornerShape(AppTheme.shapes.medium)
                 Row(
-                    Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(AppTheme.shapes.medium)).background(c.accent)
-                        .clickable(role = Role.Button, onClick = onAdd).semantics { contentDescription = "Добавить" }.padding(horizontal = sp.m),
+                    Modifier.fillMaxWidth().heightIn(min = RailItemHeight).pressScale(interaction).clip(shape).background(fill)
+                        .border(1.dp, c.accent.copy(alpha = 0.45f), shape)
+                        .clickable(interaction, ripple(color = c.accent), role = Role.Button, onClick = onAdd)
+                        .semantics { contentDescription = "Добавить" }.padding(horizontal = sp.m),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, tint = c.onAccent)
+                    Icon(Icons.Rounded.Add, contentDescription = null, tint = c.accentText)
                     Spacer(Modifier.width(sp.m))
-                    Text("Добавить", style = AppTheme.type.title, color = c.onAccent, maxLines = 1)
+                    Text("Добавить", style = AppTheme.type.title, color = c.accentText, maxLines = 1)
                 }
             } else {
                 AddButton(onAdd)
             }
         }
-        Spacer(Modifier.height(sp.m))
-        for (s in Section.entries) {
-            val selected = navigator.section == s
-            val color = if (selected) c.accent else c.textSecondary
-            Hint("${s.title} · ${s.shortcut}", enabled = true) {
-                Row(
-                    Modifier.then(if (labels) Modifier.fillMaxWidth() else Modifier.size(48.dp))
-                        .heightIn(min = 44.dp).clip(RoundedCornerShape(AppTheme.shapes.medium))
-                        .background(if (selected) c.surfaceHigh else c.surface)
-                        .clickable(role = Role.Tab) { navigator.select(s) }
-                        .semantics { this.selected = selected; if (!labels) contentDescription = s.title }
-                        .padding(horizontal = if (labels) sp.m else 0.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = if (labels) Arrangement.Start else Arrangement.Center,
-                ) {
-                    Box {
-                        Icon(s.icon, contentDescription = null, tint = color)
-                        if (s == Section.Home && status != null) StatusDot(status, Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-1).dp))
+        Spacer(Modifier.height(sp.l))
+        val index = Section.entries.indexOf(navigator.section).coerceAtLeast(0)
+        // One filled pill slides to the chosen place (2.x), glowing under it.
+        val y by animateDpAsState((RailItemHeight + RailItemGap) * index, Motion.bouncy())
+        Box(if (labels) Modifier.fillMaxWidth() else Modifier.width(RailItemHeight + 4.dp)) {
+            val shape = RoundedCornerShape(AppTheme.shapes.medium)
+            Box(
+                Modifier.offset(y = y).fillMaxWidth().height(RailItemHeight)
+                    .shadow(12.dp, shape, ambientColor = c.glow, spotColor = c.glow)
+                    .background(c.accentBrush, shape),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(RailItemGap)) {
+                for (s in Section.entries) RailItem(s, navigator, labels, if (s == Section.Home) status else null)
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        StatusCard(labels, onClick = { navigator.select(Section.Home) })
+    }
+}
+
+@Composable
+private fun RailItem(s: Section, navigator: AppNavigator, labels: Boolean, status: Status?) {
+    val c = AppTheme.colors
+    val sp = AppTheme.spacing
+    val selected = navigator.section == s
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val wash by animateColorAsState(if (hovered && !selected) c.surfaceHigh else c.surfaceHigh.copy(alpha = 0f))
+    val tint by animateColorAsState(if (selected) c.onAccent else c.textSecondary)
+    val textColor by animateColorAsState(if (selected) c.onAccent else c.text)
+    Hint("${s.title} · ${s.shortcut}", enabled = true) {
+        Row(
+            Modifier.fillMaxWidth().height(RailItemHeight).pressScale(interaction, pressed = 0.97f)
+                .clip(RoundedCornerShape(AppTheme.shapes.medium)).background(wash)
+                .clickable(interaction, indication = null, role = Role.Tab) { navigator.select(s) }
+                .semantics { this.selected = selected; if (!labels) contentDescription = s.title }
+                .padding(horizontal = if (labels) sp.m else 0.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (labels) Arrangement.Start else Arrangement.Center,
+        ) {
+            Box {
+                Icon(s.icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+                if (status != null) StatusDot(status, Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-2).dp))
+            }
+            if (labels) {
+                Spacer(Modifier.width(sp.m))
+                Text(s.title, Modifier.weight(1f), style = AppTheme.type.body.copy(fontWeight = FontWeight.SemiBold), color = textColor, maxLines = 1)
+                AnimatedVisibility(hovered && !selected, enter = fadeIn(), exit = fadeOut()) {
+                    Text(s.shortcut, style = AppTheme.type.caption, color = c.textMuted, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+/** The logo, with the name and what it is beside a wide column (2.x). */
+@Composable
+private fun RailBrand(labels: Boolean) {
+    if (labels) io.openflux.app.components.Brand(Modifier.padding(horizontal = AppTheme.spacing.xs)) else io.openflux.app.components.BrandTile()
+}
+
+/** The connection at the foot of the column (2.x): its state and what it goes through; a click opens Главная. */
+@Composable
+private fun StatusCard(labels: Boolean, onClick: () -> Unit) {
+    val container = LocalAppContainer.current
+    val c = AppTheme.colors
+    val state by container.connection.state.collectAsState()
+    val profiles by container.profiles.profiles.collectAsState()
+    val settings by container.settings.settings.collectAsState()
+    val name = state.profile?.name ?: (profiles.firstOrNull { it.id == settings.selectedProfileId } ?: profiles.firstOrNull())?.name
+    val status = connectionStatus() ?: Status.Off
+    val title = statusLine(state)
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val fill by animateColorAsState(if (hovered) c.surfaceHigh else c.surface)
+    val edge by animateColorAsState(
+        when (status) {
+            Status.On -> c.success.copy(alpha = 0.45f)
+            Status.Error -> c.danger.copy(alpha = 0.45f)
+            Status.Busy -> c.warning.copy(alpha = 0.4f)
+            else -> c.border
+        },
+    )
+    val shape = RoundedCornerShape(AppTheme.shapes.medium)
+    Hint(title, enabled = !labels) {
+        Row(
+            Modifier.then(if (labels) Modifier.fillMaxWidth() else Modifier.size(RailItemHeight + 4.dp)).pressScale(interaction, pressed = 0.97f)
+                .clip(shape).background(fill).border(1.dp, edge, shape)
+                .clickable(interaction, ripple(color = c.accent), onClick = onClick)
+                // One description for a screen reader; its texts would otherwise repeat Home's in every search.
+                .clearAndSetSemantics { contentDescription = listOfNotNull(title, name).joinToString(" · "); role = Role.Button }
+                .padding(if (labels) AppTheme.spacing.m else 0.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (labels) Arrangement.Start else Arrangement.Center,
+        ) {
+            StatusDot(status)
+            if (labels) {
+                Spacer(Modifier.width(AppTheme.spacing.m))
+                Column(Modifier.weight(1f)) {
+                    AnimatedContent(title, transitionSpec = { (fadeIn() + slideInVertically { it / 2 }) togetherWith (fadeOut() + slideOutVertically { -it / 2 }) }) {
+                        Text(it, style = AppTheme.type.body.copy(fontWeight = FontWeight.SemiBold), color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    if (labels) {
-                        Spacer(Modifier.width(sp.m))
-                        Text(s.title, style = AppTheme.type.body, color = if (selected) c.text else c.textSecondary, maxLines = 1)
-                    }
+                    Text(name ?: "Нет подключений", style = AppTheme.type.caption, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

@@ -206,17 +206,27 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
             Toggle(TransportType.TELEMOST.title, d.telemost, { on -> m.edit { it.copy(telemost = on) } }, enabled = editable)
             if (d.telemost) {
                 LinkRow(d.telemostLink, { v -> m.edit { it.copy(telemostLink = v) } }, "Ссылка на конференцию Телемоста") {
-                    TextAction("Открыть Телемост", { container.platform.openUrl("https://telemost.yandex.ru/") }, enabled = editable)
+                    TextAction("Создать в Телемосте", m::createTelemost, enabled = editable)
                 }
             }
             Toggle(
                 TransportType.CUPSONLINE.title, d.cups, { on -> m.edit { it.copy(cups = on) } },
                 subtitle = if (d.cups && d.cupsRooms.isEmpty()) "Комнаты создадутся сами" else null, enabled = editable,
             )
+            if (d.cups) {
+                LinkRow(d.cupsRooms, { v -> m.edit { it.copy(cupsRooms = v.trim()) } }, "Код комнат cups.online") {
+                    TextAction(if (d.cupsRooms.isEmpty()) "Создать комнаты" else "Новые комнаты", m::createCupsRooms, enabled = editable)
+                }
+            }
             Toggle(
                 TransportType.AVITO.title, d.avito, { on -> m.edit { it.copy(avito = on) } },
                 subtitle = if (d.avito && d.avitoRooms.isEmpty()) "Комнаты создадутся сами" else null, enabled = editable,
             )
+            if (d.avito) {
+                LinkRow(d.avitoRooms, { v -> m.edit { it.copy(avitoRooms = v.trim()) } }, "Код комнат Avito") {
+                    TextAction(if (d.avitoRooms.isEmpty()) "Создать комнаты" else "Новые комнаты", m::createAvitoRooms, enabled = editable)
+                }
+            }
             // Signed .flux packages installed here; the app sends each one to the node.
             val runnable = installedScripts.filter(NodeTransports::nodeCanRun)
             val onNode = d.scripts.map { it.id }.toSet()

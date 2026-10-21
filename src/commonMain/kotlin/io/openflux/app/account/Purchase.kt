@@ -199,7 +199,8 @@ class PurchaseModel(private val container: AppContainer, private val scope: Coro
             try {
                 val gateway = chosenGateway ?: methods.firstOrNull()?.id.orEmpty()
                 val inv = bot.checkout(term, gateway)
-                if (inv.payUrl.startsWith("https://")) container.platform.openUrl(inv.payUrl)
+                // An invoice paid at once (the free way) still carries a placeholder link (t.me/#invoice_…): nothing to open.
+                if (!inv.paid && inv.payUrl.startsWith("https://")) container.platform.openUrl(inv.payUrl)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: BotException) {
@@ -211,8 +212,8 @@ class PurchaseModel(private val container: AppContainer, private val scope: Coro
     }
 
     fun reopen() {
-        val url = bot.state.value.pendingInvoice?.invoice?.payUrl.orEmpty()
-        if (url.startsWith("https://")) container.platform.openUrl(url)
+        val inv = bot.state.value.pendingInvoice?.invoice ?: return
+        if (!inv.paid && inv.payUrl.startsWith("https://")) container.platform.openUrl(inv.payUrl)
     }
 
     fun check() {

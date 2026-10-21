@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -230,12 +231,6 @@ fun ProfileEditScreen(dest: Dest.ProfileEdit) {
                     style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
                 )
             }
-            if (d.session) {
-                Toggle(
-                    "Бондинг: все транспорты сразу", d.bonding, { on -> m.edit { it.copy(bonding = on) } },
-                    subtitle = "Скорости складываются. Нужна нода node-v1.3.0 или новее",
-                )
-            }
         }
         d.carriers.forEachIndexed { i, _ ->
             TransportBlock(m, i)
@@ -296,7 +291,7 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
             script?.name ?: c.type.title,
             subtitle = if (c.type == TransportType.SCRIPT && script == null) "JS-транспорт выключен" else c.type.blurb(),
             trailing = {
-                Row {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     if (index > 0) IconAction(Icons.Rounded.Close, "Убрать транспорт", { m.removeTransport(index) })
                     Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = AppTheme.colors.textMuted)
                 }

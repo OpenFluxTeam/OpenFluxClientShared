@@ -1,5 +1,12 @@
 package io.openflux.app.nav
 
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +20,7 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.scene.SinglePaneSceneStrategy
 import androidx.navigation3.ui.NavDisplay
 import io.openflux.app.theme.AppTheme
+import io.openflux.app.theme.appBackground
 
 /**
  * Shows the screens [navigator] holds. Every section's stack is decorated on its own and always, so a section
@@ -42,16 +50,27 @@ fun AppNavHost(
         modifier = modifier,
         sceneStrategies = listOf(ListDetailSceneStrategy(wide, nothingChosen), SinglePaneSceneStrategy()),
         onBack = { navigator.back() },
+        transitionSpec = { forward() },
+        popTransitionSpec = { backward() },
+        predictivePopTransitionSpec = { backward() },
     )
 }
 
-/**
- * A screen's entry; the section is part of its key, so the same screen kind in two sections never shares state.
- * Every screen paints the theme's background: the screens are transparent otherwise, and in a transition where two
- * are on screen at once (iOS slides the old one away over a veil, a predictive back shows the one below) each would
- * show through the other and the veil would darken a see-through screen to black.
- */
+// A screen moves a little and fades: the one leaving fades out quickly, the one arriving fades in after it, so the
+// two never show through each other (the stock cross-fade drew both at half strength, their texts on top of each
+// other). It works with the opaque page [destEntry] gives every screen.
+private const val SHIFT = 8
+private fun forward(): ContentTransform =
+    (slideInHorizontally(tween(260)) { it / SHIFT } + fadeIn(tween(180, delayMillis = 70))) togetherWith
+        (slideOutHorizontally(tween(260)) { -it / SHIFT } + fadeOut(tween(70)))
+
+private fun backward(): ContentTransform =
+    (slideInHorizontally(tween(260)) { -it / SHIFT } + fadeIn(tween(180, delayMillis = 70))) togetherWith
+        (slideOutHorizontally(tween(260)) { it / SHIFT } + fadeOut(tween(70)))
+
+/** A screen's entry; the section is part of its key, so the same screen kind in two sections never shares state. */
 fun destEntry(dest: Dest, metadata: Map<String, Any> = emptyMap(), content: @Composable () -> Unit): NavEntry<Dest> =
     NavEntry(dest, contentKey = "${dest.owner.name}/$dest", metadata = metadata) {
-        Box(Modifier.fillMaxSize().background(AppTheme.colors.background)) { content() }
+        // Opaque: a screen leaving or arriving must not show the one under it.
+        Box(Modifier.fillMaxSize().appBackground()) { content() }
     }

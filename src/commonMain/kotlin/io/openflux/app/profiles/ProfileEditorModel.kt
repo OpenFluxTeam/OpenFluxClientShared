@@ -72,7 +72,6 @@ class ProfileEditorModel(private val container: AppContainer, id: String?, priva
             secret = if (mode == EditMode.Stream) "" else it.secret,
             context = if (mode == EditMode.Stream) "" else it.context,
             extras = if (mode == EditMode.Session) it.extras else emptyList(),
-            bonding = mode == EditMode.Session && it.bonding,
         )
     }
 
@@ -88,7 +87,7 @@ class ProfileEditorModel(private val container: AppContainer, id: String?, priva
         }
     }
 
-    fun addTransport() = edit { it.copy(extras = it.extras + ExtraTransport(TransportType.DIRECT, priority = 50)) }
+    fun addTransport() = edit { it.copy(extras = it.extras + ExtraTransport(TransportType.DIRECT, priority = 110)) }
 
     fun removeTransport(index: Int) = edit { p -> p.copy(extras = p.extras.filterIndexed { i, _ -> i != index - 1 }) }
 

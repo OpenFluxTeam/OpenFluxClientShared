@@ -55,7 +55,7 @@ class ProfileEditorModelTest {
         m.edit { it.copy(name = "x", value = doc, secret = "k".repeat(32)) }
         m.setMode(EditMode.Session)
         m.addTransport()
-        assertEquals(listOf(ExtraTransport(TransportType.DIRECT, priority = 50)), m.draft.extras)
+        assertEquals(listOf(ExtraTransport(TransportType.DIRECT, priority = 110)), m.draft.extras)
         m.editTransport(1) { it.copy(value = "203.0.113.7:8445") }
         m.setMode(EditMode.Classic)
         assertTrue(m.draft.extras.isEmpty())

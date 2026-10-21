@@ -1,5 +1,26 @@
 package io.openflux.app.home
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import io.openflux.app.components.IconBubble
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,11 +54,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import io.openflux.app.components.Banner
+import io.openflux.app.components.Brand
 import io.openflux.app.components.Chip
 import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ConfirmDialog
-import io.openflux.app.components.ConnectButton
 import io.openflux.app.components.ConnectLook
+import io.openflux.app.cosmic.CosmicSwitch
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.height
 import io.openflux.app.components.Field
 import io.openflux.app.components.IconAction
 import io.openflux.app.components.LocalToaster
@@ -67,7 +91,6 @@ import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.ExitAddress
 import io.openflux.desktop.model.KnownServer
-import io.openflux.desktop.model.NetworkKind
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.model.editableNode
@@ -118,6 +141,7 @@ fun HomeRoot() {
     ScreenScaffold(null, scroll = false) {
         if (profiles.isEmpty()) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.l)) {
+                Brand(Modifier.padding(top = AppTheme.spacing.s), large = true)
                 StartPanel(hasSubscription = subscription != null, preparing = preparing || bot.preparing, botSignedIn = bot.session != null, botNote = bot.connectionNote)
             }
             return@ScreenScaffold
@@ -127,6 +151,7 @@ fun HomeRoot() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.l),
         ) {
+            Brand(Modifier.padding(top = AppTheme.spacing.s), large = true)
             Main(m, chosen, state, onPick = { picker = true })
         }
     }
@@ -199,20 +224,33 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         return
     }
 
-    ConnectButton(
-        state.look(),
-        label = if (state.isActive) "Отключить" else "Подключить",
-        onClick = m::toggle,
-        shortcut = "Ctrl+Enter",
-    )
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(state.title(), style = AppTheme.type.title, color = AppTheme.colors.text, textAlign = TextAlign.Center)
+    // The switch is a small universe: the Moon while off, the Sun with its network of devices while connected.
+    val busy = (traffic.downBytesPerSec + traffic.upBytesPerSec).toDouble()
+    // Its height is set, not left to an aspect ratio: in a wide window that would ask for more than the cap and
+    // the scene would spill over what is above and below it.
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        CosmicSwitch(
+            state.look(),
+            label = if (state.isActive) "Отключить" else "Подключить",
+            onClick = m::toggle,
+            modifier = Modifier.fillMaxWidth().height(minOf(maxWidth / 1.12f, 480.dp)),
+            traffic = (kotlin.math.log10(busy + 1.0) / 7.0).toFloat(),
+            shortcut = "Ctrl+Enter",
+        )
+    }
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
+        AnimatedContent(
+            state.title(),
+            transitionSpec = { (fadeIn(tween(220, 90)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(90)) },
+        ) { Text(it, style = AppTheme.type.title, color = AppTheme.colors.text, textAlign = TextAlign.Center) }
         val connected = state as? ConnectionState.Connected
-        if (connected != null) {
-            Text(
-                Fmt.duration(now - connected.since) + "   ↓ " + Fmt.speed(traffic.downBytesPerSec) + "   ↑ " + Fmt.speed(traffic.upBytesPerSec),
-                style = AppTheme.type.mono, color = AppTheme.colors.textSecondary,
-            )
+        AnimatedVisibility(connected != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+            val since = connected?.since ?: now
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
+                StatPill(Icons.Rounded.Schedule, Fmt.duration(now - since))
+                StatPill(Icons.Rounded.ArrowDownward, Fmt.speed(traffic.downBytesPerSec))
+                StatPill(Icons.Rounded.ArrowUpward, Fmt.speed(traffic.upBytesPerSec))
+            }
         }
     }
     if (chosen != null) {
@@ -220,7 +258,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
             RowItem(
                 chosen.name,
                 subtitle = profileLine(chosen),
-                leading = { StatusDot(profileDot(state, chosen.id)) },
+                leading = { IconBubble(profileIcon(chosen), status = profileDot(state, chosen.id)) },
                 trailing = { Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = AppTheme.colors.textSecondary) },
                 onClick = onPick,
             )
@@ -284,9 +322,6 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
                 ValueRow("Сейчас через", traffic.activeCarriers.mapNotNull { TransportType.fromCli(it)?.title }.distinct().joinToString(", "))
             }
             ValueRow("Шифрование", if (p.secret.isNotEmpty()) "AES-256-GCM" else "нет ключа")
-            if (p.bonding && p.session) {
-                ValueRow("Бондинг", p.carriers.joinToString(" + ") { c -> c.type.title + if (c.network != NetworkKind.Default) " · " + c.network.label else "" })
-            }
             if (!settings.fullTunnel) {
                 val socksAddr = socks ?: "127.0.0.1:${settings.socksPort}"
                 ValueRow("SOCKS5", socksAddr, mono = true, onCopy = { copy("Адрес", socksAddr) })
@@ -320,6 +355,24 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
         }
     }
 }
+
+/** A small tile of one fact under the switch: the time connected, the speed down or up. */
+@Composable
+private fun StatPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    val c = AppTheme.colors
+    val shape = RoundedCornerShape(AppTheme.shapes.large)
+    Row(
+        Modifier.clip(shape).background(c.surface).border(1.dp, c.border, shape).padding(horizontal = AppTheme.spacing.m, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = c.accentText, modifier = Modifier.size(16.dp))
+        Text(text, style = AppTheme.type.mono, color = c.text, maxLines = 1)
+    }
+}
+
+/** A connection's icon: a server for one's own node, the globe for the rest. */
+private fun profileIcon(p: Profile) = if (p.isOwnNode) Icons.Rounded.Dns else Icons.Rounded.Public
 
 /** Everything one can connect to, grouped (spec 6.1); the drawer's and the wide window's list. */
 @Composable
@@ -367,7 +420,7 @@ private fun ProfileRow(p: Profile, selected: Boolean, dot: Status, touch: Boolea
     RowItem(
         p.name,
         subtitle = profileLine(p),
-        leading = { StatusDot(dot) },
+        leading = { IconBubble(profileIcon(p), status = dot) },
         selected = selected,
         onClick = onChoose,
         onLongClick = if (touch) ({ menu = true }) else null,
