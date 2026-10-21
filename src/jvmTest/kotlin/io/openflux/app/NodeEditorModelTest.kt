@@ -57,10 +57,11 @@ class NodeEditorModelTest {
     private val id = "a.example:22:root"
 
     private var yandexCookies = ""
+    private var mailruCookies = ""
 
     private suspend fun TestScope.editor(channel: String? = null): NodeEditorModel {
         link.connect(SshTarget("a.example", 22, "root", password = "pw", hostKey = "SHA256:a.example"))
-        return NodeEditorModel(c, link, id, channel, this, NodeVerifier(c, now = { testScheduler.currentTime }), yandexCookies = { yandexCookies })
+        return NodeEditorModel(c, link, id, channel, this, NodeVerifier(c, now = { testScheduler.currentTime }), yandexCookies = { yandexCookies }, mailruCookies = { mailruCookies })
     }
 
     private fun installedNode(): InstalledChannel {
@@ -267,6 +268,20 @@ class NodeEditorModelTest {
         yandexCookies = "Session_id=s; yandex_login=ivan"
         m.pushYandexSignIn(); advanceUntilIdle()
         assertEquals(listOf("Session_id=s; yandex_login=ivan"), fake.cookiesSent)
+        assertNull(m.error)
+    }
+
+    @Test
+    fun theMailruSignInGoesToTheNode() = runTest {
+        val ch = InstalledChannel("of-m", "active", 8446, "ctx", listOf(NodeTransport("mailru", "https://cloud.mail.ru/public/abcd/efgh")), "l4", "k".repeat(64))
+        server.channels[ch.id] = ch
+        val m = editor("of-m")
+        m.load(); advanceUntilIdle()
+        m.pushMailruSignIn(); advanceUntilIdle()
+        assertEquals("Сначала войдите в Mail.ru: Настройки → Сервисы", m.error)
+        mailruCookies = "Mpop=p; t=t"
+        m.pushMailruSignIn(); advanceUntilIdle()
+        assertEquals(listOf("Mpop=p; t=t"), fake.cookiesSent)
         assertNull(m.error)
     }
 

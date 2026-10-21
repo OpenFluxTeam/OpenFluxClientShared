@@ -17,6 +17,7 @@ import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodePlan
 import io.openflux.desktop.model.InstalledChannel
 import io.openflux.desktop.model.NodeTransport
+import io.openflux.desktop.model.NodeUpgrade
 import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.ServerProbe
 import io.openflux.desktop.model.SshTarget
@@ -216,6 +217,14 @@ interface PlatformServices {
     fun openUrl(url: String)
     /** A new random channel key (64 hex characters). */
     fun newSecret(): String
+    /** Whether [saveSecret] keeps secrets in the system's protected storage (DPAPI, Keychain, Keystore) on this device. */
+    val secretStoreSupported: Boolean get() = false
+    /** A secret kept by [saveSecret] under [key], null when none or it cannot be read. */
+    fun loadSecret(key: String): String? = null
+    /** Keeps [value] under [key], encrypted by the system; false if it could not be kept (nothing is written in the clear). */
+    fun saveSecret(key: String, value: String): Boolean = false
+    /** Forgets the secret under [key]. */
+    fun deleteSecret(key: String) {}
     fun now(): Long
     /** Newest app release tag on GitHub, null when unknown. */
     suspend fun latestRelease(): String?
@@ -350,6 +359,13 @@ interface NodeWizardService {
     )
     suspend fun remove(channel: String, sudoPassword: String)
 
+    /**
+     * Moves every node on the server to the core this app pins and restarts the running ones (their tunnels
+     * drop for a moment).
+     */
+    suspend fun upgrade(sudoPassword: String): NodeUpgrade =
+        throw NodeWizardException("Обновление нод здесь не поддерживается")
+
     /** A channel already on the server: its documents, port, state and encryption context (needs root). */
     suspend fun showChannel(channel: String, sudoPassword: String): InstalledChannel =
         throw NodeWizardException("Изменение каналов на сервере здесь не поддерживается")
@@ -363,6 +379,14 @@ interface NodeWizardService {
      */
     suspend fun setTransports(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String = "", mode: NodeMode? = null): InstalledChannel =
         throw NodeWizardException("Изменение каналов на сервере здесь не поддерживается")
+
+    /**
+     * Gives the channel's document of [cookieHeader]'s service (Yandex: Session_id, Mail.ru: Mpop) that sign-in;
+     * the channel's other document keeps its own, and a node whose core can takes it without a restart. Returns
+     * the channel as it is now.
+     */
+    suspend fun pushSignIn(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String): InstalledChannel =
+        throw NodeWizardException("Передача входа ноде здесь не поддерживается")
 
     /** [shareLink] for a channel already on the server: the link keeps its [context]. */
     suspend fun channelShareLink(name: String, key: String, host: String, port: Int, transports: List<NodeTransport>, context: String): String =

@@ -31,8 +31,9 @@ enum class AccountKind(
     val finishCookie: String? = null,
     /**
      * Whether the core opens this service's documents as the signed-in
-     * user. Mail.ru's transport opens its document anonymously, and Cloud
-     * refuses that request (403) when it carries an account's cookies.
+     * user. Mail.ru's transport does since Cloud stopped opening a public
+     * document for an anonymous visitor (401): each device opens it with its
+     * own Mail.ru sign-in, and an exit never hands its own to a client.
      */
     val opensSignedIn: Boolean = true,
 ) {
@@ -47,7 +48,6 @@ enum class AccountKind(
         waitForHome = false,
         finishUrl = "https://cloud.mail.ru/home/",
         finishCookie = "sdcs",
-        opensSignedIn = false,
     ),
     Max("MAX", "ic_max", "https://web.max.ru/", "https://web.max.ru/", ".max.ru", false, setOf(TransportType.ONEME), signsIn = false);
 
@@ -69,6 +69,14 @@ enum class AccountKind(
 
     companion object {
         fun of(type: TransportType): AccountKind? = entries.firstOrNull { type in it.transports }
+
+        /** The account a script transport names in its info().auth ("yandex", "mailru", "max"). */
+        fun ofAccount(id: String): AccountKind? = when (id.trim().lowercase()) {
+            "yandex" -> Yandex
+            "mailru", "mail.ru" -> Mailru
+            "max" -> Max
+            else -> null
+        }
     }
 }
 
@@ -144,6 +152,9 @@ object AccountCookies {
         AccountKind.Max -> ""
     }
 
+    /** How the core names a script carrier's jar in its cookie store (main.go sessionCookieKey). */
+    fun scriptJarKey(scriptId: String, url: String): String = "script:$scriptId $url"
+
     /** "a=1; b=2" as a Cookie header sends them. */
     fun header(cookies: Map<String, String>): String = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
 
@@ -174,9 +185,27 @@ object AccountCookies {
         profile: Profile,
         sessions: Map<AccountKind, AccountSession>,
         key: (SessionSpec) -> String = { it.value },
+        scripts: (String) -> InstalledScript? = { null },
+        scriptKey: (SessionSpec, InstalledScript) -> String = { spec, script -> scriptJarKey(script.id, spec.value) },
     ): Map<String, Map<String, String>> {
         val out = store.toMutableMap()
         for (spec in profile.sessionSpecs()) {
+            if (spec.type == TransportType.SCRIPT) {
+                // A JS transport says itself which sign-in it needs and which of
+                // its cookies (info().auth): only those go into its jar.
+                val script = scripts(spec.scriptId) ?: continue
+                val auth = script.auth ?: continue
+                val kind = AccountKind.ofAccount(auth.account) ?: continue
+                val session = sessions[kind]?.takeUnless { it.expired || it.cookies.isEmpty() } ?: continue
+                val name = scriptKey(spec, script)
+                if (auth.opensSignedIn) {
+                    out[name] = out[name].orEmpty() + auth.filter(session.cookies)
+                } else {
+                    val kept = out[name]?.minus(session.cookies.keys) ?: continue
+                    if (kept.isEmpty()) out.remove(name) else out[name] = kept
+                }
+                continue
+            }
             val kind = AccountKind.of(spec.type) ?: continue
             val session = sessions[kind]?.takeUnless { it.expired || it.cookies.isEmpty() } ?: continue
             if (spec.value.isEmpty()) continue

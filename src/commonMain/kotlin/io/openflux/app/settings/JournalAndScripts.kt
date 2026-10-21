@@ -239,9 +239,18 @@ fun ScriptsScreen() {
 
 private val json = Json { ignoreUnknownKeys = true }
 
-private data class ScriptPreview(val name: String, val version: String, val fingerprint: String, val official: Boolean, val valid: Boolean, val params: Int)
+/** [signature] is the core's verdict: "valid", "invalid" (not by that key) or "unverified" (no key, or a bare .js without its .sig). */
+private data class ScriptPreview(val name: String, val version: String, val fingerprint: String, val official: Boolean, val signature: String, val params: Int, val bareJs: Boolean) {
+    val valid get() = signature == "valid"
+}
 
-/** Importing a transport: from a link or a file, checked against its author's key before anything is installed. */
+/**
+ * Importing a transport: from a link or a file, checked against its author's key before anything is installed.
+ * A key is not asked for up front: the package is first checked against OpenFlux's own, and when that is not
+ * the one that signed it the key field stays at hand to check it again with the author's. Signed by someone
+ * other than OpenFlux, it is installed only once the person says so. Unsigned it cannot be installed at all:
+ * the core will not run a script whose signature it cannot check.
+ */
 @Composable
 private fun AddScriptSheet(onClose: () -> Unit) {
     val container = LocalAppContainer.current
@@ -270,9 +279,19 @@ private fun AddScriptSheet(onClose: () -> Unit) {
             version = r["version"]?.jsonPrimitive?.contentOrNull.orEmpty(),
             fingerprint = r["fingerprint"]?.jsonPrimitive?.contentOrNull.orEmpty(),
             official = r["official"]?.jsonPrimitive?.booleanOrNull == true,
-            valid = r["signature"]?.jsonPrimitive?.contentOrNull == "valid",
+            signature = r["signature"]?.jsonPrimitive?.contentOrNull ?: "unverified",
             params = (r["params"] as? JsonArray)?.size ?: 0,
+            bareJs = !(bytes.size >= 2 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte()),
         )
+    }
+    fun install() {
+        busy = true; error = null
+        scope.launch {
+            runCatching { container.scripts.install(data, sig, authorKey(), source, origin, platform.now()) }
+                .onSuccess { onClose() }
+                .onFailure { error = it.message ?: "Не удалось установить" }
+            busy = false
+        }
     }
     Sheet(onDismiss = onClose, title = if (preview == null) "Импорт транспорта" else "Проверьте транспорт") {
         Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
@@ -284,7 +303,9 @@ private fun AddScriptSheet(onClose: () -> Unit) {
                     scope.launch {
                         val path = platform.pickFile("Файл транспорта", listOf("flux", "js")) ?: return@launch
                         val bytes = platform.readBytes(path)
-                        if (bytes == null) error = "Не удалось прочитать файл" else inspect(bytes, ByteArray(0), ScriptSource.File, path)
+                        // A bare .js carries its signature beside it, as <file>.js.sig.
+                        val signature = if (path.endsWith(".js", ignoreCase = true)) platform.readBytes("$path.sig") ?: ByteArray(0) else ByteArray(0)
+                        if (bytes == null) error = "Не удалось прочитать файл" else inspect(bytes, signature, ScriptSource.File, path)
                     }
                 })
                 if (busy) ProgressLine("Скачиваю…")
@@ -301,25 +322,40 @@ private fun AddScriptSheet(onClose: () -> Unit) {
             } else {
                 Section(null) {
                     ValueRow("Транспорт", "${p.name} · ${p.version.ifBlank { "—" }}")
-                    ValueRow("Подпись", if (p.valid) "верна" else "не совпадает")
+                    ValueRow("Подпись", when (p.signature) { "valid" -> "верна"; "invalid" -> "не этим ключом"; else -> "не проверена" })
                     ValueRow("Автор", if (p.official) "OpenFlux" else "сторонний")
-                    ValueRow("Отпечаток", p.fingerprint.chunked(2).take(8).joinToString(" "), mono = true)
+                    if (p.valid) ValueRow("Отпечаток", p.fingerprint.chunked(2).take(8).joinToString(" "), mono = true)
                     ValueRow("Параметры", p.params.toString())
                 }
-                if (!p.valid) {
-                    Banner("Подпись не совпадает с ключом автора: ставить нельзя. Проверьте ключ или источник", Tone.Danger)
-                } else {
-                    Banner("Без песочницы: доверяйте только этому автору и отпечатку", Tone.Warning)
-                    if (busy) ProgressLine("Устанавливаю…")
-                    else PrimaryButton("Доверять и установить", {
-                        busy = true; error = null
-                        scope.launch {
-                            runCatching { container.scripts.install(data, sig, authorKey(), source, origin, platform.now()) }
-                                .onSuccess { onClose() }
-                                .onFailure { error = it.message ?: "Не удалось установить" }
-                            busy = false
-                        }
-                    }, Modifier.fillMaxWidth())
+                when {
+                    busy -> ProgressLine("Устанавливаю…")
+                    p.valid && p.official -> {
+                        Banner("Без песочницы: доверяйте только этому автору и отпечатку", Tone.Warning)
+                        PrimaryButton("Установить", ::install, Modifier.fillMaxWidth())
+                    }
+                    p.valid -> {
+                        Banner(
+                            "Подписано не OpenFlux, а сторонним автором. Транспорт получит полный доступ к сети без песочницы. " +
+                                "Сверьте отпечаток с автором. Добавить его?",
+                            Tone.Warning,
+                        )
+                        PrimaryButton("Добавить транспорт", ::install, Modifier.fillMaxWidth())
+                        SecondaryButton("Не добавлять", onClose, Modifier.fillMaxWidth())
+                    }
+                    p.bareJs && sig.isEmpty() -> {
+                        Banner("Рядом с файлом нет подписи ${p.name}.js.sig: без неё транспорт не установить. Положите .sig рядом или возьмите пакет .flux", Tone.Warning)
+                        SecondaryButton("Назад", { preview = null; error = null }, Modifier.fillMaxWidth())
+                    }
+                    else -> {
+                        Banner(
+                            if (key.isBlank()) "Подписано не ключом OpenFlux. Введите открытый ключ автора, чтобы проверить подпись"
+                            else "Подпись не совпадает с этим ключом. Проверьте ключ или источник",
+                            Tone.Info,
+                        )
+                        Field(key, { key = it; error = null }, "Ключ автора (hex)", mono = true)
+                        PrimaryButton("Проверить с этим ключом", { inspect(data, sig, source, origin) }, Modifier.fillMaxWidth(), enabled = key.isNotBlank())
+                        SecondaryButton("Назад", { preview = null; error = null }, Modifier.fillMaxWidth())
+                    }
                 }
             }
             error?.let { Banner(it, Tone.Danger) }

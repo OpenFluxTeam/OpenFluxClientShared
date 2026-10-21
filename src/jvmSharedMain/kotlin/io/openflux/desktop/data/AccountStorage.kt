@@ -3,6 +3,7 @@ package io.openflux.desktop.data
 import io.openflux.desktop.model.AccountCookies
 import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.AccountSession
+import io.openflux.desktop.model.InstalledScript
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.SessionSpec
 import io.openflux.desktop.model.YandexDisk
@@ -102,9 +103,10 @@ object CookieStoreSeeder {
         profile: Profile,
         sessions: Map<AccountKind, AccountSession>,
         key: (SessionSpec) -> String = { it.value },
+        scripts: (String) -> InstalledScript? = { null },
     ) {
         val existing = runCatching { StoreJson.decodeFromString(serializer, file.readText()) }.getOrDefault(emptyMap())
-        val seeded = AccountCookies.seed(existing, profile, sessions, key)
+        val seeded = AccountCookies.seed(existing, profile, sessions, key, scripts)
         if (seeded == existing) return
         JsonFile(file, serializer).write(seeded)
     }

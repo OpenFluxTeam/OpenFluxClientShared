@@ -6,8 +6,9 @@ import kotlinx.serialization.json.JsonPrimitive
  * Creating the channel's document as the signed-in Mail.ru user, from the
  * Cloud page itself, with the calls its web client makes: a .docx in
  * /openflux, published, and the link switched to editing. The core's
- * mailru transport then opens it anonymously (r7/edit), which is checked
- * before the link is handed back.
+ * mailru transport then opens it with the account's sign-in (r7/edit; Mail.ru
+ * answers an anonymous open with 401), which is checked before the link is
+ * handed back.
  */
 object MailruCloud {
     const val HOME = "https://cloud.mail.ru/home"
@@ -43,9 +44,9 @@ object MailruCloud {
     if (pub.status !== 200 || typeof weblink !== 'string') throw new Error('публикация: ' + pub.status);
     const w = await form('weblinks/writable', {weblink: weblink});
     if (w.status !== 200) throw new Error('редактирование по ссылке: ' + w.status);
-    // What the tunnel will see: the document opened by an anonymous visitor.
-    const e = await fetch('/api/v4/r7/edit', {method: 'POST', credentials: 'omit',
-      headers: {'Content-Type': 'application/json', 'X-Api-Version': '4'},
+    // What the node will do: open the document as the signed-in account, with the CSRF token.
+    const e = await fetch('/api/v4/r7/edit', {method: 'POST', credentials: 'include',
+      headers: {'Content-Type': 'application/json', 'X-Api-Version': '4', 'X-CSRF-Token': token},
       body: JSON.stringify({'x-email': 'anonym', public: '/' + weblink, platform: 'desktop_web'})});
     const doc = e.ok ? (await e.json()).document : null;
     if (!doc || !doc.permissions || !doc.permissions.edit) throw new Error('документ не открылся на редактирование по ссылке');

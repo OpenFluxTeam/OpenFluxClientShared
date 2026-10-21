@@ -43,6 +43,9 @@ class ServerScreenModel(private val container: AppContainer, private val link: S
         private set
     var error by mutableStateOf<String?>(null)
         private set
+    /** What the last update of the nodes did, in a sentence. */
+    var notice by mutableStateOf<String?>(null)
+        private set
     var sudoInput by mutableStateOf("")
     private var job: Job? = null
 
@@ -63,6 +66,18 @@ class ServerScreenModel(private val container: AppContainer, private val link: S
         channels = link.channels(serverId)
     }
 
+    /** Moves the nodes to the core this app pins and restarts the running ones, then reads the server again. */
+    fun upgrade() = run("Обновляю ноды на сервере…") {
+        if (sudoInput.isNotEmpty()) link.setSudo(serverId, sudoInput)
+        val done = link.upgrade(serverId)
+        link.refresh(serverId)
+        channels = link.channels(serverId)
+        notice = "Ядро ${done.core}: " + when (done.restarted.size) {
+            0 -> "запущенных нод не было, перезапускать нечего"
+            else -> "перезапущено нод: ${done.restarted.size}"
+        }
+    }
+
     fun connect() = run("Подключаюсь к серверу…") {
         if (login.connect() != null) channels = link.channels(serverId)
     }
@@ -74,6 +89,28 @@ class ServerScreenModel(private val container: AppContainer, private val link: S
     fun closeAccess() {
         link.closeAccess(serverId)
         channels = null
+    }
+
+    val hasSavedPassword: Boolean get() = link.hasSavedPassword(serverId)
+
+    /** Forgets the saved password and closes the access, so the next entry asks for it. */
+    fun forgetPassword() {
+        link.forgetPassword(serverId)
+        login.remember = false
+        closeAccess()
+    }
+
+    /** Enters with the saved password, if there is one and no access yet; a rejected one is deleted and asked again. */
+    fun connectSaved() {
+        if (hasAccess || !hasSavedPassword) return
+        run("Подключаюсь к серверу…") {
+            try {
+                if (link.connectSaved(serverId)) channels = link.channels(serverId)
+            } catch (e: NodeWizardException) {
+                if (!hasSavedPassword) login.remember = false
+                throw e
+            }
+        }
     }
 
     fun forget() = link.forget(serverId)
@@ -91,6 +128,7 @@ class ServerScreenModel(private val container: AppContainer, private val link: S
         if (job?.isActive == true) return
         busy = message
         error = null
+        notice = null
         job = scope.launch {
             try {
                 block()

@@ -366,6 +366,12 @@ private fun LookPage() {
     io.openflux.app.components.Group("Тема") {
         Segmented(ThemeMode.entries, settings.theme, { t -> container.settings.update { it.copy(theme = t) } }, label = { it.label })
     }
+    Section(null) {
+        Toggle(
+            "Простая кнопка подключения", settings.simpleSwitch, { v -> container.settings.update { it.copy(simpleSwitch = v) } },
+            subtitle = "Кольцо вместо Луны и Солнца на Главной: меньше нагружает видеокарту",
+        )
+    }
     if (container.platform.kind == PlatformKind.Desktop) {
         Section(null) {
             Toggle("Сворачивать в трей при закрытии", settings.closeToTray, { v -> container.settings.update { it.copy(closeToTray = v) } })

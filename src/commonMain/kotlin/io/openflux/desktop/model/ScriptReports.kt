@@ -23,7 +23,30 @@ fun InstalledScript.withTrustReport(report: JsonObject): InstalledScript = copy(
     packageId = report["id"]?.jsonPrimitive?.contentOrNull.orEmpty(),
     wire = report["wire"]?.jsonPrimitive?.intOrNull ?: 1,
     updateUrls = (report["update"] as? JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
+    auth = parseScriptAuth(report["auth"]),
 )
+
+/** A report's "auth" (the transport's declared sign-in); null when absent or unreadable. */
+fun parseScriptAuth(el: JsonElement?): ScriptAuth? {
+    val o = el as? JsonObject ?: return null
+    fun str(k: String) = (o[k] as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it !is JsonNull }?.contentOrNull.orEmpty()
+    fun list(k: String) = (o[k] as? JsonArray).orEmpty().mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull }
+    val account = str("account").ifBlank { return null }
+    return ScriptAuth(
+        account = account,
+        label = str("label"),
+        need = str("need").ifBlank { "always" },
+        signInUrl = str("signInUrl"),
+        homeUrl = str("homeUrl"),
+        waitForHome = o["waitForHome"]?.jsonPrimitive?.booleanOrNull == true,
+        finishUrl = str("finishUrl"),
+        finishCookie = str("finishCookie"),
+        cookieUrls = list("cookieUrls"),
+        loginCookie = str("loginCookie"),
+        loginNameCookie = str("loginNameCookie"),
+        cookies = list("cookies"),
+    )
+}
 
 /** The params of a core trust or settings report ("params": [...]); anything unreadable is skipped. */
 fun parseScriptParams(el: JsonElement?): List<ScriptParam> {

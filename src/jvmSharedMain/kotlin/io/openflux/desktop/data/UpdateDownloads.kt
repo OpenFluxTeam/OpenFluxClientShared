@@ -53,7 +53,7 @@ object UpdateDownloads {
     suspend fun text(url: String): String = withContext(Dispatchers.IO) {
         val c = open(url, 20_000)
         try {
-            c.inputStream.use { it.readNBytes(MAX_TEXT).toString(Charsets.UTF_8) }
+            c.inputStream.use { it.readUpTo(MAX_TEXT).toString(Charsets.UTF_8) }
         } finally {
             c.disconnect()
         }

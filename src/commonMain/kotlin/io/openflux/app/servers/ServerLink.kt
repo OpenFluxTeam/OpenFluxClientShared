@@ -8,12 +8,15 @@ import androidx.compose.runtime.setValue
 import io.openflux.desktop.model.InstalledChannel
 import io.openflux.desktop.model.KnownServer
 import io.openflux.desktop.model.NodeCoreSource
+import io.openflux.desktop.model.NodeUpgrade
 import io.openflux.desktop.model.NodeServers
 import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.ServerProbe
 import io.openflux.desktop.model.SshTarget
 import io.openflux.desktop.service.AppContainer
 import io.openflux.desktop.service.NodeWizardService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -39,7 +42,7 @@ class ServerLink(private val container: AppContainer) {
     private val settings = container.settings
     private val lock = Mutex()
 
-    private class Access(val target: SshTarget, val source: NodeCoreSource)
+    private class Access(val target: SshTarget, val source: NodeCoreSource, val remember: Boolean = false)
 
     private val access = mutableStateMapOf<String, Access>()
     private val sudo = mutableStateMapOf<String, String>()
@@ -72,10 +75,10 @@ class ServerLink(private val container: AppContainer) {
      * Connects to [target] and keeps the way in for later calls; returns the server's id. A key not seen before
      * (or changed) fails with [hostKeyPrompt] set: [trust] goes on with it.
      */
-    suspend fun connect(target: SshTarget, source: NodeCoreSource = NodeCoreSource.Core): String {
+    suspend fun connect(target: SshTarget, source: NodeCoreSource = NodeCoreSource.Core, remember: Boolean = false): String {
         val id = serverIdOf(target.host, target.port, target.user)
         val known = settings.settings.value.knownHostKeys[NodeServers.hostKeyId(target.host, target.port)].orEmpty()
-        val a = Access(target.copy(host = target.host.trim(), user = target.user.trim(), hostKey = target.hostKey.ifEmpty { known }), source)
+        val a = Access(target.copy(host = target.host.trim(), user = target.user.trim(), hostKey = target.hostKey.ifEmpty { known }), source, remember)
         lock.withLock { open(id, a) }
         return id
     }
@@ -88,7 +91,7 @@ class ServerLink(private val container: AppContainer) {
         pending = null
         val t = a.target
         settings.update { s -> s.copy(knownHostKeys = s.knownHostKeys + (NodeServers.hostKeyId(t.host, t.port) to prompt.fingerprint)) }
-        val trusted = Access(t.copy(hostKey = prompt.fingerprint), a.source)
+        val trusted = Access(t.copy(hostKey = prompt.fingerprint), a.source, a.remember)
         lock.withLock { open(prompt.serverId, trusted) }
         return prompt.serverId
     }
@@ -123,6 +126,12 @@ class ServerLink(private val container: AppContainer) {
         return ids.map { id -> call(serverId, retry = true) { showChannel(id, sudo(serverId)) } }.sortedBy { it.port }
     }
 
+    /** Moves the nodes on [serverId] to the core this app pins; asks for the sudo password the way [channels] does. */
+    suspend fun upgrade(serverId: String): NodeUpgrade {
+        if (needsSudo(serverId) && sudo(serverId).isEmpty()) throw NodeWizardException("Введите пароль sudo", sudo = true)
+        return call(serverId) { upgrade(sudo(serverId)) }
+    }
+
     /** Connects again to read what is on the server now. */
     suspend fun refresh(serverId: String) {
         val a = access[serverId] ?: throw NodeWizardException("Нет доступа к серверу: войдите заново")
@@ -142,6 +151,7 @@ class ServerLink(private val container: AppContainer) {
     /** Removes [serverId] from the person's servers (its key fingerprint stays: a changed key is still noticed). */
     fun forget(serverId: String) {
         closeAccess(serverId)
+        container.platform.deleteSecret(secretKey(serverId))
         probes.remove(serverId)
         settings.update { s -> s.copy(knownServers = s.knownServers.filterNot { serverIdOf(it) == serverId }) }
     }
@@ -167,15 +177,66 @@ class ServerLink(private val container: AppContainer) {
         }
         openTo = id
         lastReply = container.platform.now()
+        val fresh = access[id] !== a
         access[id] = a
         probes[id] = probe
         val t = a.target
         if (probe.sudo == "password" && sudo[id].isNullOrEmpty() && t.password.isNotEmpty()) sudo[id] = t.password
-        settings.update { s -> s.copy(knownServers = NodeServers.remember(s.knownServers, KnownServer(t.host, t.port, t.user))) }
+        // The password goes to the system's secret store only after the server took it, and only when asked; a later
+        // reopening of the same way in does not write it again.
+        val saved = if (fresh) keepPassword(id, t.password, a.remember) else hasSavedPassword(id)
+        settings.update { s -> s.copy(knownServers = NodeServers.remember(s.knownServers, KnownServer(t.host, t.port, t.user, saved))) }
     }
+
+    /** Whether a password for [serverId] sits in the system's secret store (the person ticked "Запомнить пароль"). */
+    fun hasSavedPassword(serverId: String): Boolean =
+        container.platform.secretStoreSupported && settings.settings.value.knownServers.any { serverIdOf(it) == serverId && it.rememberPassword }
+
+    /** Forgets the saved password of [serverId]; the server stays in the list. */
+    fun forgetPassword(serverId: String) {
+        container.platform.deleteSecret(secretKey(serverId))
+        settings.update { s -> s.copy(knownServers = s.knownServers.map { if (serverIdOf(it) == serverId) it.copy(rememberPassword = false) else it }) }
+    }
+
+    /**
+     * Connects to [serverId] with its saved password; false when none is saved. A password the server no longer takes
+     * is deleted at once and the person is asked for it again; other failures leave it for the next try.
+     */
+    suspend fun connectSaved(serverId: String): Boolean {
+        if (!hasSavedPassword(serverId)) return false
+        val known = settings.settings.value.knownServers.first { serverIdOf(it) == serverId }
+        val password = withContext(Dispatchers.Default) { container.platform.loadSecret(secretKey(serverId)) }
+        if (password.isNullOrEmpty()) {
+            forgetPassword(serverId)
+            return false
+        }
+        try {
+            connect(SshTarget(known.host, known.port, known.user, password = password), remember = true)
+        } catch (e: NodeWizardException) {
+            if (isRejectedLogin(e)) {
+                forgetPassword(serverId)
+                throw NodeWizardException("Сохранённый пароль не подошёл и удалён: введите пароль заново")
+            }
+            throw e
+        }
+        return true
+    }
+
+    private fun keepPassword(serverId: String, password: String, remember: Boolean): Boolean {
+        val platform = container.platform
+        if (remember && password.isNotEmpty() && platform.secretStoreSupported && platform.saveSecret(secretKey(serverId), password)) return true
+        platform.deleteSecret(secretKey(serverId))
+        return false
+    }
+
+    private fun secretKey(serverId: String) = "ssh:$serverId"
 
     companion object {
         /** A connection quiet for longer is opened again before the next call. */
         const val IDLE_MS = 60_000L
+
+        /** The server refused the login, password or key (not the sudo password, not a host key to confirm). */
+        fun isRejectedLogin(e: NodeWizardException): Boolean =
+            !e.sudo && e.hostKey == null && e.message.orEmpty().let { "не принял" in it && "sudo" !in it }
     }
 }

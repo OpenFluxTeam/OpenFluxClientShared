@@ -76,6 +76,10 @@ object ConnectionNarrative {
                 Narrated(LogLevel.Info, "Ядро запущено как нода и ждёт клиентов")
             "running as client" in lower ->
                 Narrated(LogLevel.Info, "Ядро запущено как клиент и ждёт ответа ноды")
+            "sign-in required:" in lower -> {
+                val label = Regex("""label="([^"]*)"""").find(line)?.groupValues?.get(1).orEmpty().ifBlank { "аккаунт площадки" }
+                Narrated(LogLevel.Warning, "Транспорт просит войти в $label: Настройки → Сервисы. Пока входа нет, он не подключится")
+            }
             "captcha required" in lower ->
                 Narrated(LogLevel.Warning, "Площадка просит пройти проверку (капча). Откройте окно проверки в приложении: пока её не пройти, связи не будет")
             else -> null

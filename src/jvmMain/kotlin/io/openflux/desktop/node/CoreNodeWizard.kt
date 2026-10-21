@@ -9,6 +9,7 @@ import io.openflux.desktop.model.NodeCoreSource
 import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodePlan
 import io.openflux.desktop.model.NodeTransport
+import io.openflux.desktop.model.NodeUpgrade
 import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.ServerProbe
 import io.openflux.desktop.model.SshTarget
@@ -120,6 +121,11 @@ class CoreNodeWizard(
         }
     }
 
+    override suspend fun upgrade(sudoPassword: String): NodeUpgrade {
+        val reply = call("upgrade") { put("sudoPassword", sudoPassword) }
+        return json.decodeFromJsonElement(NodeUpgrade.serializer(), reply)
+    }
+
     override suspend fun showChannel(channel: String, sudoPassword: String): InstalledChannel {
         val reply = call("showChannel", "channel=$channel") {
             put("channel", channel)
@@ -131,6 +137,16 @@ class CoreNodeWizard(
     override suspend fun setTransports(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String, mode: NodeMode?): InstalledChannel {
         val reply = call("setTransports", "channel=$channel ${transports.names()} mode=${mode?.cli ?: "keep"}") {
             mode?.let { put("mode", it.cli) }
+            put("channel", channel)
+            put("transports", transports.json())
+            put("sudoPassword", sudoPassword)
+            put("cookies", cookieHeader)
+        }
+        return json.decodeFromJsonElement(InstalledChannel.serializer(), reply.getValue("channel"))
+    }
+
+    override suspend fun pushSignIn(channel: String, transports: List<NodeTransport>, sudoPassword: String, cookieHeader: String): InstalledChannel {
+        val reply = call("pushSignIn", "channel=$channel ${transports.names()}") {
             put("channel", channel)
             put("transports", transports.json())
             put("sudoPassword", sudoPassword)

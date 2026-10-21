@@ -24,6 +24,8 @@ class LoginForm(private val link: ServerLink) {
     var privateKey by mutableStateOf("")
     var passphrase by mutableStateOf("")
     var sudo by mutableStateOf("")
+    /** "Запомнить пароль": the password goes to the system's secret store once the server takes it. Per server. */
+    var remember by mutableStateOf(false)
     var error by mutableStateOf<String?>(null)
     var busy by mutableStateOf(false)
         private set
@@ -31,28 +33,42 @@ class LoginForm(private val link: ServerLink) {
     fun prefill(server: KnownServer) {
         host = if (server.port == 22) server.host else if (':' in server.host) "[${server.host}]:${server.port}" else "${server.host}:${server.port}"
         user = server.user
+        remember = server.rememberPassword
         error = null
+    }
+
+    /** The id of the server typed in when it has a saved password, so [connect] needs none typed. */
+    fun savedServerId(): String? {
+        val (h, port, valid) = parse(host, "22")
+        if (!valid || h.isEmpty() || user.isBlank()) return null
+        return serverIdOf(h, port, user).takeIf { link.hasSavedPassword(it) }
     }
 
     /** Connects; the server's id, or null with [error] set (or the key prompt open on [link]). */
     suspend fun connect(): String? {
         val (h, port, valid) = parse(host, "22")
+        val saved = if (!useKey && password.isEmpty() && remember) savedServerId() else null
         error = when {
             h.isEmpty() -> "Укажите адрес сервера"
             !valid -> "Порт — число от 1 до 65535"
             user.isBlank() -> "Укажите логин"
             useKey && privateKey.isBlank() -> "Вставьте закрытый ключ или выберите файл"
-            !useKey && password.isEmpty() -> "Введите пароль"
+            !useKey && password.isEmpty() && saved == null -> "Введите пароль"
             else -> null
         }
         if (error != null) return null
+        if (saved != null) {
+            val id = attempt { if (!link.connectSaved(saved)) throw NodeWizardException("Сохранённый пароль не найден: введите пароль"); saved }
+            if (id == null && !link.hasSavedPassword(saved)) remember = false
+            return id
+        }
         val target = SshTarget(
             host = h, port = port, user = user.trim(),
             password = if (useKey) "" else password,
             privateKey = if (useKey) privateKey.trim() else "",
             passphrase = if (useKey) passphrase else "",
         )
-        return attempt { link.connect(target) }
+        return attempt { link.connect(target, remember = remember && !useKey) }
     }
 
     /** Trusts the key the server showed and connects; the server's id, or null with [error]. */

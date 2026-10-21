@@ -104,6 +104,8 @@ data class InstalledChannel(
     val mode: String = "l4",
     /** The channel's encryption key, which the server gives its root: the owner's link and profile are made from it. */
     val key: String = "",
+    /** The documents the node says are signed out or down (an older node says nothing). */
+    val signin: List<NodeSignInState> = emptyList(),
 ) {
     // The key stays out of any log or message.
     override fun toString() = "InstalledChannel($id, port=$port, $state)"
@@ -161,7 +163,13 @@ data class YandexDocument(val url: String, val cookieHeader: String) {
 
 /** A server the wizard has installed on before, to fill the form again. */
 @Serializable
-data class KnownServer(val host: String, val port: Int, val user: String)
+data class KnownServer(
+    val host: String,
+    val port: Int,
+    val user: String,
+    /** "Запомнить пароль" was ticked: the password is in the system's secret store, never in the settings. */
+    val rememberPassword: Boolean = false,
+)
 
 /**
  * A failed wizard call. [hostKey] with [trust] asks to trust a new server,
@@ -182,6 +190,10 @@ object NodeDocuments {
 
     /** The document link without query or fragment, null if it is not a Yandex document. */
     fun clean(url: String): String? = url.trim().replace(Regex("[?#].*$"), "").takeIf(DOC_URL::matches)
+
+    /** Whether a Cookie header holds a Mail.ru login (its session cookie, Mpop). */
+    fun signedInMailru(cookieHeader: String): Boolean =
+        cookieHeader.split(';').any { it.trim().substringBefore('=') == "Mpop" && it.contains('=') }
 
     /** Whether a Cookie header holds a Yandex login (the core's provision.CookieStore check). */
     fun signedIn(cookieHeader: String): Boolean =
@@ -248,3 +260,7 @@ object NodeServers {
     /** A TCP port, null when [text] is not one. */
     fun port(text: String): Int? = text.trim().toIntOrNull()?.takeIf { it in 1..65535 }
 }
+
+/** What moving a server's nodes to this app's core did: the core now installed and the channels restarted on it. */
+@Serializable
+data class NodeUpgrade(val core: String = "", val restarted: List<String> = emptyList())

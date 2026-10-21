@@ -8,6 +8,7 @@ import io.openflux.desktop.model.NodeCoreSource
 import io.openflux.desktop.model.NodeMode
 import io.openflux.desktop.model.NodePlan
 import io.openflux.desktop.model.NodeTransport
+import io.openflux.desktop.model.NodeUpgrade
 import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.FakeShareLinkCodec
 import io.openflux.desktop.model.ServerProbe
@@ -27,6 +28,8 @@ class FakeServer(
     var sudo: String = "root",
     var sudoPassword: String = "",
     var autoupdate: Boolean = true,
+    /** The password the server takes; null: any non-empty one. */
+    var password: String? = null,
     val channels: MutableMap<String, InstalledChannel> = linkedMapOf(),
 )
 
@@ -62,6 +65,7 @@ class FakeNodeService(vararg servers: FakeServer) : NodeWizardService {
             throw NodeWizardException("Новый сервер", hostKey = s.hostKey, trust = target.hostKey.isEmpty(), mismatch = target.hostKey.isNotEmpty())
         }
         if (target.password.isEmpty() && target.privateKey.isEmpty()) throw NodeWizardException("Сервер не принял вход")
+        if (s.password != null && target.privateKey.isEmpty() && target.password != s.password) throw NodeWizardException("сервер не принял логин, пароль или ключ")
         connected = s
         return ServerProbe(os = "Ubuntu 24.04", arch = "amd64", systemd = true, sudo = s.sudo, core = "node-v1.4.1", autoupdate = s.autoupdate, channels = s.channels.keys.toList())
     }
@@ -90,6 +94,12 @@ class FakeNodeService(vararg servers: FakeServer) : NodeWizardService {
         val s = here("remove")
         sudo(s, sudoPassword)
         s.channels.remove(channel)
+    }
+
+    override suspend fun upgrade(sudoPassword: String): NodeUpgrade {
+        val s = here("upgrade")
+        sudo(s, sudoPassword)
+        return NodeUpgrade("node-v9.9.9", s.channels.values.filter { it.state == "active" }.map { it.id })
     }
 
     override suspend fun showChannel(channel: String, sudoPassword: String): InstalledChannel {

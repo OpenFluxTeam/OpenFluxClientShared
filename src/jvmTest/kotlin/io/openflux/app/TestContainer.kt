@@ -97,7 +97,16 @@ class TestPlatform : PlatformServices {
     override fun setClipboardText(text: String) { clipboard = text }
     override fun qrFromClipboardImage(): String? = null
     override fun qrFromFile(path: String): String? = null
-    override suspend fun pickFile(title: String, extensions: List<String>): String? = null
+    /** What the file picker returns, and the files there are to read. */
+    var picked: String? = null
+    val files = mutableMapOf<String, ByteArray>()
+    override suspend fun pickFile(title: String, extensions: List<String>): String? = picked
+    override suspend fun readBytes(pathOrUri: String): ByteArray? = files[pathOrUri]
+    /** The core's trust report for a transport and the key it is checked with; null: none (as on a platform without scripts). */
+    var inspect: ((data: ByteArray, sig: ByteArray, key: String) -> String)? = null
+    override val officialScriptKey = "0f".repeat(32)
+    override fun inspectTransport(data: ByteArray, sig: ByteArray, pubkeyHex: String): String =
+        inspect?.invoke(data, sig, pubkeyHex) ?: super.inspectTransport(data, sig, pubkeyHex)
     override fun readTextFile(path: String, maxBytes: Int): String? = null
     override fun qrMatrix(text: String): List<BooleanArray> = emptyList()
     /** The addresses opened for the person, in order. */
@@ -113,6 +122,12 @@ class TestPlatform : PlatformServices {
     override suspend fun httpText(url: String): String = releases ?: throw java.io.IOException("нет связи")
     var rooms = "packed-rooms"
     override suspend fun newCupsRooms(): String = rooms
+    /** The system secret store, in memory. */
+    val vault = mutableMapOf<String, String>()
+    override val secretStoreSupported = true
+    override fun loadSecret(key: String) = vault[key]
+    override fun saveSecret(key: String, value: String): Boolean { vault[key] = value; return true }
+    override fun deleteSecret(key: String) { vault.remove(key) }
     var secrets = 0
     override fun newSecret() = "%064x".format(++secrets)
 }
