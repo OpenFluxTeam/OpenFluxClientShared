@@ -1,9 +1,7 @@
 package io.openflux.app.cosmic
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -14,7 +12,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
@@ -33,12 +30,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import io.openflux.app.components.ConnectLook
+import io.openflux.app.components.rememberWindowFocused
+import io.openflux.app.components.throttledFrames
 import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.resources.Res
 import org.jetbrains.compose.resources.ExperimentalResourceApi
@@ -80,17 +80,13 @@ fun CosmicSwitch(
         }
     }
     SideEffect { universe.traffic = traffic.coerceIn(0f, 1f) }
+    val focused = rememberWindowFocused()
     LaunchedEffect(universe, scene) {
         if (!scene) return@LaunchedEffect
-        var last = 0L
-        while (true) {
-            withInfiniteAnimationFrameNanos { now ->
-                val dt = if (last == 0L) 0f else ((now - last) / 1e9f).coerceIn(0f, 0.05f)
-                last = now
-                aimCamera(camera, canvas.size, universe.time, reduced)
-                universe.update(dt, camera, reduced)
-                frame.intValue++
-            }
+        throttledFrames(focused) { dt ->
+            aimCamera(camera, canvas.size, universe.time, reduced)
+            universe.update(dt, camera, reduced)
+            frame.intValue++
         }
     }
     val interaction = remember { MutableInteractionSource() }
@@ -98,9 +94,9 @@ fun CosmicSwitch(
     val pressed by interaction.collectIsPressedAsState()
     val hover by animateFloatAsState(if (hovered) 1f else 0f)
     val press by animateFloatAsState(if (pressed) 1f else 0f)
-    val shape = RoundedCornerShape(AppTheme.shapes.large)
 
-    BoxWithConstraints(modifier.clip(shape).border(1.dp(), AppTheme.colors.border.copy(alpha = 0.6f), shape)) {
+    // No space behind it: the scene lies on the page itself.
+    BoxWithConstraints(modifier.clipToBounds()) {
         Canvas(Modifier.fillMaxSize()) {
             frame.intValue
             if (canvas.size != size) {
@@ -141,8 +137,6 @@ private fun Hint(text: String, content: @Composable () -> Unit) {
 private class CanvasSize {
     var size = Size.Zero
 }
-
-private fun Int.dp() = androidx.compose.ui.unit.Dp(this.toFloat())
 
 /** Reads the pictures from the app's resources; null if they cannot be read (the scene then draws without them). */
 @OptIn(ExperimentalResourceApi::class)

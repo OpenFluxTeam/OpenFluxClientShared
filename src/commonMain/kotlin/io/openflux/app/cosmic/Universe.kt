@@ -76,8 +76,6 @@ class Link(
 
 class Loop(var angle: Float, var width: Float, var height: Float, var born: Float, var life: Float)
 
-class Star(val x: Float, val y: Float, val size: Float, val phase: Float, val warm: Boolean, val depth: Float)
-
 class Universe(seed: Int = 42) {
     private val random = Rng(seed)
     private fun r() = random.next()
@@ -104,7 +102,6 @@ class Universe(seed: Int = 42) {
     val devices: List<Device>
     val links = ArrayList<Link>()
     val loops = Array(4) { Loop(0f, 0.2f, 0.2f, -1f, 6f) }
-    val stars: List<Star>
     private var networkOn = false
     private var nextPlan = 0f
     private var nextChurn = 0f
@@ -141,10 +138,6 @@ class Universe(seed: Int = 42) {
                 lean = (r() - 0.5f) * 1.1f,
                 faceTilt = faceTilt,
             )
-        }
-        stars = List(220) {
-            val depth = r()
-            Star(r() * 2 - 1, r() * 2 - 1, if (depth > 0.92f) 1.6f + r() * 1.2f else 0.6f + r() * 0.9f, r() * 6.28f, r() > 0.7f, depth)
         }
         loops.forEachIndexed { i, l -> renew(l, i * 1.7f) }
     }

@@ -58,6 +58,7 @@ import io.openflux.app.components.Brand
 import io.openflux.app.components.Chip
 import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ConfirmDialog
+import io.openflux.app.components.ConnectButton
 import io.openflux.app.components.ConnectLook
 import io.openflux.app.cosmic.CosmicSwitch
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -219,24 +220,12 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         return
     }
 
-    // The switch is a small universe: the Moon while off, the Sun with its network of devices while connected.
-    val busy = (traffic.downBytesPerSec + traffic.upBytesPerSec).toDouble()
-    // Its height is set, not left to an aspect ratio: in a wide window that would ask for more than the cap and
-    // the scene would spill over what is above and below it. A short window keeps it to half its height, so what
-    // follows (a failure, the connection) stays in view.
-    val windowHeight = with(androidx.compose.ui.platform.LocalDensity.current) {
-        androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toDp()
-    }
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val cap = if (windowHeight > 0.dp) minOf(480.dp, windowHeight * 0.52f) else 480.dp
-        CosmicSwitch(
-            state.look(),
-            label = if (state.isActive) "Отключить" else "Подключить",
-            onClick = m::toggle,
-            modifier = Modifier.fillMaxWidth().height(minOf(maxWidth / 1.12f, cap)),
-            traffic = (kotlin.math.log10(busy + 1.0) / 7.0).toFloat(),
-            shortcut = "Ctrl+Enter",
-        )
+    val label = if (state.isActive) "Отключить" else "Подключить"
+    // Settings → Look can ask for the plain ring: the universe below is the heavy one for the graphics card.
+    if (settings.simpleSwitch) {
+        ConnectButton(state.look(), label, onClick = m::toggle, shortcut = "Ctrl+Enter")
+    } else {
+        CosmicHome(state, label, m::toggle, (traffic.downBytesPerSec + traffic.upBytesPerSec).toDouble())
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
         AnimatedContent(
@@ -301,6 +290,28 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         )
     }
     if (chosen != null && !exitMode) Details(m, chosen, state)
+}
+
+/** The switch is a small universe: the Moon while off, the Sun with its network of devices while connected. [busy] is bytes a second. */
+@Composable
+private fun CosmicHome(state: ConnectionState, label: String, onClick: () -> Unit, busy: Double) {
+    // Its height is set, not left to an aspect ratio: in a wide window that would ask for more than the cap and
+    // the scene would spill over what is above and below it. A short window keeps it to half its height, so what
+    // follows (a failure, the connection) stays in view.
+    val windowHeight = with(androidx.compose.ui.platform.LocalDensity.current) {
+        androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toDp()
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val cap = if (windowHeight > 0.dp) minOf(480.dp, windowHeight * 0.52f) else 480.dp
+        CosmicSwitch(
+            state.look(),
+            label = label,
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth().height(minOf(maxWidth / 1.12f, cap)),
+            traffic = (kotlin.math.log10(busy + 1.0) / 7.0).toFloat(),
+            shortcut = "Ctrl+Enter",
+        )
+    }
 }
 
 /** The connection's facts, folded (spec 6, item 5). */

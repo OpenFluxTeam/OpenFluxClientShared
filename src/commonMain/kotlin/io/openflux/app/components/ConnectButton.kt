@@ -9,7 +9,6 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -187,16 +186,12 @@ private fun Ring(look: ConnectLook, label: String, onClick: () -> Unit, modifier
     val shake = remember { Animatable(1f) }
 
     val clock = remember { SpaceClock() }
+    val focused = rememberWindowFocused()
     LaunchedEffect(clock) {
-        var last = 0L
-        while (true) {
-            withInfiniteAnimationFrameNanos { now ->
-                val dt = if (last == 0L) 0f else ((now - last) / 1e9f).coerceIn(0f, 0.05f)
-                last = now
-                clock.t += dt
-                clock.head = (clock.head + dt * speed.value) % 1f
-                clock.warp += dt * busyness.value * 0.32f
-            }
+        throttledFrames(focused) { dt ->
+            clock.t += dt
+            clock.head = (clock.head + dt * speed.value) % 1f
+            clock.warp += dt * busyness.value * 0.32f
         }
     }
     // One-shot moments: the ring closing into "connected", a failure.

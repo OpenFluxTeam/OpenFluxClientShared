@@ -47,8 +47,8 @@ fun aimCamera(camera: Camera, size: Size, t: Float, reduced: Boolean) {
 fun bodyRadiusPx(camera: Camera): Float = BODY_RADIUS * camera.unit
 
 /**
- * Draws a [Universe] as the camera sees it, back to front: space, the far halves of the orbits, the devices
- * behind the body, its corona, the body, the ring of light, the near halves of the orbits, the links and their
+ * Draws a [Universe] as the camera sees it, back to front, straight on the page: the far halves of the orbits,
+ * the devices behind the body, its corona, the body, the ring of light, the near halves of the orbits, the links and their
  * traffic, the devices in front.
  */
 class CosmicRenderer(shaders: Boolean) {
@@ -79,7 +79,6 @@ class CosmicRenderer(shaders: Boolean) {
     fun DrawScope.drawScene(u: Universe, cam: Camera, images: CosmicImages?, hover: Float, press: Float) {
         val h = u.heat.value
         val dp = density
-        space(u, h)
         val bodyDepth = cam.depth(tmp.set(0f, 0f, 0f))
         orbits(u, cam, bodyDepth, behind = true)
         val sorted = u.devices.sortedByDescending { it.depth }
@@ -92,35 +91,6 @@ class CosmicRenderer(shaders: Boolean) {
         orbits(u, cam, bodyDepth, behind = false)
         links(u, cam, dp)
         for (d in sorted) if (d.depth <= bodyDepth) device(d, u, cam, h)
-    }
-
-    // ---- Space ----
-
-    private fun DrawScope.space(u: Universe, h: Float) {
-        drawRect(Brush.verticalGradient(listOf(Color(0xFF060A16), Color(0xFF02040A))))
-        val m = max(size.width, size.height)
-        val blobs = listOf(
-            Triple(Offset(0.18f, 0.22f), lerp(Color(0x2E2A3C8A), Color(0x2A0E6E78), h), 0.62f),
-            Triple(Offset(0.86f, 0.72f), lerp(Color(0x24203A7A), Color(0x22A25C14), h), 0.58f),
-            Triple(Offset(0.62f, 0.08f), lerp(Color(0x161C2E66), Color(0x1A1C8C9E), h), 0.45f),
-        )
-        for ((pos, color, r) in blobs) {
-            val c = Offset(pos.x * size.width, pos.y * size.height)
-            drawCircle(Brush.radialGradient(listOf(color, Color.Transparent), c, r * m), r * m, c)
-        }
-        // The Sun's light on the space round it.
-        if (h > 0.01f) {
-            val c = center
-            drawCircle(Brush.radialGradient(listOf(Color(1f, 0.6f, 0.22f, 0.22f * h), Color.Transparent), c, m * 0.45f), m * 0.45f, c)
-        }
-        val t = u.time
-        val bright = 1f - 0.35f * h
-        for (s in u.stars) {
-            val tw = 0.35f + 0.65f * (0.5f + 0.5f * sin(t * (0.6f + s.phase * 0.3f) + s.phase * 40f))
-            val a = (tw * bright * (0.35f + 0.65f * s.depth)).coerceIn(0f, 1f)
-            val color = if (s.warm) Color(1f, 0.92f, 0.82f, a) else Color(0.78f, 0.86f, 1f, a)
-            drawCircle(color, s.size * density * 0.6f, Offset((s.x * 0.5f + 0.5f) * size.width, (s.y * 0.5f + 0.5f) * size.height))
-        }
     }
 
     // ---- The orbits, faint, with light running along them ----
@@ -152,7 +122,8 @@ class CosmicRenderer(shaders: Boolean) {
     // ---- The body ----
 
     private fun DrawScope.coronaLayer(u: Universe, center: Offset, radius: Float, h: Float, hover: Float) {
-        val span = radius * 3.6f
+        // The Moon's halo is gone by 2.6 radii, the Sun's corona by 3.6: the shader runs on that disc only.
+        val span = radius * (if (h > 0.01f || u.red.value > 0f) 3.6f else 2.6f)
         val shader = corona
         if (shader != null) {
             shader.uniform("uCenter", center.x, center.y)
@@ -171,7 +142,7 @@ class CosmicRenderer(shaders: Boolean) {
             shader.uniform("uLoopWidth", l[0].width, l[1].width, l[2].width, l[3].width)
             shader.uniform("uLoopHeight", height(0), height(1), height(2), height(3))
             shader.uniform("uLoopLife", life(0), life(1), life(2), life(3))
-            drawRect(shader.brush(), Offset(center.x - span, center.y - span), Size(span * 2, span * 2))
+            drawCircle(shader.brush(), span, center)
         } else {
             val cold = Color(0.45f, 0.66f, 1f)
             val warm = Color(1f, 0.55f, 0.15f)
