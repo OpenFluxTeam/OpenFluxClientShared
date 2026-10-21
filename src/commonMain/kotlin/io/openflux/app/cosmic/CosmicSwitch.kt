@@ -70,8 +70,16 @@ fun CosmicSwitch(
     val images by produceState<CosmicImages?>(null, scene) { if (scene) value = loadCosmicImages() }
     val frame = remember { mutableIntStateOf(0) }
     var first by remember { androidx.compose.runtime.mutableStateOf(true) }
-    LaunchedEffect(look) {
-        if (first) {
+    val animate = io.openflux.app.theme.LocalAnimations.current
+    LaunchedEffect(look, animate) {
+        if (!animate) {
+            // A still picture of the state: put straight into it once the canvas has its size, and drawn once.
+            androidx.compose.runtime.withFrameNanos { }
+            aimCamera(camera, canvas.size, universe.time, reduced)
+            universe.jump(look, camera)
+            first = false
+            frame.intValue++
+        } else if (first) {
             aimCamera(camera, canvas.size, universe.time, reduced)
             universe.jump(look, camera)
             first = false
@@ -81,8 +89,8 @@ fun CosmicSwitch(
     }
     SideEffect { universe.traffic = traffic.coerceIn(0f, 1f) }
     val focused = rememberWindowFocused()
-    LaunchedEffect(universe, scene) {
-        if (!scene) return@LaunchedEffect
+    LaunchedEffect(universe, scene, animate) {
+        if (!scene || !animate) return@LaunchedEffect
         throttledFrames(focused) { dt ->
             aimCamera(camera, canvas.size, universe.time, reduced)
             universe.update(dt, camera, reduced)

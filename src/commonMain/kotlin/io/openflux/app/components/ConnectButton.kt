@@ -187,7 +187,10 @@ private fun Ring(look: ConnectLook, label: String, onClick: () -> Unit, modifier
 
     val clock = remember { SpaceClock() }
     val focused = rememberWindowFocused()
-    LaunchedEffect(clock) {
+    val animate = io.openflux.app.theme.LocalAnimations.current
+    LaunchedEffect(clock, animate) {
+        // Without animations the ring stands still: no frame is asked for until the state changes.
+        if (!animate) return@LaunchedEffect
         throttledFrames(focused) { dt ->
             clock.t += dt
             clock.head = (clock.head + dt * speed.value) % 1f

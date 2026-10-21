@@ -207,12 +207,14 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     val settings by container.settings.settings.collectAsState()
-    val traffic by container.connection.traffic.collectAsState()
+    // Without animations nothing ticks: the speed is read once per state, the time since connecting is a time of day.
+    val animate = io.openflux.app.theme.LocalAnimations.current
+    val traffic by liveTraffic(animate, state)
     val status by container.accounts.status.collectAsState()
     val subscription by container.subscription.state.collectAsState()
     val platform = container.platform
     val exitMode = settings.mode == ConnectionMode.Exit && state.isActive
-    val now by produceState(platform.now()) { while (true) { delay(1_000); value = platform.now() } }
+    val now by produceState(platform.now(), animate) { while (animate) { delay(1_000); value = platform.now() } }
     // The exit node's controls, QR and link live here too: a switch above the button while nothing runs. A running
     // node or client hides it: the switch could not leave either, their own button stops them.
     var exitTab by rememberSaveable { mutableStateOf(false) }
@@ -241,9 +243,13 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         AnimatedVisibility(connected != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
             val since = connected?.since ?: now
             FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-                StatPill(Icons.Rounded.Schedule, Fmt.duration(now - since))
-                StatPill(Icons.Rounded.ArrowDownward, Fmt.speed(traffic.downBytesPerSec))
-                StatPill(Icons.Rounded.ArrowUpward, Fmt.speed(traffic.upBytesPerSec))
+                if (animate) {
+                    StatPill(Icons.Rounded.Schedule, Fmt.duration(now - since))
+                    StatPill(Icons.Rounded.ArrowDownward, Fmt.speed(traffic.downBytesPerSec))
+                    StatPill(Icons.Rounded.ArrowUpward, Fmt.speed(traffic.upBytesPerSec))
+                } else {
+                    StatPill(Icons.Rounded.Schedule, "с " + Fmt.clock(since, platform.utcOffsetSeconds))
+                }
             }
         }
     }
@@ -326,7 +332,8 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
     val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     val settings by container.settings.settings.collectAsState()
-    val traffic by container.connection.traffic.collectAsState()
+    val animate = io.openflux.app.theme.LocalAnimations.current
+    val traffic by liveTraffic(animate, state)
     val socks by container.connection.socksAddress.collectAsState()
     val address by container.connection.exitAddress.collectAsState()
     val android = container.platform.kind.isPhone
@@ -357,7 +364,7 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
                 ValueRow("Внешний IP", ip, Modifier.weight(1f))
                 IconAction(Icons.Rounded.Refresh, "Проверить ещё раз", container.connection::refreshExitAddress, enabled = on)
             }
-            if (on) ValueRow("За сессию", Fmt.bytes(traffic.totalDown + traffic.totalUp))
+            if (on && animate) ValueRow("За сессию", Fmt.bytes(traffic.totalDown + traffic.totalUp))
             if (on && !traffic.live) ValueRow("Статистика", "ядро не сообщает")
             for (kind in m.pushable(p, state)) {
                 RowItem("Передать вход ${kind.label} ноде", onClick = {
@@ -469,4 +476,14 @@ private fun ProfileRow(p: Profile, selected: Boolean, dot: Status, touch: Boolea
             danger = true,
         )
     }
+}
+
+/**
+ * The connection's traffic: live, or with [animate] off read once per [state] (the window is then not redrawn every
+ * second for the numbers; what only a live figure says is not shown).
+ */
+@Composable
+private fun liveTraffic(animate: Boolean, state: ConnectionState): androidx.compose.runtime.State<io.openflux.desktop.model.TrafficStats> {
+    val flow = LocalAppContainer.current.connection.traffic
+    return if (animate) flow.collectAsState() else remember(state) { mutableStateOf(flow.value) }
 }

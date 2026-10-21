@@ -85,7 +85,7 @@ fun StatusDot(status: Status, modifier: Modifier = Modifier) {
         },
     )
     // Only a live dot runs a clock; it is read while drawing, so the pulse redraws without recomposing.
-    val pulse = if (status == Status.On || status == Status.Busy) {
+    val pulse = if ((status == Status.On || status == Status.Busy) && io.openflux.app.theme.LocalAnimations.current) {
         val period = if (status == Status.Busy) 900 else 1800
         rememberInfiniteTransition().animateFloat(0f, 1f, infiniteRepeatable(tween(period, easing = LinearEasing), RepeatMode.Restart))
     } else null

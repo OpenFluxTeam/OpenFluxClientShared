@@ -24,6 +24,12 @@ object Fmt {
 
     private fun two(n: Long) = n.toString().padStart(2, '0')
 
+    /** "14:05": the time of day of [millis] since the epoch in the zone [offsetSeconds] east of UTC. */
+    fun clock(millis: Long, offsetSeconds: Int = 0): String {
+        val s = (millis / 1000 + offsetSeconds).mod(86_400L)
+        return "${two(s / 3600)}:${two((s % 3600) / 60)}"
+    }
+
     private val MONTHS = listOf(
         "января", "февраля", "марта", "апреля", "мая", "июня",
         "июля", "августа", "сентября", "октября", "ноября", "декабря",

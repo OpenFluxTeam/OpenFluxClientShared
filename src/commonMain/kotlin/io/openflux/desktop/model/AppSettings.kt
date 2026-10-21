@@ -140,6 +140,8 @@ data class AppSettings(
     val sidebarCollapsed: Boolean = false,
     /** Home's switch as the plain ring (ConnectButton) instead of the Moon and the Sun: far lighter on the graphics card. */
     val simpleSwitch: Boolean = false,
+    /** Anything that moves by itself, and the transitions between states: off, the window is drawn only when it changes. */
+    val animations: Boolean = true,
     /**
      * Developer mode: shows the Accounts tab. Turned on by tapping the app
      * version in Settings → About ten times, off by its switch there.

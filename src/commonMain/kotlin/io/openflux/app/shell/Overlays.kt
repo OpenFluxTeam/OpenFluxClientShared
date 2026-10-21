@@ -188,7 +188,7 @@ fun UpdateLine(modifier: Modifier = Modifier) {
                 style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
             )
             if (s.total > 0) LinearProgressIndicator(progress = { (s.done.toFloat() / s.total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(), color = AppTheme.colors.accent)
-            else LinearProgressIndicator(Modifier.fillMaxWidth(), color = AppTheme.colors.accent)
+            else io.openflux.app.components.BusyBar(Modifier.fillMaxWidth())
         }
         is UpdateState.Installing -> Banner(s.note ?: "Устанавливаю ${s.release.version}…", Tone.Success, pad, action = "Закрыть", onAction = updates::dismiss)
         is UpdateState.Failed -> if (s.release != null) Banner(s.message, Tone.Danger, pad, action = "Повторить", onAction = updates::install, secondAction = "Закрыть", onSecondAction = updates::dismiss)

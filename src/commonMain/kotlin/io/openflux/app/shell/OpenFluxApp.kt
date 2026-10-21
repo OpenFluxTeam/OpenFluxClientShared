@@ -97,6 +97,7 @@ internal fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortc
             LocalNavigator provides navigator,
             LocalServerLink provides serverLink,
             LocalOpenAdd provides { addOpen = true },
+            io.openflux.app.theme.LocalAnimations provides settings.animations,
         ) {
             Box(Modifier.fillMaxSize()) {
                 Shell(navigator, onAdd = { addOpen = true }) { wide ->

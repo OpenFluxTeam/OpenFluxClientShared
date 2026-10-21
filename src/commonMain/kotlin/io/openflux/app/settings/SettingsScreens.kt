@@ -368,6 +368,10 @@ private fun LookPage() {
     }
     Section(null) {
         Toggle(
+            "Анимации", settings.animations, { v -> container.settings.update { it.copy(animations = v) } },
+            subtitle = if (settings.animations) "Выключите, чтобы ничего не двигалось и видеокарта не нагружалась" else "Выключены: окно перерисовывается, только когда что-то меняется",
+        )
+        Toggle(
             "Простая кнопка подключения", settings.simpleSwitch, { v -> container.settings.update { it.copy(simpleSwitch = v) } },
             subtitle = "Кольцо вместо Луны и Солнца на Главной: меньше нагружает видеокарту",
         )
