@@ -92,6 +92,45 @@ class SetupPagesTest {
     }
 
     @Test
+    fun aPageSignInNamesTheAddressItWaitsFor() {
+        val ok = SetupPages.parseLogin("""{"id":"5","url":"https://boards.yandex.ru/","title":"Доски","capture":{"page":{"match":"^https://boards\\.yandex\\.ru/whiteboard/.*hash=","hint":"Откройте доску"}}}""")
+        assertTrue(ok.capturesPage)
+        assertEquals("^https://boards\\.yandex\\.ru/whiteboard/.*hash=", ok.pageMatch)
+        assertEquals("Откройте доску", ok.pageHint)
+        assertEquals("", ok.storageKey)
+        assertEquals("", ok.signedInPath)
+        val re = ok.pageRegex!!
+        assertTrue(re.containsMatchIn("https://boards.yandex.ru/whiteboard/?hash=abc"))
+        assertFalse(re.containsMatchIn("https://boards.yandex.ru/"))
+        assertFalse(re.containsMatchIn("https://evil.com/?u=https://boards.yandex.ru/whiteboard/x?hash=1"))
+        // the button alone: no pattern
+        val manual = SetupPages.parseLogin("""{"id":"5","url":"https://a.b","capture":{"page":true}}""")
+        assertTrue(manual.capturesPage)
+        assertNull(manual.pageRegex)
+        assertEquals("", SetupPages.parseLogin("""{"id":"5","url":"https://a.b","capture":{"page":{}}}""").pageMatch)
+        // a long hint is cut
+        assertEquals(160, SetupPages.parseLogin("""{"id":"5","url":"https://a.b","capture":{"page":{"hint":"${"x".repeat(500)}"}}}""").pageHint.length)
+        val bad = listOf(
+            """{"id":"1","url":"https://a.b","capture":{"page":{"match":"("}}}""",                                          // not a regular expression
+            """{"id":"1","url":"https://a.b","capture":{"page":{"match":"${"x".repeat(600)}"}}}""",
+            """{"id":"1","url":"https://a.b","capture":{"page":false}}""",                                                  // nothing to capture
+            """{"id":"1","url":"https://a.b","capture":{"page":true,"localStorage":"k"}}""",                                // one thing only
+            """{"id":"1","url":"https://a.b","capture":{"page":true,"cookies":true,"signedIn":{"fetch":"/x"}}}""",
+            """{"id":"1","url":"http://a.b","capture":{"page":true}}""",                                                    // https only
+        )
+        for (json in bad) assertFailsWith<IllegalArgumentException>(json) { SetupPages.parseLogin(json) }
+    }
+
+    @Test
+    fun aPageCaptureIsPlainJsonWithTheAddressAndTheTitle() {
+        val json = SetupPages.pageCapture("https://a.b/c?d=\"e\"#f", "Доска «1»")
+        val o = kotlinx.serialization.json.Json.parseToJsonElement(json) as kotlinx.serialization.json.JsonObject
+        assertEquals("https://a.b/c?d=\"e\"#f", (o["url"] as kotlinx.serialization.json.JsonPrimitive).content)
+        assertEquals("Доска «1»", (o["title"] as kotlinx.serialization.json.JsonPrimitive).content)
+        assertEquals(setOf("url", "title"), o.keys)
+    }
+
+    @Test
     fun theCookieCaptureIsPlainJsonAndTheProbeAsksOnePathWithTheWindowsCookies() {
         val json = SetupPages.cookieCapture("a=1; b=\"2\"", "UA/1", "{\"email\":\"x\"}")
         val o = kotlinx.serialization.json.Json.parseToJsonElement(json) as kotlinx.serialization.json.JsonObject

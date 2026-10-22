@@ -155,6 +155,15 @@ object SetupPages {
      * the site with its own storage and cookies forgotten, as above.
      *
      * [storageKey] is empty and [signedInPath] set for the second kind.
+     *
+     * A page is asked for with `capture: {page: {match, hint}}`: the person does something on the site (makes a
+     * document, opens a board) and the window hands back the address of the page they ended on, as
+     * [pageCapture]'s JSON. The window closes by itself once its address has matched the regular expression
+     * [pageMatch] (Java syntax, searched in the whole address) for a moment; a bar button, "Это она", takes the
+     * page the window is on whatever it matches, which is the way out when the site's addresses are not what the
+     * script expected. [pageHint] is the line the bar shows. With `page: true` only the button takes the page. The
+     * window may go anywhere over https (a sign-in often changes the host); nothing but the address, and the page's
+     * title while the window is on the site it was opened for, is read.
      */
     data class LoginRequest(
         val id: String,
@@ -162,11 +171,19 @@ object SetupPages {
         val title: String,
         val storageKey: String,
         val signedInPath: String = "",
-    )
+        val capturesPage: Boolean = false,
+        val pageMatch: String = "",
+        val pageHint: String = "",
+    ) {
+        /** [pageMatch] as a regular expression; null when the page is taken by the button only. */
+        val pageRegex: Regex? get() = pageMatch.takeIf { it.isNotEmpty() }?.let { Regex(it) }
+    }
 
     private const val MAX_LOGIN_TITLE = 120
     private const val MAX_LOGIN_KEY = 128
     private const val MAX_SIGNED_IN_PATH = 256
+    private const val MAX_PAGE_MATCH = 512
+    private const val MAX_PAGE_HINT = 160
 
     /** The request's id, or "" when [json] is not even that: enough to reject the page's promise. */
     fun loginId(json: String): String = try {
@@ -191,6 +208,22 @@ object SetupPages {
         val key = text(capture?.get("localStorage"))
         val withCookies = (capture?.get("cookies") as? JsonPrimitive)?.booleanOrNull == true
         val title = text(root["title"]).take(MAX_LOGIN_TITLE).ifBlank { "Вход" }
+        val page = capture?.get("page")
+        val withPage = page is JsonObject || (page as? JsonPrimitive)?.booleanOrNull == true
+        if (withPage) {
+            require(key.isEmpty() && !withCookies) { "Окну входа нужно что-то одно: ключ localStorage, куки сайта или адрес страницы" }
+            val spec = page as? JsonObject
+            val match = text(spec?.get("match")).trim()
+            require(match.length <= MAX_PAGE_MATCH) { "capture.page.match длиннее $MAX_PAGE_MATCH знаков" }
+            if (match.isNotEmpty()) {
+                try {
+                    Regex(match)
+                } catch (e: Exception) {
+                    throw IllegalArgumentException("capture.page.match не разбирается как регулярное выражение")
+                }
+            }
+            return LoginRequest(id, url, title, "", "", true, match, text(spec?.get("hint")).take(MAX_PAGE_HINT))
+        }
         if (withCookies) {
             require(key.isEmpty()) { "Окну входа нужно что-то одно: ключ localStorage или куки сайта" }
             val path = text((capture?.get("signedIn") as? JsonObject)?.get("fetch"))
@@ -202,6 +235,13 @@ object SetupPages {
         require(key.isNotEmpty() && key.length <= MAX_LOGIN_KEY) { "Не сказано, что забрать после входа (capture.localStorage)" }
         return LoginRequest(id, url, title, key)
     }
+
+    /** What a page-taking window hands back (see [LoginRequest]): the page's address and its title (empty when it could not be read). */
+    fun pageCapture(url: String, title: String): String =
+        buildJsonObject {
+            put("url", url)
+            put("title", title)
+        }.toString()
 
     /** What a cookie sign-in window hands back (see [LoginRequest]): the Cookie header the site's origin gets, the window's User-Agent and the probe's answer. */
     fun cookieCapture(cookie: String, userAgent: String, probe: String): String =
