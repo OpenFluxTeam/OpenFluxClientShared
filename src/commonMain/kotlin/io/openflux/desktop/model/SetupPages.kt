@@ -164,6 +164,12 @@ object SetupPages {
      * script expected. [pageHint] is the line the bar shows. With `page: true` only the button takes the page. The
      * window may go anywhere over https (a sign-in often changes the host); nothing but the address, and the page's
      * title while the window is on the site it was opened for, is read.
+     *
+     * A site whose sign-in has no "who am I" path (nothing a GET answers with JSON) is asked for with cookies AND a
+     * page together: `capture: {cookies: true, page: {match, hint}}`. The window completes the same way as a page
+     * request - its address matching [pageMatch], or "Это она" - but hands back [cookieCapture]'s JSON (the site's
+     * whole session), not the address: the matched page is only the signal that the sign-in is done. [cookies] is
+     * set with [capturesPage] for this kind; there is no probe, so [cookieCapture]'s probe field is empty.
      */
     data class LoginRequest(
         val id: String,
@@ -174,6 +180,8 @@ object SetupPages {
         val capturesPage: Boolean = false,
         val pageMatch: String = "",
         val pageHint: String = "",
+        /** With [capturesPage]: the window hands back the site's session ([cookieCapture]), not the page's address. */
+        val cookies: Boolean = false,
     ) {
         /** [pageMatch] as a regular expression; null when the page is taken by the button only. */
         val pageRegex: Regex? get() = pageMatch.takeIf { it.isNotEmpty() }?.let { Regex(it) }
@@ -211,7 +219,9 @@ object SetupPages {
         val page = capture?.get("page")
         val withPage = page is JsonObject || (page as? JsonPrimitive)?.booleanOrNull == true
         if (withPage) {
-            require(key.isEmpty() && !withCookies) { "Окну входа нужно что-то одно: ключ localStorage, куки сайта или адрес страницы" }
+            // cookies may ride with a page request: the page match/button is then only the "signed in" signal and
+            // the window hands back the session, not the address (a site with no JSON "who am I" path).
+            require(key.isEmpty()) { "Окну входа нужно что-то одно: ключ localStorage, или адрес страницы (с куками сайта или без)" }
             val spec = page as? JsonObject
             val match = text(spec?.get("match")).trim()
             require(match.length <= MAX_PAGE_MATCH) { "capture.page.match длиннее $MAX_PAGE_MATCH знаков" }
@@ -222,15 +232,15 @@ object SetupPages {
                     throw IllegalArgumentException("capture.page.match не разбирается как регулярное выражение")
                 }
             }
-            return LoginRequest(id, url, title, "", "", true, match, text(spec?.get("hint")).take(MAX_PAGE_HINT))
+            return LoginRequest(id, url, title, "", "", true, match, text(spec?.get("hint")).take(MAX_PAGE_HINT), withCookies)
         }
         if (withCookies) {
             require(key.isEmpty()) { "Окну входа нужно что-то одно: ключ localStorage или куки сайта" }
             val path = text((capture?.get("signedIn") as? JsonObject)?.get("fetch"))
             require(path.length <= MAX_SIGNED_IN_PATH && SIGNED_IN_PATH.matches(path)) {
-                "Для кук нужен capture.signedIn.fetch: путь на сайте (вида /api/...), который отвечает JSON, когда вход выполнен"
+                "Для кук нужен capture.signedIn.fetch: путь на сайте (вида /api/...), который отвечает JSON, когда вход выполнен, либо capture.page для входа по адресу"
             }
-            return LoginRequest(id, url, title, "", path)
+            return LoginRequest(id, url, title, "", path, cookies = true)
         }
         require(key.isNotEmpty() && key.length <= MAX_LOGIN_KEY) { "Не сказано, что забрать после входа (capture.localStorage)" }
         return LoginRequest(id, url, title, key)

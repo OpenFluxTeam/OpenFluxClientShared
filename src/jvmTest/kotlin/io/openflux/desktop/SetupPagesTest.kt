@@ -73,7 +73,7 @@ class SetupPagesTest {
     @Test
     fun aCookieSignInNamesTheSitesWhoAmIPath() {
         val ok = SetupPages.parseLogin("""{"id":"4","url":"https://app.workspace.vk.ru/calls","title":"VK","capture":{"cookies":true,"signedIn":{"fetch":"/api/v2/userinfo"}}}""")
-        assertEquals(SetupPages.LoginRequest("4", "https://app.workspace.vk.ru/calls", "VK", "", "/api/v2/userinfo"), ok)
+        assertEquals(SetupPages.LoginRequest("4", "https://app.workspace.vk.ru/calls", "VK", "", "/api/v2/userinfo", cookies = true), ok)
         // a query belongs to the path
         assertEquals("/api/v1/userinfo?v=2", SetupPages.parseLogin("""{"id":"4","url":"https://a.b","capture":{"cookies":true,"signedIn":{"fetch":"/api/v1/userinfo?v=2"}}}""").signedInPath)
         val bad = listOf(
@@ -110,12 +110,18 @@ class SetupPagesTest {
         assertEquals("", SetupPages.parseLogin("""{"id":"5","url":"https://a.b","capture":{"page":{}}}""").pageMatch)
         // a long hint is cut
         assertEquals(160, SetupPages.parseLogin("""{"id":"5","url":"https://a.b","capture":{"page":{"hint":"${"x".repeat(500)}"}}}""").pageHint.length)
+        // cookies may ride with a page request: the match/button is the "signed in" signal and the session comes back
+        val cookiePage = SetupPages.parseLogin("""{"id":"6","url":"https://pruffme.com/","title":"PRUFFME","capture":{"cookies":true,"page":{"match":"^https://pruffme\\.com/cabinet","hint":"Войдите"}}}""")
+        assertTrue(cookiePage.capturesPage && cookiePage.cookies)
+        assertEquals("^https://pruffme\\.com/cabinet", cookiePage.pageMatch)
+        assertEquals("", cookiePage.signedInPath)
+        val cookieManual = SetupPages.parseLogin("""{"id":"6","url":"https://pruffme.com/","capture":{"cookies":true,"page":true}}""")
+        assertTrue(cookieManual.capturesPage && cookieManual.cookies && cookieManual.pageRegex == null)
         val bad = listOf(
             """{"id":"1","url":"https://a.b","capture":{"page":{"match":"("}}}""",                                          // not a regular expression
             """{"id":"1","url":"https://a.b","capture":{"page":{"match":"${"x".repeat(600)}"}}}""",
             """{"id":"1","url":"https://a.b","capture":{"page":false}}""",                                                  // nothing to capture
             """{"id":"1","url":"https://a.b","capture":{"page":true,"localStorage":"k"}}""",                                // one thing only
-            """{"id":"1","url":"https://a.b","capture":{"page":true,"cookies":true,"signedIn":{"fetch":"/x"}}}""",
             """{"id":"1","url":"http://a.b","capture":{"page":true}}""",                                                    // https only
         )
         for (json in bad) assertFailsWith<IllegalArgumentException>(json) { SetupPages.parseLogin(json) }
