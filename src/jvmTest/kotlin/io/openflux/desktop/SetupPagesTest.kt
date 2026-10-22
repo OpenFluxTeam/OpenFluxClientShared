@@ -71,6 +71,39 @@ class SetupPagesTest {
     }
 
     @Test
+    fun aCookieSignInNamesTheSitesWhoAmIPath() {
+        val ok = SetupPages.parseLogin("""{"id":"4","url":"https://app.workspace.vk.ru/calls","title":"VK","capture":{"cookies":true,"signedIn":{"fetch":"/api/v2/userinfo"}}}""")
+        assertEquals(SetupPages.LoginRequest("4", "https://app.workspace.vk.ru/calls", "VK", "", "/api/v2/userinfo"), ok)
+        // a query belongs to the path
+        assertEquals("/api/v1/userinfo?v=2", SetupPages.parseLogin("""{"id":"4","url":"https://a.b","capture":{"cookies":true,"signedIn":{"fetch":"/api/v1/userinfo?v=2"}}}""").signedInPath)
+        val bad = listOf(
+            """{"id":"1","url":"https://a.b","capture":{"cookies":true}}""",                                                    // nothing to ask
+            """{"id":"1","url":"https://a.b","capture":{"cookies":true,"signedIn":{}}}""",
+            """{"id":"1","url":"https://a.b","capture":{"cookies":true,"signedIn":{"fetch":"https://evil.com/x"}}}""",         // not the site's own path
+            """{"id":"1","url":"https://a.b","capture":{"cookies":true,"signedIn":{"fetch":"//evil.com/x"}}}""",
+            """{"id":"1","url":"https://a.b","capture":{"cookies":true,"signedIn":{"fetch":"api/x"}}}""",
+            """{"id":"1","url":"https://a.b","capture":{"cookies":true,"signedIn":{"fetch":"/a b"}}}""",
+            """{"id":"1","url":"https://a.b","capture":{"cookies":true,"signedIn":{"fetch":"/a#b"}}}""",
+            """{"id":"1","url":"https://a.b","capture":{"cookies":true,"signedIn":{"fetch":"/${"x".repeat(300)}"}}}""",
+            """{"id":"1","url":"https://a.b","capture":{"cookies":true,"localStorage":"k","signedIn":{"fetch":"/x"}}}""",      // one thing or the other
+            """{"id":"1","url":"http://a.b","capture":{"cookies":true,"signedIn":{"fetch":"/x"}}}""",                          // the site is still https only
+        )
+        for (json in bad) assertFailsWith<IllegalArgumentException>(json) { SetupPages.parseLogin(json) }
+    }
+
+    @Test
+    fun theCookieCaptureIsPlainJsonAndTheProbeAsksOnePathWithTheWindowsCookies() {
+        val json = SetupPages.cookieCapture("a=1; b=\"2\"", "UA/1", "{\"email\":\"x\"}")
+        val o = kotlinx.serialization.json.Json.parseToJsonElement(json) as kotlinx.serialization.json.JsonObject
+        assertEquals("a=1; b=\"2\"", (o["cookie"] as kotlinx.serialization.json.JsonPrimitive).content)
+        assertEquals("UA/1", (o["ua"] as kotlinx.serialization.json.JsonPrimitive).content)
+        assertEquals("{\"email\":\"x\"}", (o["probe"] as kotlinx.serialization.json.JsonPrimitive).content)
+        val js = SetupPages.signedInProbe("/api/v2/userinfo")
+        assertTrue("fetch(\"/api/v2/userinfo\"," in js && "credentials:'include'" in js && "indexOf('json')" in js, js)
+        assertTrue(js.startsWith("(async()=>{") && js.endsWith("})()"))
+    }
+
+    @Test
     fun theLoginIdSurvivesABadRequestSoThePromiseCanBeRejected() {
         assertEquals("7", SetupPages.loginId("""{"id":"7","url":"ftp://x"}"""))
         assertEquals("", SetupPages.loginId("nonsense"))

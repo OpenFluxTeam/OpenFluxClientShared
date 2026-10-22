@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -141,12 +142,31 @@ object SetupPages {
      * site the window was opened on is ever read, and only by the page's own
      * request; the window's address is shown to the person like any other.
      * This is for sites that keep their sign-in in localStorage instead of
-     * cookies (MAX does); cookie sign-ins still go through a check page.
+     * cookies (MAX does).
+     *
+     * A site that signs in with cookies is asked for differently:
+     * `capture: {cookies: true, signedIn: {fetch: "/path"}}`. The window waits
+     * until a same-origin GET of `/path` (with the window's cookies) answers 200 with
+     * JSON, which is how such a site tells that someone is signed in, then hands the
+     * page [cookieCapture]'s JSON: the Cookie header the site's origin gets, the
+     * window's User-Agent (a session may be bound to it) and the answer's text. This
+     * gives the page the whole session of the site, HttpOnly cookies included, so a
+     * page asks for it only for the site the script talks to; the window starts from
+     * the site with its own storage and cookies forgotten, as above.
+     *
+     * [storageKey] is empty and [signedInPath] set for the second kind.
      */
-    data class LoginRequest(val id: String, val url: String, val title: String, val storageKey: String)
+    data class LoginRequest(
+        val id: String,
+        val url: String,
+        val title: String,
+        val storageKey: String,
+        val signedInPath: String = "",
+    )
 
     private const val MAX_LOGIN_TITLE = 120
     private const val MAX_LOGIN_KEY = 128
+    private const val MAX_SIGNED_IN_PATH = 256
 
     /** The request's id, or "" when [json] is not even that: enough to reject the page's promise. */
     fun loginId(json: String): String = try {
@@ -167,10 +187,39 @@ object SetupPages {
         require(id.isNotEmpty() && id.length <= 32) { "У запроса входа нет номера" }
         val url = text(root["url"]).trim()
         require(httpsOrigin(url) != null) { "Окно входа открывает только сайт по https без логина в адресе" }
-        val key = text((root["capture"] as? JsonObject)?.get("localStorage"))
-        require(key.isNotEmpty() && key.length <= MAX_LOGIN_KEY) { "Не сказано, что забрать после входа (capture.localStorage)" }
+        val capture = root["capture"] as? JsonObject
+        val key = text(capture?.get("localStorage"))
+        val withCookies = (capture?.get("cookies") as? JsonPrimitive)?.booleanOrNull == true
         val title = text(root["title"]).take(MAX_LOGIN_TITLE).ifBlank { "Вход" }
+        if (withCookies) {
+            require(key.isEmpty()) { "Окну входа нужно что-то одно: ключ localStorage или куки сайта" }
+            val path = text((capture?.get("signedIn") as? JsonObject)?.get("fetch"))
+            require(path.length <= MAX_SIGNED_IN_PATH && SIGNED_IN_PATH.matches(path)) {
+                "Для кук нужен capture.signedIn.fetch: путь на сайте (вида /api/...), который отвечает JSON, когда вход выполнен"
+            }
+            return LoginRequest(id, url, title, "", path)
+        }
+        require(key.isNotEmpty() && key.length <= MAX_LOGIN_KEY) { "Не сказано, что забрать после входа (capture.localStorage)" }
         return LoginRequest(id, url, title, key)
+    }
+
+    /** What a cookie sign-in window hands back (see [LoginRequest]): the Cookie header the site's origin gets, the window's User-Agent and the probe's answer. */
+    fun cookieCapture(cookie: String, userAgent: String, probe: String): String =
+        buildJsonObject {
+            put("cookie", cookie)
+            put("ua", userAgent)
+            put("probe", probe)
+        }.toString()
+
+    /**
+     * The expression a cookie sign-in window evaluates to ask [path] of its site (same origin, with the window's
+     * cookies): "v:" and the answer's text when it is 200 and JSON, else "" (not signed in yet, or the site is busy).
+     */
+    fun signedInProbe(path: String): String {
+        val p = JsonPrimitive(path)
+        return "(async()=>{try{var r=await fetch($p,{credentials:'include',headers:{'Accept':'application/json'}});" +
+            "var t=r.headers.get('content-type')||'';if(r.status!==200||t.indexOf('json')<0)return '';" +
+            "var b=await r.text();return b?'v:'+b:''}catch(e){return ''}})()"
     }
 
     /** The script that settles the page's openfluxLogin promise [id]: [value] on success, else [error]. */
@@ -204,6 +253,9 @@ object SetupPages {
 
     /** Whether [url] is on the same origin as [origin] (a result of [httpsOrigin]). */
     fun isOn(origin: String, url: String): Boolean = httpsOrigin(url) == origin
+
+    /** A path on the site's own origin: one slash, then address characters (no second slash, no space, no fragment). */
+    private val SIGNED_IN_PATH = Regex("""/(?!/)[A-Za-z0-9._~:@%/?&=+,-]*""")
 
     private val HTTPS = Regex("""(?i)https://([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)(?::(\d{1,5}))?(?:[/?#].*)?""")
 
