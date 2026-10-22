@@ -215,15 +215,15 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     val platform = container.platform
     val exitMode = settings.mode == ConnectionMode.Exit && state.isActive
     val now by produceState(platform.now(), animate) { while (animate) { delay(1_000); value = platform.now() } }
-    // The exit node's controls, QR and link live here too: a switch above the button while nothing runs. A running
+    // The exit node's controls, QR and link live here too: a switch under the button while nothing runs. A running
     // node or client hides it: the switch could not leave either, their own button stops them.
     var exitTab by rememberSaveable { mutableStateOf(false) }
     val showExit = exitMode || (exitTab && !state.isActive)
-    if (!state.isActive && platform.exitNodeSupported) {
-        Segmented(listOf(false, true), showExit, { exitTab = it }, label = { if (it) "Выходная нода" else "Клиент" })
-    }
+    val modeSwitch: (@Composable () -> Unit)? = if (!state.isActive && platform.exitNodeSupported) {
+        { Segmented(listOf(false, true), showExit, { exitTab = it }, label = { if (it) "Выходная нода" else "Клиент" }) }
+    } else null
     if (showExit) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) { ExitNodeBody() }
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) { ExitNodeBody(underButton = modeSwitch) }
         return
     }
 
@@ -234,6 +234,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     } else {
         CosmicHome(state, label, m::toggle, (traffic.downBytesPerSec + traffic.upBytesPerSec).toDouble())
     }
+    modeSwitch?.invoke()
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
         AnimatedContent(
             state.title(),

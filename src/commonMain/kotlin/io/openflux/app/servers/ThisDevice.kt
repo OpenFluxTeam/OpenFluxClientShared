@@ -76,9 +76,9 @@ fun ThisDeviceScreen() {
     ScreenScaffold("Это устройство", onBack = { navigator.back() }) { ExitNodeBody() }
 }
 
-/** The node's controls and, once it runs, its QR and link: «Это устройство» and Home's «Выходная нода». */
+/** The node's controls and, once it runs, its QR and link: «Это устройство» and Home's «Выходная нода»; [underButton] goes under the start button (Home's Клиент / Выходная нода switch). */
 @Composable
-fun ExitNodeBody() {
+fun ExitNodeBody(underButton: (@Composable () -> Unit)? = null) {
     val container = LocalAppContainer.current
     val m = remember(container) { ThisDeviceModel(container) }
     val settings by container.settings.settings.collectAsState()
@@ -117,11 +117,13 @@ fun ExitNodeBody() {
     (state as? ConnectionState.Failed)?.takeIf { settings.mode == ConnectionMode.Exit }?.let { Banner(it.message, Tone.Danger) }
     if (choices.isEmpty()) {
         Banner("Нужен профиль со своими транспортами и ключом: добавьте его через ＋", Tone.Info)
+        underButton?.invoke()
         return
     }
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         ConnectButton(ConnectLook.Off, "Запустить ноду", { chosen?.let(m::start) })
     }
+    underButton?.invoke()
     if (state.isActive && settings.mode != ConnectionMode.Exit) {
         Text("Сейчас устройство подключено как клиент: запуск ноды это подключение остановит.", style = AppTheme.type.bodySmall, color = AppTheme.colors.warning)
     }
