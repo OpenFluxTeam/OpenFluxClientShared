@@ -106,8 +106,7 @@ internal class WinDivertFiles(
         private const val MAX_ZIP = 4 * 1024 * 1024
 
         fun defaultDir(): File {
-            val local = System.getenv("LOCALAPPDATA")?.let { File(it, "OpenFlux") } ?: AppDirs.config
-            return File(local, "windivert/$VERSION")
+            return File(AppDirs.local, "windivert/$VERSION")
         }
     }
 }

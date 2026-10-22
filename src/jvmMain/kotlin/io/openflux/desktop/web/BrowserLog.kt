@@ -15,7 +15,7 @@ object BrowserLog {
     @Volatile var listener: ((String, Boolean) -> Unit)? = null
 
     val dir: File by lazy {
-        (System.getenv("LOCALAPPDATA")?.let { File(it, "OpenFlux") } ?: AppDirs.config).apply { mkdirs() }
+        AppDirs.local
     }
 
     val cefLogFile: File get() = File(dir, "browser-cef.log")

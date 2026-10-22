@@ -23,7 +23,7 @@ import kotlin.test.Test
 
 /**
  * Opens every service's sign-in page in the real built-in browser (the
- * Chromium installed in %LOCALAPPDATA%/OpenFlux/browser) the way the
+ * Chromium installed in %LOCALAPPDATA%/OpenFluxData/browser) the way the
  * Accounts tab does; OPENFLUX_LIVE_BROWSER=1 runs it.
  */
 class BrowserLiveTest {

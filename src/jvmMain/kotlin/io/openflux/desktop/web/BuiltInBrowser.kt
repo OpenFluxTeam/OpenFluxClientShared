@@ -186,11 +186,25 @@ object BuiltInBrowser {
     /** KCEF gets stuck "initializing" when its start fails; this process cannot start it again. */
     @Volatile private var broken: String? = null
 
-    private val installDir: File
-        get() {
-            val local = System.getenv("LOCALAPPDATA")?.let { File(it, "OpenFlux") }
-            return File(local ?: AppDirs.config, "browser")
+    /** Out of the app's install folder, which an update removes (see [AppDirs.local]). */
+    private val installDir: File by lazy { browserDir(AppDirs.local, AppDirs.legacyLocal) }
+
+    /**
+     * The browser's folder in [local]. A runtime still in the old place ([legacy]: a portable copy, a folder an
+     * update has not reached yet) is moved over instead of being downloaded again.
+     */
+    internal fun browserDir(local: File, legacy: File?): File {
+        val dir = File(local, "browser")
+        val old = legacy?.let { File(it, "browser") }
+        if (old != null && old != dir && !runtimeInstalled(dir) && runtimeInstalled(old)) {
+            if (!dir.exists() || dir.deleteRecursively()) {
+                dir.parentFile?.mkdirs()
+                val moved = old.renameTo(dir)
+                BrowserLog.info(if (moved) "перенёс браузер из $old в $dir" else "не перенёс браузер из $old: скачаю заново")
+            }
         }
+        return dir
+    }
 
     /**
      * Opens [url] in a new page; with [upstream] ("127.0.0.1:port") the page
