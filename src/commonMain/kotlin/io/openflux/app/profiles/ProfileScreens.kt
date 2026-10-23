@@ -88,6 +88,7 @@ import io.openflux.desktop.model.managed
 import io.openflux.desktop.model.profile
 import io.openflux.desktop.service.LocalAppContainer
 import io.openflux.desktop.service.PlatformKind
+import io.openflux.desktop.service.isPhone
 import io.openflux.app.platform.LocalShortcuts
 import io.openflux.app.platform.LocalTouchUi
 import io.openflux.app.platform.PlatformBackHandler
@@ -318,8 +319,8 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
     val scripts = all.filter { it.enabled }
     val script = if (c.type == TransportType.SCRIPT) scripts.firstOrNull { it.id == c.scriptId } else null
     var pick by remember { mutableStateOf(false) }
-    val android = container.platform.kind == PlatformKind.Android
-    Section(if (index == 0) "Основной транспорт" else "Транспорт ${index + 1}") {
+    val android = container.platform.kind.isPhone
+    Section(if (!d.session) "Транспорт" else if (index == 0) "Основной транспорт" else "Транспорт ${index + 1}") {
         RowItem(
             script?.name ?: c.type.title,
             subtitle = if (c.type == TransportType.SCRIPT && script == null) "JS-транспорт выключен" else c.type.blurb(),

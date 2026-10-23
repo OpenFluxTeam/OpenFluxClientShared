@@ -11,6 +11,9 @@ plugins {
 kotlin {
     jvm()
     androidTarget()
+    // iOS: the app links this as a framework (the consumer declares it); no
+    // simulator slice by default, a consumer can add iosSimulatorArm64().
+    iosArm64()
     jvmToolchain(17)
 
     // jvmSharedMain: code both the desktop and Android use (java.io, java.util.zip).

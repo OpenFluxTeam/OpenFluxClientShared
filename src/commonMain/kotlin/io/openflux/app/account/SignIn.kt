@@ -164,17 +164,26 @@ class SignInModel(
 
 /** The sign-in screen's body for each state; the screen around it is [SignInScreen]. */
 @Composable
-fun SignInContent(ui: SignInUi, onStart: () -> Unit, onCancel: () -> Unit, onReopen: () -> Unit, onCopy: () -> Unit) {
+fun SignInContent(
+    ui: SignInUi,
+    onStart: () -> Unit,
+    onCancel: () -> Unit,
+    onReopen: () -> Unit,
+    onCopy: () -> Unit,
+    // False where the app may not sell (PlatformServices.purchasesInApp): no subscription or bot in the texts.
+    purchases: Boolean = true,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) {
         when (ui) {
             SignInUi.Idle -> {
                 Text("Вход в OpenFlux", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
                 Text(
-                    "Войдите по почте или через Telegram на странице OpenFlux: подписка и подключение появятся здесь сами.",
+                    if (purchases) "Войдите по почте или через Telegram на странице OpenFlux: подписка и подключение появятся здесь сами."
+                    else "Войдите по почте или через Telegram на странице OpenFlux: подключения вашего аккаунта появятся здесь сами.",
                     style = AppTheme.type.body, color = AppTheme.colors.textSecondary,
                 )
                 PrimaryButton("Войти", onStart, Modifier.fillMaxWidth())
-                Text(
+                if (purchases) Text(
                     "Покупали в боте @${OpenFluxBot.USERNAME}? Выберите вход через Telegram, чтобы открыть тот же аккаунт.",
                     style = AppTheme.type.body, color = AppTheme.colors.textSecondary,
                 )
@@ -214,6 +223,6 @@ fun SignInScreen() {
     val m = rememberScreenModel { SignInModel(container, it) }
     LaunchedEffect(m.ui) { if (m.ui == SignInUi.Done) navigator.back() }
     ScreenScaffold("Вход", onBack = { m.cancel(); navigator.back() }) {
-        SignInContent(m.ui, onStart = m::start, onCancel = m::cancel, onReopen = m::reopen, onCopy = m::copyLink)
+        SignInContent(m.ui, onStart = m::start, onCancel = m::cancel, onReopen = m::reopen, onCopy = m::copyLink, purchases = container.platform.purchasesInApp)
     }
 }

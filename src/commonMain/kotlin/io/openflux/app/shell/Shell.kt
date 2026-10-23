@@ -37,6 +37,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -138,18 +140,22 @@ private val Section.shortcut: String
 fun Shell(navigator: AppNavigator, onAdd: () -> Unit, content: @Composable (wide: Boolean) -> Unit) {
     val touch = LocalTouchUi.current
     ShellShortcuts(navigator, onAdd, enabled = !touch)
-    BoxWithConstraints(Modifier.fillMaxSize().appBackground().windowInsetsPadding(WindowInsets.safeDrawing)) {
+    BoxWithConstraints(Modifier.fillMaxSize().appBackground()) {
         val window = maxWidth
         val widthClass = widthClassOf(window)
         if (widthClass == WidthClass.Phone) {
-            Column(Modifier.fillMaxSize()) {
-                Box(Modifier.weight(1f).fillMaxWidth()) { content(false) }
-                // The keyboard takes the room: the bar would only float above it.
-                if (WindowInsets.ime.getBottom(LocalDensity.current) == 0) BottomBar(navigator, onAdd)
+            // The bottom inset (a home indicator, gesture bar) is the bar's own: it paints its surface down to the
+            // screen's edge and pads only its items, instead of stopping above a strip of the page's background.
+            Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
+                // The keyboard takes the room: the bar would only float above it, so the page keeps clear of it.
+                val keyboard = WindowInsets.ime.getBottom(LocalDensity.current) != 0
+                val page = if (keyboard) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)) else Modifier
+                Box(Modifier.weight(1f).fillMaxWidth().then(page)) { content(false) }
+                if (!keyboard) BottomBar(navigator, onAdd)
             }
         } else {
             val rail = if (widthClass == WidthClass.Compact) RailCompact else RailFull
-            Row(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                 SideRail(navigator, onAdd, labels = widthClass != WidthClass.Compact, modifier = Modifier.width(rail).fillMaxHeight())
                 Box(Modifier.width(1.dp).fillMaxHeight().background(AppTheme.colors.border))
                 Box(Modifier.weight(1f).fillMaxHeight()) { content(window - rail >= WideContent) }
@@ -226,7 +232,8 @@ private fun BottomBar(navigator: AppNavigator, onAdd: () -> Unit) {
     val status = connectionStatus()
     BoxWithConstraints(
         Modifier.fillMaxWidth().background(c.sidebar)
-            .drawBehind { drawLine(c.border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) },
+            .drawBehind { drawLine(c.border, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
     ) {
         // Too narrow for every label at this text size: only the chosen place keeps its label.
         val allLabels = maxWidth / 5 >= 76.dp * LocalDensity.current.fontScale

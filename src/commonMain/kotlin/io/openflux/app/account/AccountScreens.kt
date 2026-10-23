@@ -74,13 +74,14 @@ fun AccountScreen() {
     LaunchedEffect(m.notice) { m.notice?.let { toaster.show(it); m.clearNotice() } }
     LaunchedEffect(buy.notice) { buy.notice?.let { toaster.show(it); buy.clearNotice() } }
     val platform = container.platform
-    ScreenScaffold("Подписка", onBack = { navigator.back() }, actions = { TextAction("Обновить", m::refreshAll, enabled = m.busy == null) }) {
+    ScreenScaffold(if (platform.purchasesInApp) "Подписка" else "Аккаунт OpenFlux", onBack = { navigator.back() }, actions = { TextAction("Обновить", m::refreshAll, enabled = m.busy == null) }) {
         OpenFluxAccountContent(
             summary = accountSummary(bot, platform.now(), platform.utcOffsetSeconds),
             bot = bot,
             busy = m.busy,
             error = m.error,
             offsetSeconds = platform.utcOffsetSeconds,
+            purchases = platform.purchasesInApp,
             actions = AccountActions(
                 onSignIn = { navigator.open(Dest.Auth) },
                 onBuy = buy::open,
@@ -123,7 +124,8 @@ fun AccountScreen() {
         Sheet(onDismiss = { openConnection = null }, title = shown.name.ifBlank { "Подключение" }) {
             AccountConnectionContent(
                 shown,
-                viaTelegram = bot.session?.viaTelegram == true,
+                // Where buying is the store's alone, the bot (where a place is resumed or bought) is not named.
+                viaTelegram = bot.session?.viaTelegram == true && platform.purchasesInApp,
                 connected = shown.profileId == connectedProfileId,
                 platform = platform,
                 onConnect = {
@@ -199,12 +201,15 @@ fun OpenFluxAccountContent(
     offsetSeconds: Int = 0,
     /** The profile this device is connected through, to mark that connection. */
     connectedProfileId: String? = null,
+    /** PlatformServices.purchasesInApp: false shows the account's state and connections, never a way to pay. */
+    purchases: Boolean = true,
 ) {
     val idle = busy == null
     if (summary == null) {
         Group("Аккаунт OpenFlux") {
             Text(
-                "Войдите, чтобы купить подписку и получить подключение. Вход по почте или через Telegram.",
+                if (purchases) "Войдите, чтобы купить подписку и получить подключение. Вход по почте или через Telegram."
+                else "Войдите, чтобы подключения вашего аккаунта появились на этом устройстве. Вход по почте или через Telegram.",
                 style = AppTheme.type.body, color = AppTheme.colors.textSecondary,
             )
         }
@@ -216,11 +221,13 @@ fun OpenFluxAccountContent(
             for ((k, v) in summary.facts) ValueRow(k, v)
         }
         if (bot.preparing) ProgressLine("Готовлю подключение…")
-        AccountBanner(bot, actions, offsetSeconds)
-        val waiting = bot.pendingInvoice?.let { it.invoice != null && it.waiting } == true
-        PrimaryButton(if (waiting) "Оплатить счёт" else summary.buyLabel, actions.onBuy, Modifier.fillMaxWidth(), enabled = idle)
-        if (summary.renewInBot) SecondaryButton("Продлить место в @${OpenFluxBot.USERNAME}", actions.onRenewInBot, Modifier.fillMaxWidth())
-        summary.note?.let { Text(it, style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary) }
+        AccountBanner(bot, actions, offsetSeconds, purchases)
+        if (purchases) {
+            val waiting = bot.pendingInvoice?.let { it.invoice != null && it.waiting } == true
+            PrimaryButton(if (waiting) "Оплатить счёт" else summary.buyLabel, actions.onBuy, Modifier.fillMaxWidth(), enabled = idle)
+            if (summary.renewInBot) SecondaryButton("Продлить место в @${OpenFluxBot.USERNAME}", actions.onRenewInBot, Modifier.fillMaxWidth())
+            summary.note?.let { Text(it, style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary) }
+        }
     }
     busy?.let { ProgressLine(it) }
     error?.let { Banner(it, Tone.Danger) }
@@ -229,17 +236,20 @@ fun OpenFluxAccountContent(
         // The account's places, from the slots API: each with its state and the one thing it can do now.
         SlotsSection(slots, offsetSeconds, idle, actions.onStartSlot, actions.onStopSlot, actions.onOpenSlot)
     } else {
-        AccountConnectionsSection(bot.links.filter { it.account }, bot.session?.viaTelegram == true, connectedProfileId, actions.onOpenConnection)
+        AccountConnectionsSection(bot.links.filter { it.account }, bot.session?.viaTelegram == true && purchases, connectedProfileId, actions.onOpenConnection)
     }
-    Section("Подключения по ссылке из бота") {
+    Section(if (purchases) "Подключения по ссылке из бота" else "Подключения по ссылке") {
         for (link in bot.links.filterNot { it.account }) {
             RowItem(
-                link.name.ifBlank { "Подключение из бота" },
-                subtitle = if (link.gone) "закончилось или заменено: возьмите новую ссылку в боте" else "обновляется само",
+                link.name.ifBlank { if (purchases) "Подключение из бота" else "Подключение по ссылке" },
+                subtitle = if (link.gone) (if (purchases) "закончилось или заменено: возьмите новую ссылку в боте" else "закончилось или заменено") else "обновляется само",
                 trailing = { TextAction("Убрать", { actions.onRemoveLink(link.token) }, enabled = idle) },
             )
         }
-        RowItem("Добавить ссылку из бота", subtitle = "link.openflux.dev/…: подключение появится здесь и будет обновляться само", onClick = actions.onAddLink)
+        RowItem(
+            if (purchases) "Добавить ссылку из бота" else "Добавить ссылку",
+            subtitle = "link.openflux.dev/…: подключение появится здесь и будет обновляться само", onClick = actions.onAddLink,
+        )
     }
     if (summary != null) {
         Section(null) { RowItem("Выйти из аккаунта OpenFlux", onClick = actions.onSignOut.takeIf { idle }) }
@@ -248,8 +258,8 @@ fun OpenFluxAccountContent(
 
 /** At most one line of what needs attention (spec 3): the purchase, then why there is no connection, then a failed refresh. */
 @Composable
-private fun AccountBanner(bot: BotState, actions: AccountActions, offsetSeconds: Int) {
-    val inv = bot.pendingInvoice?.invoice
+private fun AccountBanner(bot: BotState, actions: AccountActions, offsetSeconds: Int, purchases: Boolean = true) {
+    val inv = bot.pendingInvoice?.invoice?.takeIf { purchases }
     when {
         inv != null && inv.paid -> Banner("Оплата получена", Tone.Success, action = "Закрыть", onAction = actions.onDismissInvoice)
         inv != null && inv.expired -> Banner("Счёт не оплачен и закрыт", Tone.Warning, action = "Закрыть", onAction = actions.onDismissInvoice)
@@ -293,7 +303,7 @@ private fun KeySubscription(m: SubscriptionModel) {
     }
     if (preparing) ProgressLine("Готовим вашу локацию: обычно это минута-две")
     s.lastError?.let { Banner("Не удалось обновить: $it", Tone.Warning) }
-    s.pendingOrder?.let { p ->
+    s.pendingOrder?.takeIf { platform.purchasesInApp }?.let { p ->
         Banner(
             "Ждём оплату заказа ${p.orderId}",
             Tone.Info,
@@ -307,6 +317,7 @@ private fun KeySubscription(m: SubscriptionModel) {
         Banner(s.announce, Tone.Info, action = "Закрыть", onAction = container.subscription::dismissAnnounce)
     }
     when {
+        !platform.purchasesInApp -> Unit
         s.kind == SubscriptionKind.Account && account?.trialAvailable == true && !s.active ->
             PrimaryButton("Начать пробный период", m::startTrial, Modifier.fillMaxWidth(), enabled = m.busy == null)
         s.kind == SubscriptionKind.Account -> PrimaryButton(if (look.attention) "Продлить" else "Продлить заранее", m::openPlans, Modifier.fillMaxWidth(), enabled = m.busy == null)

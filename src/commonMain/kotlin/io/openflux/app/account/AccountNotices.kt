@@ -20,7 +20,14 @@ data class AccountNotice(val key: String, val title: String, val text: String)
  * paused again). Keys starting with "~" are said to nobody: they remember a state ("a subscription held") so that its
  * end can be told from "there never was one".
  */
-fun accountNotices(s: BotState, noticed: Set<String>, nowMillis: Long, offsetSeconds: Int): Pair<List<AccountNotice>, Set<String>> {
+fun accountNotices(
+    s: BotState,
+    noticed: Set<String>,
+    nowMillis: Long,
+    offsetSeconds: Int,
+    /** PlatformServices.purchasesInApp: false says what holds without the way to buy. */
+    purchases: Boolean = true,
+): Pair<List<AccountNotice>, Set<String>> {
     val session = s.session ?: return Pair(emptyList(), emptySet())
     val holds = linkedMapOf<String, AccountNotice?>()
     val sub = s.subscription
@@ -31,21 +38,29 @@ fun accountNotices(s: BotState, noticed: Set<String>, nowMillis: Long, offsetSec
             holds[ACTIVE] = null
             val days = if (sub.expiresAt > 0) daysLeft(sub.expiresAt, nowMillis) else -1
             if (days in 1..3) {
-                val way = if (session.viaTelegram) "Продлите место в @${OpenFluxBot.USERNAME} или купите новое в разделе «Подписка»"
-                else "Купите новое место в разделе «Подписка»"
+                val way = when {
+                    !purchases -> ""
+                    session.viaTelegram -> " Продлите место в @${OpenFluxBot.USERNAME} или купите новое в разделе «Подписка»"
+                    else -> " Купите новое место в разделе «Подписка»"
+                }
                 holds["ending:${sub.expiresAt}"] = AccountNotice(
                     "ending:${sub.expiresAt}", "Подписка заканчивается",
-                    Fmt.daysLeft(days).replaceFirstChar { it.uppercase() } + ", до ${Fmt.date(sub.expiresAt, offsetSeconds)}. $way",
+                    Fmt.daysLeft(days).replaceFirstChar { it.uppercase() } + ", до ${Fmt.date(sub.expiresAt, offsetSeconds)}.$way",
                 )
             }
         }
         ACTIVE in noticed || ENDED in noticed ->
-            holds[ENDED] = AccountNotice(ENDED, "Подписка закончилась", "Подключения не работают. Купите подписку в разделе «Подписка»")
+            holds[ENDED] = AccountNotice(
+                ENDED, "Подписка закончилась",
+                if (purchases) "Подключения не работают. Купите подписку в разделе «Подписка»" else "Подключения не работают",
+            )
     }
-    if (s.connectionNote == BotAccountManager.PAUSED_NOTE || s.connectionNote == BotAccountManager.PAUSED_NOTE_EMAIL) {
+    if (s.connectionNote == BotAccountManager.PAUSED_NOTE || s.connectionNote == BotAccountManager.PAUSED_NOTE_EMAIL ||
+        s.connectionNote == BotAccountManager.PAUSED_NOTE_PLAIN
+    ) {
         holds[PAUSED] = AccountNotice(PAUSED, "Подключение приостановлено", s.connectionNote)
     }
-    s.pendingInvoice?.invoice?.takeIf { it.paid }?.let { inv ->
+    s.pendingInvoice?.invoice?.takeIf { it.paid && purchases }?.let { inv ->
         holds["paid:${inv.id}"] = AccountNotice("paid:${inv.id}", "Оплата получена", "Место добавлено, подключение появится само")
     }
     val say = holds.filter { (k, n) -> n != null && k !in noticed }.values.filterNotNull()
@@ -66,6 +81,7 @@ class AccountNotifier(
     private val save: suspend (Set<String>) -> Unit,
     private val now: () -> Long,
     private val offsetSeconds: () -> Int,
+    private val purchases: Boolean = true,
 ) {
     private val flow = MutableSharedFlow<AccountNotice>(extraBufferCapacity = 16)
     val notices: SharedFlow<AccountNotice> = flow.asSharedFlow()
@@ -74,7 +90,7 @@ class AccountNotifier(
         scope.launch {
             state.collect { s ->
                 val noticed = s.noticed.toSet()
-                val (say, holds) = accountNotices(s, noticed, now(), offsetSeconds())
+                val (say, holds) = accountNotices(s, noticed, now(), offsetSeconds(), purchases)
                 if (holds != noticed) save(holds)
                 say.forEach { flow.emit(it) }
             }

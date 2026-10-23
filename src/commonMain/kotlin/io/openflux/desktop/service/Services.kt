@@ -164,7 +164,10 @@ interface ConnectionService {
 }
 
 /** Where the app runs; decides wording and touch-sized controls. */
-enum class PlatformKind { Desktop, Android }
+enum class PlatformKind { Desktop, Android, Ios }
+
+/** A phone (Android or iOS): touch UI, the system VPN, a gallery to pick a QR from. */
+val PlatformKind.isPhone: Boolean get() = this != PlatformKind.Desktop
 
 /** Platform facilities the UI needs without touching the platform itself. */
 interface PlatformServices {
@@ -279,6 +282,21 @@ interface PlatformServices {
 
     /** The OpenFlux first-party script signing key (hex); "" when scripts aren't supported. */
     val officialScriptKey: String get() = ""
+
+    /** This device can serve as an exit node (Home's «Выходная нода», «Это устройство»); false where it cannot (iOS). */
+    val exitNodeSupported: Boolean get() = true
+
+    /** Where "Поддержка" in About leads (a chat or a site); null hides it. */
+    val supportUrl: String? get() = null
+
+    /** The app downloads and installs its own releases; false where a store updates it (iOS: TestFlight, the App Store). */
+    val selfUpdates: Boolean get() = true
+
+    /**
+     * The app may offer buying: plans, invoices, renewing, the bot's purchase. False where the store allows buying a
+     * digital service only through itself (iOS): the account then shows its state and connections, never a way to pay.
+     */
+    val purchasesInApp: Boolean get() = true
 
     /**
      * Reads a downloaded transport and returns the core's JSON trust report

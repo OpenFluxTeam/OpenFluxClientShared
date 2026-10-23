@@ -27,7 +27,7 @@ fun ShareLinkActions(link: String, modifier: Modifier = Modifier) {
             PrimaryButton("Поделиться ссылкой", { if (!platform.shareText(link)) copy() }, Modifier.fillMaxWidth(), leading = Icons.Rounded.Share)
             SecondaryButton("Копировать ссылку", copy, Modifier.fillMaxWidth())
         } else {
-            val q = java.net.URLEncoder.encode(link, "UTF-8").replace("+", "%20")
+            val q = percentEncode(link)
             PrimaryButton("Копировать ссылку", copy, Modifier.fillMaxWidth())
             FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                 SecondaryButton("Telegram", { platform.openUrl("https://t.me/share/url?url=$q") })
@@ -35,5 +35,19 @@ fun ShareLinkActions(link: String, modifier: Modifier = Modifier) {
                 SecondaryButton("Почта", { platform.openUrl("mailto:?subject=OpenFlux&body=$q") })
             }
         }
+    }
+}
+
+/**
+ * [text] for a URL query, as java.net.URLEncoder with spaces as %20 would give
+ * it, but in common code (iOS has no java.net): UTF-8 bytes, everything but
+ * letters, digits and -._* percent-encoded.
+ */
+internal fun percentEncode(text: String): String = buildString {
+    for (b in text.encodeToByteArray()) {
+        val c = b.toInt() and 0xFF
+        val ch = c.toChar()
+        if (ch in 'a'..'z' || ch in 'A'..'Z' || ch in '0'..'9' || ch == '-' || ch == '.' || ch == '_' || ch == '*') append(ch)
+        else { append('%'); append("0123456789ABCDEF"[c shr 4]); append("0123456789ABCDEF"[c and 0xF]) }
     }
 }

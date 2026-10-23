@@ -100,6 +100,7 @@ import io.openflux.desktop.model.managed
 import io.openflux.desktop.model.profile
 import io.openflux.desktop.service.LocalAppContainer
 import io.openflux.desktop.service.PlatformKind
+import io.openflux.desktop.service.isPhone
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -175,21 +176,26 @@ private fun StartPanel(hasSubscription: Boolean, preparing: Boolean, botSignedIn
     }
     // Signed in through Telegram but nothing to connect to: say why, instead of offering to sign in again.
     if (botNote != null) {
-        Banner(botNote, Tone.Warning, action = "Открыть подписку", onAction = { navigator.open(Dest.Account) })
+        Banner(botNote, Tone.Warning, action = if (LocalAppContainer.current.platform.purchasesInApp) "Открыть подписку" else "Открыть аккаунт", onAction = { navigator.open(Dest.Account) })
         return
     }
     if (botSignedIn) {
-        Banner("Вы вошли, подключения пока нет", Tone.Info, action = "Открыть подписку", onAction = { navigator.open(Dest.Account) })
+        Banner("Вы вошли, подключения пока нет", Tone.Info, action = if (LocalAppContainer.current.platform.purchasesInApp) "Открыть подписку" else "Открыть аккаунт", onAction = { navigator.open(Dest.Account) })
         return
     }
     if (hasSubscription) {
-        Banner("В подписке пока нет локаций", Tone.Info, action = "Открыть подписку", onAction = { navigator.open(Dest.Account) })
+        Banner("В подписке пока нет локаций", Tone.Info, action = if (LocalAppContainer.current.platform.purchasesInApp) "Открыть подписку" else "Открыть аккаунт", onAction = { navigator.open(Dest.Account) })
         return
     }
     Text("Приступим", Modifier.appear(), style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
     Text("Все способы — под кнопкой ＋", Modifier.appear(delayMillis = 60), style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
     Section(null) {
-        RowItem("Войти в аккаунт OpenFlux", Modifier.appear(delayMillis = 120), subtitle = "По почте или через Telegram; подписка и подключение появятся сами", onClick = { navigator.open(Dest.Auth) })
+        RowItem(
+            "Войти в аккаунт OpenFlux",
+            Modifier.appear(delayMillis = 120),
+            subtitle = if (LocalAppContainer.current.platform.purchasesInApp) "По почте или через Telegram; подписка и подключение появятся сами" else "По почте или через Telegram; подключения появятся сами",
+            onClick = { navigator.open(Dest.Auth) },
+        )
         RowItem("Ключ или ссылка", Modifier.appear(delayMillis = 180), subtitle = "От друга или из сервиса", onClick = { navigator.open(Dest.AddKey) })
         RowItem("Свой сервер", Modifier.appear(delayMillis = 240), subtitle = "VDS по SSH: нода поставится сама", onClick = { navigator.open(Dest.AddServer) })
     }
@@ -212,7 +218,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     // node or client hides it: the switch could not leave either, their own button stops them.
     var exitTab by rememberSaveable { mutableStateOf(false) }
     val showExit = exitMode || (exitTab && !state.isActive)
-    if (!state.isActive) {
+    if (!state.isActive && platform.exitNodeSupported) {
         Segmented(listOf(false, true), showExit, { exitTab = it }, label = { if (it) "Выходная нода" else "Клиент" })
     }
     if (showExit) {
@@ -271,7 +277,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     if (!exitMode && (platform.fullTunnelSupported || (platform.systemProxySupported && !settings.fullTunnel))) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s, Alignment.CenterHorizontally), modifier = Modifier.fillMaxWidth()) {
             if (platform.fullTunnelSupported) {
-                Chip(if (platform.kind == PlatformKind.Android) "VPN: весь трафик" else "Весь трафик", settings.fullTunnel, { m.setFullTunnel(!settings.fullTunnel) })
+                Chip(if (platform.kind.isPhone) "VPN: весь трафик" else "Весь трафик", settings.fullTunnel, { m.setFullTunnel(!settings.fullTunnel) })
             }
             if (platform.systemProxySupported && !settings.fullTunnel) {
                 Chip("Системный прокси", settings.systemProxy, { m.setSystemProxy(!settings.systemProxy) })
@@ -297,7 +303,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
             action = "Войти заново",
             onAction = { scope.launch { runCatching { container.accounts.signIn(b.kind) }.onFailure { toaster.show(it.message ?: "Вход не выполнен") } } },
         )
-        is HomeBanner.Subscription -> Banner(b.look.line, Tone.Warning, action = "Продлить", onAction = { navigator.open(Dest.Account) })
+        is HomeBanner.Subscription -> Banner(b.look.line, Tone.Warning, action = if (container.platform.purchasesInApp) "Продлить" else "Открыть", onAction = { navigator.open(Dest.Account) })
         HomeBanner.ThisDevice -> Banner("Это устройство работает как нода", Tone.Info, action = "Открыть", onAction = { navigator.open(Dest.ThisDevice) })
         null -> Unit
     }
@@ -322,7 +328,7 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
     val traffic by container.connection.traffic.collectAsState()
     val socks by container.connection.socksAddress.collectAsState()
     val address by container.connection.exitAddress.collectAsState()
-    val android = container.platform.kind == PlatformKind.Android
+    val android = container.platform.kind.isPhone
     fun copy(what: String, text: String) { container.platform.setClipboardText(text); toaster.show("$what скопирован") }
     Section(null) {
         Collapsible("Сведения") {
@@ -392,7 +398,7 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
     val state by container.connection.state.collectAsState()
     val subscription by container.subscription.state.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
-    val touch = container.platform.kind == PlatformKind.Android
+    val touch = container.platform.kind.isPhone
     val shown = if (query.isBlank()) profiles else profiles.filter { p ->
         p.name.contains(query.trim(), ignoreCase = true) || p.carriers.any { it.value.contains(query.trim(), ignoreCase = true) }
     }
@@ -405,7 +411,7 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
                     val look = sub.look(container.platform.now(), container.platform.utcOffsetSeconds)
                     RowItem(
                         sub.title.ifBlank { "Подписка" }, subtitle = look.line,
-                        trailing = { TextAction(if (look.attention) "Продлить" else "Открыть", { navigator.open(Dest.Account) }) },
+                        trailing = { TextAction(if (look.attention && container.platform.purchasesInApp) "Продлить" else "Открыть", { navigator.open(Dest.Account) }) },
                     )
                 }
             }
