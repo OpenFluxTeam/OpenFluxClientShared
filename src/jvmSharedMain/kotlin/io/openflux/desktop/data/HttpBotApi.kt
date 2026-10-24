@@ -60,7 +60,7 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
     }
 
     override suspend fun exchange(code: String, verifier: String, redirectUri: String): BotSession {
-        if (appId.isEmpty()) throw BotException("no_app_id", "Вход в этой сборке выключен: в ней нет идентификатора приложения")
+        if (appId.isEmpty()) throw BotException("no_app_id", "Вход в этой сборке недоступен: не задан идентификатор приложения")
         val body = JsonObject(
             mapOf("code" to JsonPrimitive(code), "code_verifier" to JsonPrimitive(verifier), "redirect_uri" to JsonPrimitive(redirectUri)),
         )
@@ -198,7 +198,7 @@ class HttpBotApi(private val base: String = OpenFluxBot.API, private val appId: 
     private fun documentRefusal(status: Int, said: String): BotException? = when (status) {
         400 -> when {
             "not a supported document link" in said -> BotException("bad_link", "Это не ссылка на поддерживаемый документ: Яндекс Диск, Облако Mail.ru, Телемост, Доски или Cups")
-            "cannot be used" in said -> BotException("doc_unusable", "Документ не подходит: он не открыт на редактирование по ссылке, это не docx или xlsx, или его нет")
+            "cannot be used" in said -> BotException("doc_unusable", "Документ не подходит: нужен доступ на редактирование по ссылке и формат docx или xlsx, а сам документ должен существовать")
             "pick one to five" in said -> BotException("doc_pick", "Выберите от одного до пяти документов разных видов")
             else -> BotException("bad_request", "Документы этого места сейчас менять нельзя: место занято подключением или закончилось")
         }

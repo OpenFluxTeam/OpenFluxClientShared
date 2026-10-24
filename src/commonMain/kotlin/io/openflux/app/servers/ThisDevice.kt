@@ -146,7 +146,7 @@ fun ExitNodeBody(underButton: (@Composable () -> Unit)? = null) {
         modifier = Modifier.fillMaxWidth(),
     )
     if (state.isActive && !exit) {
-        Text("Сейчас устройство подключено как клиент: запуск ноды это подключение остановит.", style = AppTheme.type.bodySmall, color = AppTheme.colors.warning)
+        Text("Сейчас устройство подключено как клиент: запуск ноды остановит это подключение.", style = AppTheme.type.bodySmall, color = AppTheme.colors.warning)
     }
     if (chosen != null) {
         // Like the client's connection row: it always opens the picker while the node is stopped.

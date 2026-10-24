@@ -125,7 +125,7 @@ fun CaptchaOverlay() {
             SecondaryButton("Открыть заново", connection::openCaptcha, enabled = !current.busy)
         }
         if (!setup && sessions[AccountKind.Yandex]?.let { !it.expired && it.cookies.isNotEmpty() } != true) {
-            TextAction("Не проходить каждый раз: войти в Яндекс", {
+            TextAction("Войти в Яндекс, чтобы не проходить проверку", {
                 connection.dismissCaptcha()
                 navigator.open(Dest.SettingsPage("services"))
             })
@@ -160,7 +160,7 @@ fun ScriptSettingsOverlay() {
     val current = state ?: return
     BrowserOverlay(
         title = "Настройки «${current.title}»",
-        note = "Измените и нажмите «Сохранить» на странице. Применится при следующем подключении.",
+        note = "Измените настройки и нажмите «Сохранить» на странице. Применится при следующем подключении.",
         page = current.page,
         waiting = current.progress.ifEmpty { "Открываю настройки…" },
         onClose = service::close,

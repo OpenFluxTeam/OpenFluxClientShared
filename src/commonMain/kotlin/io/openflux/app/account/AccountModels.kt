@@ -122,17 +122,17 @@ class SubscriptionModel(private val container: AppContainer, private val scope: 
 
     fun addDocument(url: String) {
         val id = openSlotId ?: return
-        call("Добавляю документ…") { container.bot.addDocument(id, url); documents = container.bot.documents(id) }
+        call("Добавляю ссылку…") { container.bot.addDocument(id, url); documents = container.bot.documents(id) }
     }
 
     fun removeDocument(documentId: String) {
         val id = openSlotId ?: return
-        call("Убираю документ…") { container.bot.deleteDocument(id, documentId); documents = container.bot.documents(id) }
+        call("Убираю ссылку…") { container.bot.deleteDocument(id, documentId); documents = container.bot.documents(id) }
     }
 
     fun checkDocument(documentId: String) {
         val id = openSlotId ?: return
-        call("Проверяю документ…") {
+        call("Проверяю ссылку…") {
             val d = container.bot.checkDocument(id, documentId)
             documents = documents?.map { if (it.id == d.id) d else it }
         }

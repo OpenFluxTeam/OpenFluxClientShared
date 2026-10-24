@@ -25,7 +25,7 @@ fun ProgressLine(text: String, modifier: Modifier = Modifier, onDetails: (() -> 
     val c = AppTheme.colors
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.xs)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text, Modifier.weight(1f), style = AppTheme.type.bodySmall, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(text, Modifier.weight(1f), style = AppTheme.type.bodySmall, color = c.textSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
             if (onDetails != null) TextAction("Подробнее", onDetails, color = c.textSecondary)
         }
         BusyBar(Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)), c.accent, c.surfaceHigh)

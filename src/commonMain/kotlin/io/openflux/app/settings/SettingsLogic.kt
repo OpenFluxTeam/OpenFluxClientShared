@@ -36,7 +36,7 @@ fun serviceStatus(status: AuthStatus, now: Long): String = when (status) {
     AuthStatus.SignedOut -> "вход не выполнен"
     is AuthStatus.Checking -> "проверяю вход…"
     is AuthStatus.SignedIn -> "вход выполнен" + (if (status.login.isBlank()) "" else ": ${status.login}") + " · проверено " + Fmt.ago(now - status.checkedAt)
-    is AuthStatus.Expired -> "сессия истекла" + if (status.login.isBlank()) "" else ": ${status.login}"
+    is AuthStatus.Expired -> "вход истёк" + if (status.login.isBlank()) "" else ": ${status.login}"
     is AuthStatus.NeedsCheck -> "сервис просит проверку — войдите заново"
     is AuthStatus.Busy -> status.step
     is AuthStatus.Failed -> status.message
@@ -46,7 +46,7 @@ fun serviceStatus(status: AuthStatus, now: Long): String = when (status) {
 fun serviceUsage(kind: AccountKind, profiles: List<Profile>): String {
     val n = profiles.count { p -> p.carriers.any { AccountKind.of(it.type) == kind } }
     val what = when (kind) {
-        AccountKind.Yandex -> "Документ и Доска Яндекса"
+        AccountKind.Yandex -> "Документ, Доска и Телемост Яндекса"
         AccountKind.Mailru -> "Документ Mail.ru"
         AccountKind.Max -> "MAX"
     }

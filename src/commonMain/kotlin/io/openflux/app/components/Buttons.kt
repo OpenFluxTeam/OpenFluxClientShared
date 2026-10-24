@@ -35,6 +35,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.openflux.app.theme.AppTheme
@@ -51,12 +53,14 @@ private fun ButtonLabel(text: String, leading: ImageVector?) {
         Icon(leading, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(AppTheme.spacing.s))
     }
-    // A narrow button (two side by side on a small phone) shrinks its label rather than cutting it.
+    // A narrow button (two side by side on a small phone) shrinks or wraps its label rather than cutting it.
+    val touch = AppTheme.touch
     BasicText(
         text,
-        style = AppTheme.type.title.copy(color = LocalContentColor.current),
-        maxLines = 1,
-        softWrap = false,
+        style = AppTheme.type.title.copy(color = LocalContentColor.current, textAlign = TextAlign.Center),
+        maxLines = if (touch) 2 else 1,
+        softWrap = touch,
+        overflow = TextOverflow.Ellipsis,
         autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = AppTheme.type.title.fontSize, stepSize = 0.5.sp),
     )
 }
@@ -134,7 +138,7 @@ fun TextAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
         shape = RoundedCornerShape(AppTheme.shapes.small),
         colors = ButtonDefaults.textButtonColors(contentColor = color, disabledContentColor = AppTheme.colors.textMuted),
         interactionSource = interaction,
-    ) { Text(text, style = AppTheme.type.title, maxLines = 1) }
+    ) { Text(text, style = AppTheme.type.title, textAlign = TextAlign.Center) }
 }
 
 /** An icon with a tooltip naming it (and its shortcut, when [description] carries one: "Добавить · Ctrl+N"). */

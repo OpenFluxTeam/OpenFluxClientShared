@@ -15,6 +15,9 @@ import io.openflux.app.theme.appear
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -50,6 +53,7 @@ import kotlinx.coroutines.delay
 enum class Tone { Info, Success, Warning, Danger }
 
 /** One line of what needs attention, with what to do about it. A screen shows at most one (spec 3). */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun Banner(
     text: String,
@@ -70,30 +74,50 @@ fun Banner(
     }
     val shape = RoundedCornerShape(AppTheme.shapes.medium)
     // Tinted by its tone, with a bar of the tone on its leading edge; it rises in when it appears.
-    Row(
-        modifier.appear().fillMaxWidth().clip(shape).background(c.surface).background(color.copy(alpha = if (c.isDark) 0.10f else 0.07f))
-            .border(1.dp, color.copy(alpha = 0.32f), shape)
-            .drawBehind { drawRect(color, size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height)) }
-            .padding(start = AppTheme.spacing.m, end = AppTheme.spacing.xs, top = AppTheme.spacing.xs, bottom = AppTheme.spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s),
-    ) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
-        Text(
-            text,
-            modifier = Modifier.weight(1f).padding(vertical = AppTheme.spacing.s),
-            style = AppTheme.type.bodySmall,
-            color = c.text,
-            maxLines = 3,
-        )
-        if (secondAction != null && onSecondAction != null) TextAction(secondAction, onSecondAction, color = c.textSecondary)
-        if (action != null && onAction != null) TextAction(action, onAction)
+    val frame = modifier.appear().fillMaxWidth().clip(shape).background(c.surface).background(color.copy(alpha = if (c.isDark) 0.10f else 0.07f))
+        .border(1.dp, color.copy(alpha = 0.32f), shape)
+        .drawBehind { drawRect(color, size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height)) }
+    val hasActions = (secondAction != null && onSecondAction != null) || (action != null && onAction != null) || more.isNotEmpty()
+    val moreButton: @Composable () -> Unit = {
         if (more.isNotEmpty()) Box {
             var open by remember { mutableStateOf(false) }
             IconAction(Icons.Rounded.MoreVert, "Ещё", { open = true })
             DropdownMenu(open, { open = false }) {
                 more.forEach { (label, run) -> DropdownMenuItem({ Text(label) }, { open = false; run() }) }
             }
+        }
+    }
+    if (AppTheme.touch) {
+        // On a phone the actions go under the text: a large font or a long note leaves them both readable.
+        Column(
+            frame.padding(start = AppTheme.spacing.m, end = AppTheme.spacing.xs, top = AppTheme.spacing.xs, bottom = AppTheme.spacing.xs),
+            verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.xs),
+        ) {
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+                Text(text, Modifier.weight(1f).padding(vertical = AppTheme.spacing.s), style = AppTheme.type.bodySmall, color = c.text)
+            }
+            if (hasActions) FlowRow(
+                Modifier.fillMaxWidth().padding(start = 20.dp + AppTheme.spacing.s, end = AppTheme.spacing.s, bottom = AppTheme.spacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s),
+                verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.xs),
+            ) {
+                if (secondAction != null && onSecondAction != null) TextAction(secondAction, onSecondAction, color = c.textSecondary)
+                if (action != null && onAction != null) TextAction(action, onAction)
+                moreButton()
+            }
+        }
+    } else {
+        Row(
+            frame.padding(start = AppTheme.spacing.m, end = AppTheme.spacing.xs, top = AppTheme.spacing.xs, bottom = AppTheme.spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s),
+        ) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+            Text(text, Modifier.weight(1f).padding(vertical = AppTheme.spacing.s), style = AppTheme.type.bodySmall, color = c.text, maxLines = 3)
+            if (secondAction != null && onSecondAction != null) TextAction(secondAction, onSecondAction, color = c.textSecondary)
+            if (action != null && onAction != null) TextAction(action, onAction)
+            moreButton()
         }
     }
 }

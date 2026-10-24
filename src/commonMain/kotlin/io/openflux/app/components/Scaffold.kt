@@ -62,7 +62,7 @@ fun ScreenScaffold(
                     modifier = Modifier.weight(1f),
                     style = AppTheme.type.screenTitle,
                     color = AppTheme.colors.text,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(sp.xs), verticalAlignment = Alignment.CenterVertically, content = actions)

@@ -52,7 +52,7 @@ fun accountNotices(
         ACTIVE in noticed || ENDED in noticed ->
             holds[ENDED] = AccountNotice(
                 ENDED, "Подписка закончилась",
-                if (purchases) "Подключения не работают. Купите подписку в разделе «Подписка»" else "Подключения не работают",
+                if (purchases) "Подключения не работают. Купите новое место в разделе «Подписка»" else "Подключения не работают",
             )
     }
     if (s.connectionNote == BotAccountManager.PAUSED_NOTE || s.connectionNote == BotAccountManager.PAUSED_NOTE_EMAIL ||

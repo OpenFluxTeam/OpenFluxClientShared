@@ -92,18 +92,18 @@ object NodeSignInPolicy {
         record: NodeSignInRecord?,
         nowMs: Long,
     ): NodeSignInDecision {
-        if (record == null) return NodeSignInDecision.Skip("нода не получала вход ${kind.label} из этого приложения")
+        if (record == null) return NodeSignInDecision.Skip("нода не получала вход в ${kind.label} из этого приложения")
         val docs = documents(channel, kind)
-        if (docs.isEmpty()) return NodeSignInDecision.Skip("у ноды нет документа ${kind.label}")
+        if (docs.isEmpty()) return NodeSignInDecision.Skip("у ноды нет документа, который открывает вход в ${kind.label}")
         if (session == null || session.expired || !AccountCookies.signedIn(kind, session.cookies)) {
-            return NodeSignInDecision.Skip("нет действующего входа ${kind.label}: войдите в Настройках → Сервисы", problem = true)
+            return NodeSignInDecision.Skip("нет действующего входа в ${kind.label}: войдите в Настройках → Сервисы", problem = true)
         }
         val fp = fingerprint(kind, session.cookies)
         val changed = fp != record.fingerprint
         val state = channel.signin.filter { it.doc in docs }
         val signedOut = state.any { it.state == "login" }
         val longDown = state.any { it.state == "down" && nowMs / 1000 - it.since >= DOWN_GRACE_S }
-        if (!changed && !signedOut && !longDown) return NodeSignInDecision.Skip("вход ${kind.label} на ноде свежий")
+        if (!changed && !signedOut && !longDown) return NodeSignInDecision.Skip("вход в ${kind.label} на ноде свежий")
         if (record.failures > 0 && nowMs - record.lastTryAt < retryWait(record.failures)) {
             return NodeSignInDecision.Skip("прошлая попытка не удалась, повторю позже")
         }
@@ -112,15 +112,15 @@ object NodeSignInPolicy {
             val sinceMs = state.minOf { it.since } * 1000
             if (record.lastTryAt > 0 && sinceMs < record.lastTryAt) return NodeSignInDecision.Skip("нода ещё не проверила переданный вход")
             if (record.repeats >= MAX_REPEATS) {
-                return NodeSignInDecision.Skip("нода не принимает вход ${kind.label}: войдите в ${kind.label} заново в Настройках → Сервисы", problem = true)
+                return NodeSignInDecision.Skip("нода не принимает вход в ${kind.label}: войдите в ${kind.label} заново в Настройках → Сервисы", problem = true)
             }
         }
         if (nowMs - session.checkedAt > FRESH_MS) return NodeSignInDecision.Recheck
         return NodeSignInDecision.Push(
             when {
-                changed -> "вход ${kind.label} в приложении обновился"
-                signedOut -> "нода сообщает, что вход ${kind.label} истёк"
-                else -> "документ ${kind.label} на ноде не работает с ${state.minOf { it.since }}"
+                changed -> "вход в ${kind.label} в приложении обновился"
+                signedOut -> "нода сообщает, что вход в ${kind.label} истёк"
+                else -> "документ сервиса ${kind.label} на ноде не работает с ${state.minOf { it.since }}"
             },
         )
     }

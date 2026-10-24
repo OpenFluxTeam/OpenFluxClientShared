@@ -30,6 +30,7 @@ class SettingsScreensTest {
         )
         c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.Logs) }.snapshot().encode()) }
         setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
+        onNodeWithText("Поиск в журнале").assertIsDisplayed()
         onNodeWithText("соединение установлено").assertIsDisplayed()
         onNodeWithText("Ошибки").performClick()
         assertEquals(0, onAllNodes(hasText("соединение установлено")).fetchSemanticsNodes().size)

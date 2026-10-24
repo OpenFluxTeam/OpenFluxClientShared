@@ -72,7 +72,7 @@ fun accountSummary(s: BotState, nowMillis: Long, offsetSeconds: Int): AccountSum
         active = true,
         buyLabel = "Купить ещё место",
         renewInBot = session.viaTelegram,
-        note = if (ending && !session.viaTelegram) "Продлить место из приложения пока нельзя. Когда срок закончится, купите подписку заново" else null,
+        note = if (ending && !session.viaTelegram) "Продлить место из приложения пока нельзя. Когда срок закончится, купите место заново." else null,
     )
 }
 

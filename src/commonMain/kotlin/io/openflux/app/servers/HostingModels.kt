@@ -213,7 +213,7 @@ class HostingSetupModel(
             PhpHosts.chosenTokenProblem(chosenToken.trim())?.let { return it }
         }
         if (carrier == TransportType.MAILRU && NodeTransports.cleanMailru(mailru) == null) {
-            return "Нужна публичная ссылка на документ Mail.ru: https://cloud.mail.ru/public/…"
+            return "Нужна публичная ссылка Облака Mail.ru: https://cloud.mail.ru/public/…"
         }
         return null
     }

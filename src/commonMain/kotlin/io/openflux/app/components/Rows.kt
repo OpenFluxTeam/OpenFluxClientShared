@@ -151,6 +151,8 @@ fun RowItem(
             )
         }
     }
+    // A phone with a large system font gets more lines before a name or a subtitle is cut.
+    val lines = if (AppTheme.touch) 3 else 2
     Row(
         modifier.fillMaxWidth().heightIn(min = rowMinHeight()).then(mark).then(clickable)
             .padding(horizontal = sp.l, vertical = sp.s),
@@ -169,11 +171,11 @@ fun RowItem(
                     selected -> c.accentText
                     else -> c.text
                 },
-                maxLines = 2,
+                maxLines = lines,
                 overflow = TextOverflow.Ellipsis,
             )
             if (subtitle != null) {
-                Text(subtitle, style = AppTheme.type.bodySmall, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = AppTheme.type.bodySmall, color = c.textSecondary, maxLines = lines, overflow = TextOverflow.Ellipsis)
             }
         }
         if (trailing != null) {
@@ -198,7 +200,7 @@ fun ValueRow(title: String, value: String, modifier: Modifier = Modifier, mono: 
             horizontalArrangement = Arrangement.spacedBy(sp.m, Alignment.End),
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, Modifier.weight(1f), style = AppTheme.type.body, color = c.textSecondary, maxLines = 1)
+            Text(title, Modifier.weight(1f), style = AppTheme.type.body, color = c.textSecondary, maxLines = if (AppTheme.touch) 2 else 1)
             Text(value, style = (if (mono) AppTheme.type.mono else AppTheme.type.body).copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), color = c.text)
         }
         if (onCopy != null) IconAction(Icons.Rounded.ContentCopy, "Копировать", onCopy)

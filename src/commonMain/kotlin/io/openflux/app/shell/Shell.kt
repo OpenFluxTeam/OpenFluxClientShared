@@ -285,13 +285,13 @@ private fun BarItem(section: Section, navigator: AppNavigator, status: Status?, 
         }
         if (label || selected) {
             Spacer(Modifier.height(3.dp))
-            // The chosen place's label alone may still be long on a tiny screen: it shrinks rather than gets cut.
+            // The chosen place's label alone may still be long on a tiny screen: it wraps and shrinks rather than gets cut.
             BasicText(
                 section.title,
                 style = AppTheme.type.caption.copy(color = labelColor, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium),
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Clip,
+                maxLines = 2,
+                softWrap = true,
+                overflow = TextOverflow.Ellipsis,
                 autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = AppTheme.type.caption.fontSize, stepSize = 0.5.sp),
             )
         }

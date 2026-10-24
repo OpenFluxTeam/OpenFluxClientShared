@@ -357,10 +357,10 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
             if (on) ValueRow("За сессию", Fmt.bytes(traffic.totalDown + traffic.totalUp))
             if (on && !traffic.live) ValueRow("Статистика", "ядро не сообщает")
             for (kind in m.pushable(p, state)) {
-                RowItem("Передать вход ${kind.label} ноде", onClick = {
+                RowItem("Передать вход в ${kind.label} ноде", onClick = {
                     scope.launch {
                         runCatching { container.connection.pushAccountToExit(kind) }
-                            .onSuccess { toaster.show("Вход ${kind.label} передан ноде") }
+                            .onSuccess { toaster.show("Вход в ${kind.label} передан ноде") }
                             .onFailure { toaster.show(it.message ?: "Не удалось передать вход") }
                     }
                 })
@@ -380,7 +380,7 @@ private fun StatPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Icon(icon, contentDescription = null, tint = c.accentText, modifier = Modifier.size(16.dp))
-        Text(text, style = AppTheme.type.mono, color = c.text, maxLines = 1)
+        Text(text, style = AppTheme.type.mono, color = c.text)
     }
 }
 

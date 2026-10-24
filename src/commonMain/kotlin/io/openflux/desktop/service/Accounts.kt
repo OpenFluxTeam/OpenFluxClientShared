@@ -66,7 +66,7 @@ class Accounts(
      */
     suspend fun signIn(kind: AccountKind, inDialog: Boolean = true): AccountSession {
         if (!kind.signsIn) throw AccountException("Вход в ${kind.label} пока не поддерживается: вставьте токен в профиль")
-        set(kind, AuthStatus.Busy("Войдите в аккаунт ${kind.label} во встроенном браузере"))
+        set(kind, AuthStatus.Busy("Войдите в ${kind.label} во встроенном браузере"))
         _signingIn.value = kind.takeIf { inDialog }
         try {
             browser.open(kind, kind.signInUrl, emptyMap()) { set(kind, AuthStatus.Busy(it)) }
@@ -135,7 +135,7 @@ class Accounts(
                 val url = browser.url
                 if (maker.signInPages.any { it in url }) {
                     markExpired(kind)
-                    throw AccountException("Сессия ${kind.label} истекла — войдите заново", expired = true)
+                    throw AccountException("Вход в ${kind.label} истёк — войдите заново", expired = true)
                 }
                 if (!browser.loading && url.startsWith(maker.readyUrl)) {
                     set(kind, AuthStatus.Busy(maker.hint ?: "Создаю документ: ${maker.place}…"))
@@ -154,7 +154,7 @@ class Accounts(
                             return doc
                         }
                         "fail" -> throw AccountException(
-                            "Не получилось создать документ: " + (result["error"]?.jsonPrimitive?.content ?: "ошибка ${kind.label}"),
+                            "Не получилось создать документ: " + (result["error"]?.jsonPrimitive?.content ?: "ошибка сервиса ${kind.label}"),
                         )
                         else -> Unit // the page is still loading its data
                     }
@@ -205,7 +205,7 @@ class Accounts(
                     AuthStatus.Expired(session.login)
                 }
                 ProbeResult.NeedsCheck -> AuthStatus.NeedsCheck(session.login)
-                ProbeResult.Offline -> AuthStatus.Failed("Нет связи с ${kind.label}, проверю позже", session.login)
+                ProbeResult.Offline -> AuthStatus.Failed("Нет связи с сервисом ${kind.label}, проверю позже", session.login)
             }
         } catch (e: CancellationException) {
             restore(kind)

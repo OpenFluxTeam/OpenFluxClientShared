@@ -10,8 +10,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -22,6 +21,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import io.openflux.app.theme.MinTouch
 import io.openflux.app.theme.Motion
 import io.openflux.app.theme.accentBrush
@@ -108,7 +109,7 @@ private fun TextInput(
         label = { Text(label) },
         placeholder = placeholder?.let { { Text(it) } },
         isError = error != null,
-        supportingText = error?.let { { Text(it, maxLines = 2) } },
+        supportingText = error?.let { { Text(it, maxLines = 4, overflow = TextOverflow.Ellipsis) } },
         singleLine = singleLine,
         textStyle = if (mono) AppTheme.type.mono else AppTheme.type.body,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
@@ -154,17 +155,20 @@ fun <T> Segmented(
     val inner = RoundedCornerShape(AppTheme.shapes.medium - 3.dp)
     val index = options.indexOf(selected).coerceAtLeast(0)
     val height = if (AppTheme.touch) MinTouch else 42.dp
+    // A large system font makes the track taller and the labels wrap, instead of cutting either.
     BoxWithConstraints(
-        modifier.fillMaxWidth().height(height).clip(shape).background(c.surface).border(1.dp, c.border, shape).padding(3.dp),
+        modifier.fillMaxWidth().heightIn(min = height).clip(shape).background(c.surface).border(1.dp, c.border, shape).padding(3.dp),
     ) {
         val cell = maxWidth / options.size.coerceAtLeast(1)
         val x by animateDpAsState(cell * index, Motion.bouncy())
-        Box(
-            Modifier.offset(x = x).width(cell).fillMaxHeight()
-                .shadow(6.dp, inner, ambientColor = c.glow, spotColor = c.glow)
-                .background(c.accentBrush, inner),
-        )
-        Row(Modifier.fillMaxSize()) {
+        Box(Modifier.matchParentSize()) {
+            Box(
+                Modifier.offset(x = x).width(cell).fillMaxHeight()
+                    .shadow(6.dp, inner, ambientColor = c.glow, spotColor = c.glow)
+                    .background(c.accentBrush, inner),
+            )
+        }
+        Row(Modifier.fillMaxWidth()) {
             options.forEachIndexed { i, option ->
                 val on = i == index
                 val can = enabled(option)
@@ -176,17 +180,22 @@ fun <T> Segmented(
                     },
                 )
                 Box(
-                    Modifier.weight(1f).fillMaxHeight().clip(inner)
+                    Modifier.weight(1f).heightIn(min = height).clip(inner)
                         .selectable(on, enabled = can, role = Role.RadioButton, onClick = { onSelect(option) }),
                     contentAlignment = Alignment.Center,
                 ) {
-                    // A narrow screen shrinks a long label rather than cutting it.
+                    // A narrow screen shrinks or wraps a long label rather than cutting it.
                     BasicText(
                         label(option),
-                        modifier = Modifier.padding(horizontal = AppTheme.spacing.s),
-                        style = AppTheme.type.body.copy(color = color, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium),
-                        maxLines = 1,
-                        softWrap = false,
+                        modifier = Modifier.padding(horizontal = AppTheme.spacing.s, vertical = AppTheme.spacing.xs),
+                        style = AppTheme.type.body.copy(
+                            color = color,
+                            fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                        ),
+                        maxLines = 2,
+                        softWrap = true,
+                        overflow = TextOverflow.Ellipsis,
                         autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = AppTheme.type.body.fontSize, stepSize = 0.5.sp),
                     )
                 }
@@ -227,7 +236,7 @@ fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifie
         selected = selected,
         onClick = onClick,
         modifier = modifier,
-        label = { Text(text, style = AppTheme.type.bodySmall.copy(fontWeight = FontWeight.Medium), maxLines = 1) },
+        label = { Text(text, style = AppTheme.type.bodySmall.copy(fontWeight = FontWeight.Medium), maxLines = 2, overflow = TextOverflow.Ellipsis) },
         // A chosen chip shows a tick that grows in; one with its own icon keeps it.
         leadingIcon = (leading ?: Icons.Rounded.Check.takeIf { selected })?.let { icon ->
             { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) }

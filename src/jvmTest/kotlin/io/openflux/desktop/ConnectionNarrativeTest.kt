@@ -29,7 +29,7 @@ class ConnectionNarrativeTest {
     fun aNodeIsConfirmedByTheAddressTheTrafficLeavesFrom() {
         val ok = ConnectionNarrative.nodeConfirmed("203.0.113.7", 1_340)
         assertEquals(LogLevel.Success, ok.level)
-        assertTrue(ok.text.contains("203.0.113.7") && ok.text.contains("1.3 с"), ok.text)
+        assertTrue(ok.text.contains("203.0.113.7") && ok.text.contains("1,3 с"), ok.text)
     }
 
     @Test

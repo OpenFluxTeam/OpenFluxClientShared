@@ -171,10 +171,10 @@ class NodeEditorModel(
             error = "У ноды нет транспорта Яндекса"
             return
         }
-        run("Передаю вход Яндекса ноде…") {
+        run("Передаю вход в Яндекс ноде…") {
             installed = pushSignIn(info, cookies)
             recordNodeSignIn(container, serverId, info.id, AccountKind.Yandex)
-            notice = "Вход Яндекса передан ноде"
+            notice = "Вход в Яндекс передан ноде"
         }
     }
 
@@ -198,10 +198,10 @@ class NodeEditorModel(
             error = "У ноды нет транспорта Mail.ru"
             return
         }
-        run("Передаю вход Mail.ru ноде…") {
+        run("Передаю вход в Mail.ru ноде…") {
             installed = pushSignIn(info, cookies)
             recordNodeSignIn(container, serverId, info.id, AccountKind.Mailru)
-            notice = "Вход Mail.ru передан ноде"
+            notice = "Вход в Mail.ru передан ноде"
         }
     }
 
@@ -326,7 +326,7 @@ class NodeEditorModel(
         }
     }
 
-    fun createMailruDocument() = run("Создаю документ в Облаке Mail…") {
+    fun createMailruDocument() = run("Создаю документ в Облаке Mail.ru…") {
         val url = accountDocument { container.accounts.createDocument(AccountKind.Mailru, it) } ?: return@run
         draft = draft.copy(mailru = true, mailruLink = url)
     }

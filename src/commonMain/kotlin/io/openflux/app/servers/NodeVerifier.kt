@@ -59,7 +59,7 @@ class NodeVerifier(
                 if (now() > deadline) {
                     throw NodeWizardException(
                         if (lastProblem.isNotEmpty()) "Канал поднялся, но запрос через него не прошёл: $lastProblem"
-                        else "Нода не ответила: проверьте, что сервер доступен, а документ и ключ совпадают",
+                        else "Нода не ответила: проверьте, что сервер доступен, а параметры транспорта и ключ совпадают",
                     )
                 }
                 val state = connection.state.value

@@ -177,7 +177,7 @@ class HostingModelTest {
         hosting.webroot = "htdocs"
         val m = setup().apply { ftpForm(); carrier = TransportType.MAILRU; mailru = "x" }
         m.install(); advanceUntilIdle()
-        assertEquals("Нужна публичная ссылка на документ Mail.ru: https://cloud.mail.ru/public/…", m.error)
+        assertEquals("Нужна публичная ссылка Облака Mail.ru: https://cloud.mail.ru/public/…", m.error)
         assertFalse(hosting.uploaded)
     }
 

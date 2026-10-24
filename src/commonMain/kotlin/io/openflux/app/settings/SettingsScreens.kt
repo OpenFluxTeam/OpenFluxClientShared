@@ -160,7 +160,7 @@ private fun ConnectionPage() {
     }
     NextConnectionNote()
     Section(null) {
-        Toggle("Подключаться при запуске", settings.autoConnect, { v -> container.settings.update { it.copy(autoConnect = v) } }, subtitle = "Выбранное подключение, когда OpenFlux открывается")
+        Toggle("Подключаться при запуске", settings.autoConnect, { v -> container.settings.update { it.copy(autoConnect = v) } }, subtitle = "Подключать выбранный профиль при запуске OpenFlux")
     }
 }
 
@@ -236,7 +236,7 @@ private fun ServicesPage() {
             }
         }
     }
-    Text("Войдите один раз: Яндекс реже просит проверку, а ваши ноды получают сессию сами. Пароль OpenFlux не видит.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
+    Text("Войдите один раз: сервисы реже просят проверку, а ваши ноды получают сессию сами. Пароль OpenFlux не видит.", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
     for (kind in AccountKind.entries.filter { it.signsIn }) {
         val st = status[kind] ?: AuthStatus.SignedOut
         Section(kind.label) {
@@ -287,7 +287,7 @@ private fun ServicesPage() {
     }
     if (status.values.any { it !is AuthStatus.SignedOut }) SecondaryButton("Проверить все", { container.accounts.checkAllInBackground(force = true) })
     Text(
-        "Сервис может заблокировать аккаунт, которым пользуются так. Авторы OpenFlux за это не отвечают. Cups.online и прямое подключение входа не требуют.",
+        "Сервис может заблокировать аккаунт за такое использование. Авторы OpenFlux за это не отвечают. Cups.online и прямое подключение входа не требуют.",
         style = AppTheme.type.bodySmall, color = AppTheme.colors.textMuted,
     )
 }
@@ -344,7 +344,7 @@ private fun CorePage() {
             }
         }
     }
-    io.openflux.app.components.Group("Подробность журнала ядра") {
+    io.openflux.app.components.Group("Детализация журнала ядра") {
         Segmented(listOf(0, 1, 2, 3), settings.debugLevel, { v -> container.settings.update { it.copy(debugLevel = v) } }, label = { if (it == 0) "Выкл" else "-" + "d".repeat(it) })
         Text(
             when (settings.debugLevel) {
@@ -427,7 +427,7 @@ private fun AboutPage() {
             }
         }, Modifier.fillMaxWidth())
         Section(null) {
-            Toggle("Проверять обновления автоматически", settings.autoUpdate, { v -> container.settings.update { it.copy(autoUpdate = v) } }, subtitle = "Раз в несколько часов. Ставятся только с вашего согласия")
+            Toggle("Проверять обновления автоматически", settings.autoUpdate, { v -> container.settings.update { it.copy(autoUpdate = v) } }, subtitle = "Раз в несколько часов. Обновления ставятся только с вашего согласия")
         }
         if (settings.developerMode) {
             io.openflux.app.components.Group("Канал обновлений") {

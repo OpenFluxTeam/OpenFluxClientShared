@@ -109,7 +109,7 @@ fun JournalScreen() {
             Field(query, { query = it }, "Поиск в журнале")
             Segmented(JournalFilter.entries, filter, { filter = it }, label = { it.label })
             if (shown.isEmpty()) {
-                Text(if (all.isEmpty()) "Журнал пуст" else "Нет строк под фильтр", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
+                Text(if (all.isEmpty()) "Журнал пуст" else "Нет строк по фильтру", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
             } else {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     SelectionContainer {
@@ -349,7 +349,7 @@ private fun AddScriptSheet(onClose: () -> Unit) {
                     else -> {
                         Banner(
                             if (key.isBlank()) "Подписано не ключом OpenFlux. Введите открытый ключ автора, чтобы проверить подпись"
-                            else "Подпись не совпадает с этим ключом. Проверьте ключ или источник",
+                            else "Подпись не совпадает с этим ключом. Проверьте ключ или источник.",
                             Tone.Info,
                         )
                         Field(key, { key = it; error = null }, "Ключ автора (hex)", mono = true)

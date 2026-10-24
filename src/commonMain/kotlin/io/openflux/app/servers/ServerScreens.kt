@@ -227,7 +227,7 @@ fun AddServerScreen() {
                 if (probe != null && probe.channels.isNotEmpty()) {
                     RowItem(
                         "Открыть сервер",
-                        subtitle = "На нём уже нод: ${probe.channels.size}",
+                        subtitle = "Нод на нём: ${probe.channels.size}",
                         trailing = { Chevron() },
                         onClick = { navigator.replaceTop(Dest.Server(id)) },
                     )

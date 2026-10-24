@@ -66,7 +66,7 @@ class NodeSignInKeeper(
     fun recordPush(serverId: String, channel: String, kind: AccountKind, session: AccountSession) {
         val key = NodeSignInPolicy.key(serverId, channel, kind)
         ledger.put(key, NodeSignInPolicy.pushed(NodeSignInRecord(), kind, session, now()).copy(repeats = 0))
-        note(key, "вход ${kind.label} передан ноде", false)
+        note(key, "вход в ${kind.label} передан ноде", false)
     }
 
     /** Runs until cancelled: once soon after start, then every period and whenever [sessions] change. */
@@ -82,7 +82,7 @@ class NodeSignInKeeper(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                log("Вход нод: ${e.message}", LogLevel.Warning)
+                log("Вход в ноды: ${e.message}", LogLevel.Warning)
             }
             delay(NodeSignInPolicy.PERIOD_MS)
         }
@@ -128,10 +128,10 @@ class NodeSignInKeeper(
             val status = recheck(kind)
             decision = if (status is AuthStatus.SignedIn) {
                 NodeSignInPolicy.decide(kind, session(kind), info, record, now()).let {
-                    if (it == NodeSignInDecision.Recheck) NodeSignInDecision.Skip("сессия ${kind.label} не проверилась") else it
+                    if (it == NodeSignInDecision.Recheck) NodeSignInDecision.Skip("вход в ${kind.label} не проверился") else it
                 }
             } else {
-                NodeSignInDecision.Skip("сессия ${kind.label} не подтвердилась: проверьте её в Настройках → Сервисы", problem = true)
+                NodeSignInDecision.Skip("вход в ${kind.label} не подтвердился: проверьте его в Настройках → Сервисы", problem = true)
             }
         }
         when (decision) {
@@ -148,17 +148,17 @@ class NodeSignInKeeper(
                 val s = session(kind) ?: return info
                 // The decision checked the sign-in is valid and of this service; the core routes it to that service's document only.
                 if (!AccountCookies.signedIn(kind, s.cookies)) return info
-                log("Вход нод: ${decision.why} — передаю ноде $channel", LogLevel.Info)
+                log("${decision.why.replaceFirstChar { it.uppercase() }} — передаю ноде $channel", LogLevel.Info)
                 return try {
                     val fresh = access.push(serverId, channel, info.transports, AccountCookies.header(s.cookies))
                     ledger.put(key, NodeSignInPolicy.pushed(record, kind, s, now()))
-                    note(key, "вход ${kind.label} обновлён на ноде: ${decision.why}", false)
-                    log("Вход нод: вход ${kind.label} передан ноде $channel", LogLevel.Success)
+                    note(key, "вход в ${kind.label} обновлён на ноде: ${decision.why}", false)
+                    log("Вход в ${kind.label} передан ноде $channel", LogLevel.Success)
                     fresh
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
-                    failed(key, "не удалось передать вход ${kind.label}: ${e.message}")
+                    failed(key, "не удалось передать вход в ${kind.label}: ${e.message}")
                     info
                 }
             }
@@ -169,7 +169,7 @@ class NodeSignInKeeper(
     private fun failed(key: String, text: String) {
         ledger.all()[key]?.let { ledger.put(key, NodeSignInPolicy.failed(it, now())) }
         note(key, text, true)
-        log("Вход нод: $text", LogLevel.Warning)
+        log("Вход в ноды: $text", LogLevel.Warning)
     }
 
     private fun note(key: String, text: String, problem: Boolean) {

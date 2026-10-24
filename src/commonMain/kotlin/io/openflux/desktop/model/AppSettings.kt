@@ -13,7 +13,7 @@ enum class UpdateChannel(val label: String) { Stable("Основной"), Nightl
 @Serializable
 enum class ConnectionMode(val label: String, val description: String) {
     Client("Клиент (SOCKS5)", "Трафик программ идёт через ноду"),
-    Exit("Выходная нода", "Этот компьютер выпускает в интернет других"),
+    Exit("Выходная нода", "Этот компьютер выпускает других в интернет"),
 }
 
 /**

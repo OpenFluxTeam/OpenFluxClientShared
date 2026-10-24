@@ -55,6 +55,19 @@ class ComponentsTest {
     }
 
     @Test
+    fun segmentedLeavesRoomForWhatComesNext() = runComposeUiTest {
+        setContent {
+            AppTheme(dark = true, touch = false) {
+                Column(Modifier.height(600.dp)) {
+                    Segmented(listOf("L4", "L3"), "L4", {}, label = { it })
+                    Text("ниже")
+                }
+            }
+        }
+        onNodeWithText("ниже").assertIsDisplayed()
+    }
+
+    @Test
     fun secretFieldRevealsOnDemand() = runComposeUiTest {
         setContent { AppTheme(dark = true, touch = false) { SecretField("hunter2", {}, "Пароль") } }
         // What is drawn, not the field's value (which semantics always carry as InputText).

@@ -158,7 +158,7 @@ class SignInModel(
         /** The page's code lives minutes; past this the way back closes. */
         const val WAIT_MS = 15 * 60 * 1000L
         const val GENERIC = "Не получилось войти"
-        const val NO_CLIENT = "Вход в этой сборке выключен: в ней нет клиента входа"
+        const val NO_CLIENT = "Вход в этой сборке недоступен"
     }
 }
 

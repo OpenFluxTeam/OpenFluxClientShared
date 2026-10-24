@@ -60,7 +60,7 @@ fun Brand(modifier: Modifier = Modifier, large: Boolean = false, subtitle: Strin
                 color = c.text,
                 maxLines = 1,
             )
-            Text(subtitle, style = AppTheme.type.caption, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, style = AppTheme.type.caption, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }

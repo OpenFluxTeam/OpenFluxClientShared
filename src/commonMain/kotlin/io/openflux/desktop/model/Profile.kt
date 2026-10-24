@@ -132,7 +132,7 @@ data class Profile(
             transport == TransportType.CUPSONLINE ->
                 if (PhpHosts.cupsRoom(v) == null) "Нужен адрес комнаты cups.online (https://interview.cups.online/live-coding/?room=…)" else null
             transport == TransportType.MAILRU ->
-                if (NodeTransports.cleanMailru(v) == null) "Нужна публичная ссылка на документ Mail.ru (https://cloud.mail.ru/public/…)" else null
+                if (NodeTransports.cleanMailru(v) == null) "Нужна публичная ссылка Облака Mail.ru (https://cloud.mail.ru/public/…)" else null
             else -> "Режим без сервера работает через cups.online или Mail.ru"
         }
     }

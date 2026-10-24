@@ -82,11 +82,11 @@ import io.openflux.app.platform.LocalShortcuts
 import io.openflux.app.platform.LocalTouchUi
 import io.openflux.app.platform.PlatformBackHandler
 
-/** "в Яндексе", "в Облаке Mail": where a document is made. */
+/** "в Яндексе", "в Облаке Mail.ru": where a document is made. */
 val io.openflux.desktop.model.AccountKind.where: String
     get() = when (this) {
         io.openflux.desktop.model.AccountKind.Yandex -> "Яндексе"
-        io.openflux.desktop.model.AccountKind.Mailru -> "Облаке Mail"
+        io.openflux.desktop.model.AccountKind.Mailru -> "Облаке Mail.ru"
         else -> label
     }
 
@@ -95,7 +95,7 @@ fun TransportType.blurb(): String = when (this) {
     TransportType.VYANDEX -> "Документ Яндекса, по ссылке на редактирование"
     TransportType.YANDEX -> "Файл на Яндекс Диске"
     TransportType.BOARDS -> "Доска Яндекса"
-    TransportType.MAILRU -> "Публичный файл Облака Mail.ru"
+    TransportType.MAILRU -> "Публичная ссылка Облака Mail.ru"
     TransportType.CUPSONLINE -> "Комнаты cups.online, код выдаёт нода"
     TransportType.TELEMOST -> "Конференция Яндекс Телемоста, по ссылке-приглашению"
     TransportType.AVITO -> "Комнаты Avito Code, код выдаёт нода"
@@ -139,7 +139,7 @@ fun ProfileScreen(dest: Dest.Profile) {
             if (!p.managed) SecondaryButton("Изменить", { navigator.open(Dest.ProfileEdit(p.id)) }, leading = Icons.Rounded.Edit)
             if (actions.canShare(p)) SecondaryButton("Поделиться", { navigator.open(Dest.Give(p.id)) }, leading = Icons.Rounded.Share)
         }
-        if (p.managed) Banner("Приходит с подпиской, менять её нельзя", Tone.Info, action = "Подписка", onAction = { navigator.open(Dest.Account) })
+        if (p.managed) Banner("Приходит с подпиской, менять его нельзя", Tone.Info, action = "Подписка", onAction = { navigator.open(Dest.Account) })
         p.problems().firstOrNull()?.let { Banner(it, Tone.Danger) }
         Section("Транспорты") {
             for (c in p.carriers) {
@@ -214,11 +214,11 @@ fun ProfileEditScreen(dest: Dest.ProfileEdit) {
         actions = { if (!m.readOnly) TextAction("Сохранить", save) },
     ) {
         if (m.readOnly) {
-            Banner("Приходит с подпиской, менять её нельзя", Tone.Info)
+            Banner("Приходит с подпиской, менять его нельзя", Tone.Info)
             return@ScreenScaffold
         }
         if (m.showProblems) m.problems.firstOrNull()?.let { Banner(it, Tone.Danger) }
-        Field(d.name, { v -> m.edit { it.copy(name = v) } }, "Название", placeholder = "Например, Нода в Нидерландах")
+        Field(d.name, { v -> m.edit { it.copy(name = v) } }, "Название", placeholder = "Например, нода в Нидерландах")
         Section("Режим") {
             Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
                 Segmented(EditMode.entries, d.editMode, m::setMode, label = { it.label })
@@ -310,6 +310,8 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
                     c.type.kind == ValueKind.DocumentUrl -> when {
                         d.stream && c.type == TransportType.CUPSONLINE -> "Адрес комнаты cups.online"
                         c.type == TransportType.CUPSONLINE || c.type == TransportType.AVITO -> "Код комнат"
+                        c.type == TransportType.BOARDS -> "Ссылка на доску"
+                        c.type == TransportType.TELEMOST -> "Ссылка на конференцию"
                         else -> "Ссылка на документ"
                     }
                     c.type.kind == ValueKind.Address -> "Адрес ноды"
@@ -317,7 +319,7 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
                 }
                 val error = if (c.value.isBlank()) null else when {
                     d.stream && c.type == TransportType.CUPSONLINE -> if (PhpHosts.cupsRoom(c.value) == null) "Нужен адрес комнаты: https://interview.cups.online/live-coding/?room=…" else null
-                    d.stream && c.type == TransportType.MAILRU -> if (NodeTransports.cleanMailru(c.value) == null) "Нужна публичная ссылка на документ Mail.ru" else null
+                    d.stream && c.type == TransportType.MAILRU -> if (NodeTransports.cleanMailru(c.value) == null) "Нужна публичная ссылка Облака Mail.ru" else null
                     else -> Profile.carrierProblem(c)?.takeIf { c.type.kind != ValueKind.Token }
                 }
                 if (c.type.kind == ValueKind.Token || param?.type == "secret") {

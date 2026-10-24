@@ -114,10 +114,10 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
                     DropdownMenu(menu, { menu = false }) {
                         DropdownMenuItem({ Text("Обновить состояние") }, { menu = false; m.load() })
                         if (info.transportTypes.any { it == TransportType.VYANDEX || it == TransportType.YANDEX }) {
-                            DropdownMenuItem({ Text("Передать вход Яндекса ноде") }, { menu = false; m.pushYandexSignIn() })
+                            DropdownMenuItem({ Text("Передать вход в Яндекс ноде") }, { menu = false; m.pushYandexSignIn() })
                         }
                         if (info.transportTypes.any { it == TransportType.MAILRU }) {
-                            DropdownMenuItem({ Text("Передать вход Mail.ru ноде") }, { menu = false; m.pushMailruSignIn() })
+                            DropdownMenuItem({ Text("Передать вход в Mail.ru ноде") }, { menu = false; m.pushMailruSignIn() })
                         }
                         DropdownMenuItem({ Text("Удалить с сервера", color = AppTheme.colors.danger) }, { menu = false; removeAsk = true })
                     }
@@ -148,7 +148,7 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
         },
     ) {
         if (!link.hasAccess(serverId)) {
-            Banner("Нет доступа к серверу: войдите на нём заново", Tone.Warning, action = "Открыть сервер", onAction = { navigator.open(Dest.Server(serverId)) })
+            Banner("Нет доступа к серверу: войдите заново", Tone.Warning, action = "Открыть сервер", onAction = { navigator.open(Dest.Server(serverId)) })
             return@ScreenScaffold
         }
         if (info != null) {
@@ -197,7 +197,7 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
             Toggle(TransportType.MAILRU.title, d.mailru, { on -> m.edit { it.copy(mailru = on) } }, enabled = editable)
             if (d.mailru) {
                 LinkRow(d.mailruLink, { v -> m.edit { it.copy(mailruLink = v) } }, "Публичная ссылка Mail.ru") {
-                    TextAction("Создать в Облаке Mail", m::createMailruDocument, enabled = editable)
+                    TextAction("Создать в Облаке Mail.ru", m::createMailruDocument, enabled = editable)
                 }
             }
             Toggle(TransportType.BOARDS.title, d.board, { on -> m.edit { it.copy(board = on) } }, enabled = editable)
@@ -208,7 +208,7 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
             }
             Toggle(TransportType.TELEMOST.title, d.telemost, { on -> m.edit { it.copy(telemost = on) } }, enabled = editable)
             if (d.telemost) {
-                LinkRow(d.telemostLink, { v -> m.edit { it.copy(telemostLink = v) } }, "Ссылка на конференцию Телемоста") {
+                LinkRow(d.telemostLink, { v -> m.edit { it.copy(telemostLink = v) } }, "Ссылка на конференцию") {
                     TextAction("Создать в Телемосте", m::createTelemost, enabled = editable)
                 }
             }

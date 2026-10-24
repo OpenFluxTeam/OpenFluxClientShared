@@ -73,7 +73,7 @@ fun AddKeyScreen(scan: Boolean = false) {
             }
         },
     ) {
-        Field(m.text, { m.onText(it) }, "Ключ подписки или ссылка openflux://", singleLine = false, mono = true)
+        Field(m.text, { m.onText(it) }, "Ключ или ссылка", placeholder = "Ключ подписки или ссылка openflux://", singleLine = false, mono = true)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             SecondaryButton("Вставить", m::paste, leading = Icons.Rounded.ContentPaste)
             SecondaryButton("Файл", m::fromFile, leading = Icons.Rounded.Description)
@@ -101,14 +101,14 @@ fun AddKeyScreen(scan: Boolean = false) {
                         "Срок",
                         when {
                             doc.status == SubStatus.REVOKED -> "доступ отключён"
-                            doc.status == SubStatus.EXPIRED -> "вышел" + if (doc.expires > 0) " ${Fmt.date(doc.expires, offset)}" else ""
+                            doc.status == SubStatus.EXPIRED -> "истёк" + if (doc.expires > 0) " ${Fmt.date(doc.expires, offset)}" else ""
                             doc.expires == 0L -> "без ограничения"
                             else -> "до ${Fmt.date(doc.expires, offset)}"
                         },
                     )
                     if (doc.profiles.isNotEmpty()) ValueRow("Локации", doc.profiles.joinToString(", ") { it.name })
                 }
-                if (!r.canAdd) Banner("По этому ключу подключиться нельзя: срок вышел или доступ отключён", Tone.Warning)
+                if (!r.canAdd) Banner("По этому ключу подключиться нельзя: срок истёк или доступ отключён", Tone.Warning)
                 val current = container.subscription.state.collectAsState().value
                 if (current != null && r.canAdd) Banner("Новая подписка заменит ту, что есть на этом устройстве", Tone.Info)
             }

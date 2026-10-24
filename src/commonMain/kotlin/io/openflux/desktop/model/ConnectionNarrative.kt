@@ -102,6 +102,6 @@ object ConnectionNarrative {
 
     private fun seconds(millis: Long): String {
         val tenths = (millis / 100).coerceAtLeast(1)
-        return "${tenths / 10}.${tenths % 10}"
+        return "${tenths / 10},${tenths % 10}"
     }
 }

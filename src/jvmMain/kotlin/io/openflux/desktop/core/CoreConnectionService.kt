@@ -168,7 +168,7 @@ class CoreConnectionService(
 
     private suspend fun pushQuietly(run: Run, kind: AccountKind) {
         runCatching { pushTo(run, kind) }
-            .onFailure { log(LogLevel.Warning, "Не удалось передать вход ${kind.label} ноде: ${it.message}") }
+            .onFailure { log(LogLevel.Warning, "Не удалось передать вход в ${kind.label} ноде: ${it.message}") }
     }
 
     override suspend fun pushAccountToExit(kind: AccountKind): Int {
@@ -177,14 +177,14 @@ class CoreConnectionService(
     }
 
     private fun pushTo(run: Run, kind: AccountKind): Int {
-        check(run.settings.mode == ConnectionMode.Client && run.usesIpc) { "Передать вход можно только ноде профиля Session" }
+        check(run.settings.mode == ConnectionMode.Client && run.usesIpc) { "Передать вход можно только ноде, у которой профиль Session" }
         val ipc = run.ipc ?: throw IllegalStateException("Нет связи с ядром")
         val session = accounts.validSession(kind) ?: throw IllegalStateException("Сначала войдите в ${kind.label}")
         val names = run.profile.sessionSpecs().filter { it.type in kind.signedInTransports }.map { it.name }
-        check(names.isNotEmpty()) { "В профиле нет транспортов ${kind.label}" }
+        check(names.isNotEmpty()) { "В профиле нет транспортов для ${kind.label}" }
         names.forEach { ipc.offerCookies(IpcCookiesOffer(it, session.cookies, remote = true)) }
         run.pushed[kind] = session.cookies
-        log(LogLevel.Success, "Вход ${kind.label} передан ноде (${names.size} транспорт.)")
+        log(LogLevel.Success, "Вход в ${kind.label} передан ноде (транспортов: ${names.size})")
         return names.size
     }
 

@@ -148,18 +148,18 @@ fun SlotSetupContent(
             }
         } else {
             Text(
-                "Свои документы: подключение берёт их все, по порядку — первый рабочий становится основным, " +
-                    "Телемост и Доски идут последними. До пяти, разных видов; без них работают cups.online и Avito.",
+                "Свои документы и ссылки: подключение берёт их все, по порядку — первый рабочий становится основным, " +
+                    "Телемост и Доски идут последними. До пяти разных видов; без них работают cups.online и Avito.",
                 style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
             )
             when {
                 documents == null -> ProgressLine("Загружаю документы…")
                 documents.isEmpty() -> Text(
-                    "Своих документов нет: подключение пойдёт через cups.online и Avito, им аккаунт не нужен. " +
-                        "Добавьте документ (Яндекс Диск, Облако Mail.ru, Телемост, Доски), если нужен ещё транспорт.",
+                    "Своих документов и ссылок нет: подключение пойдёт через cups.online и Avito, им аккаунт не нужен. " +
+                        "Добавьте ссылку (Яндекс Диск, Облако Mail.ru, Телемост, Доски), если нужен ещё транспорт.",
                     style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
                 )
-                else -> Section("Документы") {
+                else -> Section("Документы и ссылки") {
                     for (d in documents) {
                         RowItem(
                             d.label.ifBlank { documentKindName(d.kind) },
@@ -192,9 +192,9 @@ fun SlotSetupContent(
 private fun AddDocumentField(idle: Boolean, onAdd: (String) -> Unit) {
     var url by remember { mutableStateOf("") }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-        Field(url, { url = it }, "Ссылка на документ", placeholder = "https://disk.yandex.ru/i/…")
+        Field(url, { url = it }, "Ссылка", placeholder = "https://disk.yandex.ru/i/…, ссылка на доску или Телемост")
         SecondaryButton(
-            "Добавить документ",
+            "Добавить ссылку",
             { val u = url.trim(); if (u.isNotEmpty()) { onAdd(u); url = "" } },
             Modifier.fillMaxWidth(),
             enabled = idle && url.isNotBlank(),
