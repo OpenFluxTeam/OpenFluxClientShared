@@ -139,12 +139,6 @@ data class AppSettings(
     val savedSystemProxy: SavedSystemProxy? = null,
     val sidebarCollapsed: Boolean = false,
     /**
-     * Home's button as the Moon and the Sun (the 3D scene with its devices and network) instead of the OpenFlux mark.
-     * Off by default: the scene keeps the graphics card busy the whole time Home is shown; the mark moves only when
-     * the state changes.
-     */
-    val moonAndSun: Boolean = false,
-    /**
      * Developer mode: shows the Accounts tab. Turned on by tapping the app
      * version in Settings → About ten times, off by its switch there.
      */

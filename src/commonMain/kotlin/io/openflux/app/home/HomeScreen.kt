@@ -60,7 +60,6 @@ import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ConfirmDialog
 import io.openflux.app.components.ConnectButton
 import io.openflux.app.components.ConnectLook
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.height
 import io.openflux.app.components.Field
 import io.openflux.app.components.IconAction
@@ -295,14 +294,8 @@ fun SwitchBlock(
 ) {
     val container = LocalAppContainer.current
     val platform = container.platform
-    val settings by container.settings.settings.collectAsState()
     val traffic by container.connection.traffic.collectAsState()
-    // Settings → Внешний вид can ask for the Moon and the Sun: the scene that keeps the graphics card busy.
-    if (settings.moonAndSun) {
-        CosmicHome(look, label, onClick, (traffic.downBytesPerSec + traffic.upBytesPerSec).toDouble(), shortcut)
-    } else {
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { ConnectButton(look, label, onClick = onClick, shortcut = shortcut) }
-    }
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { ConnectButton(look, label, onClick = onClick, shortcut = shortcut) }
     under?.invoke()
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
         AnimatedContent(
@@ -320,28 +313,6 @@ fun SwitchBlock(
                 }
             }
         }
-    }
-}
-
-/** The switch as a small universe: the Moon while off, the Sun with its network of devices while connected. [busy] is bytes a second. */
-@Composable
-private fun CosmicHome(look: ConnectLook, label: String, onClick: () -> Unit, busy: Double, shortcut: String?) {
-    // Its height is set, not left to an aspect ratio: in a wide window that would ask for more than the cap and
-    // the scene would spill over what is above and below it. A short window keeps it to half its height, so what
-    // follows (a failure, the connection) stays in view.
-    val windowHeight = with(androidx.compose.ui.platform.LocalDensity.current) {
-        androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toDp()
-    }
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val cap = if (windowHeight > 0.dp) minOf(480.dp, windowHeight * 0.52f) else 480.dp
-        io.openflux.app.cosmic.CosmicSwitch(
-            look,
-            label = label,
-            onClick = onClick,
-            modifier = Modifier.fillMaxWidth().height(minOf(maxWidth / 1.12f, cap)),
-            traffic = (kotlin.math.log10(busy + 1.0) / 7.0).toFloat(),
-            shortcut = shortcut,
-        )
     }
 }
 

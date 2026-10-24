@@ -366,14 +366,6 @@ private fun LookPage() {
     io.openflux.app.components.Group("Тема") {
         Segmented(ThemeMode.entries, settings.theme, { t -> container.settings.update { it.copy(theme = t) } }, label = { it.label })
     }
-    io.openflux.app.components.Group("Кнопка подключения") {
-        Segmented(listOf(false, true), settings.moonAndSun, { v -> container.settings.update { it.copy(moonAndSun = v) } }, label = { if (it) "Луна и Солнце" else "Логотип" })
-        Text(
-            if (settings.moonAndSun) "Сцена с устройствами и сетью: красиво, но видеокарта работает всё время, пока открыта Главная"
-            else "Знак OpenFlux: двигается только при смене состояния, видеокарту почти не нагружает",
-            style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
-        )
-    }
     if (container.platform.kind == PlatformKind.Desktop) {
         Section(null) {
             Toggle("Сворачивать в трей при закрытии", settings.closeToTray, { v -> container.settings.update { it.copy(closeToTray = v) } })
