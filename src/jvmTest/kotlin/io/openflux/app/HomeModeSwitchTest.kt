@@ -34,4 +34,16 @@ class HomeModeSwitchTest {
         onNodeWithText("Клиент").performClick()
         onNodeWithContentDescription("Подключить").assertIsDisplayed()
     }
+
+    /** «Что раздавать» is the client's connection row: pressing it opens the list, a choice there is the one served. */
+    @Test
+    fun whatToServeIsChosenFromItsRow() = runComposeUiTest {
+        val c = homeWorld()
+        c.settings.update { it.copy(simpleSwitch = true) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
+        onNodeWithText("Выходная нода").performClick()
+        onNodeWithText("Амстердам").performScrollTo().performClick()
+        onNodeWithText("Франкфурт").performClick()
+        kotlin.test.assertEquals("b", c.settings.settings.value.selectedProfileId)
+    }
 }

@@ -38,6 +38,28 @@ class HomeShotsTest {
     @Test fun failed() = shot("home-failed") { it.state.value = ConnectionState.Failed(io.openflux.desktop.model.Profile(id = "a", name = "Амстердам"), "Нода не ответила за 20 секунд") }
     @Test fun busy() = shot("home-busy") { it.state.value = ConnectionState.Connecting(io.openflux.desktop.model.Profile(id = "a", name = "Амстердам"), ConnectionMode.Client, 0) }
 
+    private val nodeProfile = io.openflux.desktop.model.Profile(id = "a", name = "Амстердам")
+
+    /** The exit node runs: the same switch and stats as the client, its link under them. */
+    @Test fun exitOn() {
+        val conn = ScriptedConnection()
+        val c = homeWorld(conn)
+        c.settings.update { it.copy(mode = ConnectionMode.Exit, selectedProfileId = "a") }
+        conn.state.value = ConnectionState.Connected(nodeProfile, ConnectionMode.Exit, 0)
+        (conn.exitShareLink as kotlinx.coroutines.flow.MutableStateFlow).value = "openflux://node#" + "x".repeat(60)
+        Shots.render("home-exit-on") { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
+    }
+
+    /** The exit node stopped: «Это устройство» lays it out as the client's Home. */
+    @Test fun exitOff() {
+        val c = homeWorld()
+        Shots.render("home-exit") {
+            CompositionLocalProvider(LocalAppContainer provides c, io.openflux.app.shell.LocalNavigator provides io.openflux.app.nav.AppNavigator()) {
+                io.openflux.app.servers.ThisDeviceScreen()
+            }
+        }
+    }
+
     @Test fun drawer() {
         val c = homeWorld()
         Shots.render("home-list") {

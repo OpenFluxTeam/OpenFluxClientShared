@@ -207,9 +207,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     val settings by container.settings.settings.collectAsState()
-    // Without animations nothing ticks: the speed is read once per state, the time since connecting is a time of day.
     val animate = io.openflux.app.theme.LocalAnimations.current
-    val traffic by liveTraffic(animate, state)
     val status by container.accounts.status.collectAsState()
     val subscription by container.subscription.state.collectAsState()
     val platform = container.platform
@@ -223,37 +221,12 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         { Segmented(listOf(false, true), showExit, { exitTab = it }, label = { if (it) "Выходная нода" else "Клиент" }) }
     } else null
     if (showExit) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.m)) { ExitNodeBody(underButton = modeSwitch) }
+        ExitNodeBody(underButton = modeSwitch)
         return
     }
 
     val label = if (state.isActive) "Отключить" else "Подключить"
-    // Settings → Look can ask for the plain ring: the universe below is the heavy one for the graphics card.
-    if (settings.simpleSwitch) {
-        ConnectButton(state.look(), label, onClick = m::toggle, shortcut = "Ctrl+Enter")
-    } else {
-        CosmicHome(state, label, m::toggle, (traffic.downBytesPerSec + traffic.upBytesPerSec).toDouble())
-    }
-    modeSwitch?.invoke()
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-        AnimatedContent(
-            state.title(),
-            transitionSpec = { (fadeIn(tween(220, 90)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(90)) },
-        ) { Text(it, style = AppTheme.type.title, color = AppTheme.colors.text, textAlign = TextAlign.Center) }
-        val connected = state as? ConnectionState.Connected
-        AnimatedVisibility(connected != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-            val since = connected?.since ?: now
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-                if (animate) {
-                    StatPill(Icons.Rounded.Schedule, Fmt.duration(now - since))
-                    StatPill(Icons.Rounded.ArrowDownward, Fmt.speed(traffic.downBytesPerSec))
-                    StatPill(Icons.Rounded.ArrowUpward, Fmt.speed(traffic.upBytesPerSec))
-                } else {
-                    StatPill(Icons.Rounded.Schedule, "с " + Fmt.clock(since, platform.utcOffsetSeconds))
-                }
-            }
-        }
-    }
+    SwitchBlock(state.look(), label, m::toggle, state.title(), state as? ConnectionState.Connected, state, under = modeSwitch)
     if (chosen != null) {
         Section("Подключение") {
             RowItem(
@@ -304,9 +277,62 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     if (chosen != null && !exitMode) Details(m, chosen, state)
 }
 
+/**
+ * The switch and what it says under it, one for the client and the exit node: the universe (or the plain ring),
+ * [under] right below it (Home's Клиент / Выходная нода), [title] in a few words and, while [connected], the time
+ * and the speed. [speeds] off leaves the speed out unless the core reports it (an exit node's traffic).
+ */
+@Composable
+fun SwitchBlock(
+    look: ConnectLook,
+    label: String,
+    onClick: () -> Unit,
+    title: String,
+    connected: ConnectionState.Connected?,
+    state: ConnectionState,
+    shortcut: String? = "Ctrl+Enter",
+    speeds: Boolean = true,
+    under: (@Composable () -> Unit)? = null,
+) {
+    val container = LocalAppContainer.current
+    val settings by container.settings.settings.collectAsState()
+    val platform = container.platform
+    // Without animations nothing ticks: the speed is read once per state, the time since connecting is a time of day.
+    val animate = io.openflux.app.theme.LocalAnimations.current
+    val traffic by liveTraffic(animate, state)
+    val now by produceState(platform.now(), animate) { while (animate) { delay(1_000); value = platform.now() } }
+    // Settings → Look can ask for the plain ring: the universe below is the heavy one for the graphics card.
+    if (settings.simpleSwitch) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { ConnectButton(look, label, onClick = onClick, shortcut = shortcut) }
+    } else {
+        CosmicHome(look, label, onClick, (traffic.downBytesPerSec + traffic.upBytesPerSec).toDouble(), shortcut)
+    }
+    under?.invoke()
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
+        AnimatedContent(
+            title,
+            transitionSpec = { (fadeIn(tween(220, 90)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(90)) },
+        ) { Text(it, style = AppTheme.type.title, color = AppTheme.colors.text, textAlign = TextAlign.Center) }
+        AnimatedVisibility(connected != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+            val since = connected?.since ?: now
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
+                if (animate) {
+                    StatPill(Icons.Rounded.Schedule, Fmt.duration(now - since))
+                    if (speeds || traffic.live) {
+                        StatPill(Icons.Rounded.ArrowDownward, Fmt.speed(traffic.downBytesPerSec))
+                        StatPill(Icons.Rounded.ArrowUpward, Fmt.speed(traffic.upBytesPerSec))
+                    }
+                } else {
+                    StatPill(Icons.Rounded.Schedule, "с " + Fmt.clock(since, platform.utcOffsetSeconds))
+                }
+            }
+        }
+    }
+}
+
 /** The switch is a small universe: the Moon while off, the Sun with its network of devices while connected. [busy] is bytes a second. */
 @Composable
-private fun CosmicHome(state: ConnectionState, label: String, onClick: () -> Unit, busy: Double) {
+private fun CosmicHome(look: ConnectLook, label: String, onClick: () -> Unit, busy: Double, shortcut: String?) {
     // Its height is set, not left to an aspect ratio: in a wide window that would ask for more than the cap and
     // the scene would spill over what is above and below it. A short window keeps it to half its height, so what
     // follows (a failure, the connection) stays in view.
@@ -316,12 +342,12 @@ private fun CosmicHome(state: ConnectionState, label: String, onClick: () -> Uni
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val cap = if (windowHeight > 0.dp) minOf(480.dp, windowHeight * 0.52f) else 480.dp
         CosmicSwitch(
-            state.look(),
+            look,
             label = label,
             onClick = onClick,
             modifier = Modifier.fillMaxWidth().height(minOf(maxWidth / 1.12f, cap)),
             traffic = (kotlin.math.log10(busy + 1.0) / 7.0).toFloat(),
-            shortcut = "Ctrl+Enter",
+            shortcut = shortcut,
         )
     }
 }
