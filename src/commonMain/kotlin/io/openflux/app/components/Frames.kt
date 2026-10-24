@@ -7,8 +7,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalWindowInfo
 import kotlinx.coroutines.delay
 
-/** How often the app's endless animations (Home's switch, the node's button) move: plenty for them, a fraction of a fast screen. */
-const val ANIMATION_FPS = 30
+/**
+ * How often the app's endless animations (Home's switch, the node's button) move: film's rate, smooth for their slow
+ * turns and a fifth less work for the graphics card than 30.
+ */
+const val ANIMATION_FPS = 24
 
 /** The same while the window is behind others or minimised. */
 const val BACKGROUND_FPS = 10

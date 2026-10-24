@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -95,35 +95,60 @@ class CosmicRenderer(shaders: Boolean) {
 
     // ---- The orbits, faint, with light running along them ----
 
+    private val ringPoints = Points(121)
+    private val ringBehind = BooleanArray(121)
+    private val strips = Strips()
+    private val wavePoints = Points(25)
+    private val linePoints = Points(27)
+
     private fun DrawScope.orbits(u: Universe, cam: Camera, bodyDepth: Float, behind: Boolean) {
         val show = u.devices.sumOf { it.order.value.toDouble() }.toFloat() / u.devices.size
         if (show < 0.02f) return
         val n = 120
+        val dp = density
+        val dash = 2f * dp
+        val period = 9f * dp
+        // The dashes run forward 14 dp a second; walked along the ring by hand, all drawn as one batch of lines.
+        val phase = ((u.time * 14f * dp) % period + period) % period
+        // Soft-edged, so a little brighter in the middle than the 1 dp line it replaces.
+        val dashColor = Color(0.45f, 0.78f, 1f, 0.3f * show)
         for (ring in u.rings) {
-            val path = Path()
-            var open = false
             for (k in 0..n) {
                 val a = k.toFloat() / n * 2 * PI.toFloat()
                 tmp.set(cos(a) * ring.radius, 0f, sin(a) * ring.radius)
                 ring.tilt.apply(tmp, tmp2)
-                val isBehind = cam.depth(tmp2) > bodyDepth
-                val p = cam.project(tmp2)
-                if (isBehind == behind) {
-                    if (open) path.lineTo(p.x, p.y) else path.moveTo(p.x, p.y)
-                    open = true
-                } else open = false
+                ringBehind[k] = cam.depth(tmp2) > bodyDepth
+                ringPoints[k] = cam.project(tmp2)
             }
-            val color = Color(0.45f, 0.78f, 1f, 0.22f * show)
-            val dp = density
-            drawPath(path, color, style = Stroke(1f * dp, pathEffect = PathEffect.dashPathEffect(floatArrayOf(2f * dp, 7f * dp), -u.time * 14f * dp)))
+            var along = -phase
+            for (k in 0 until n) {
+                val a = ringPoints[k]
+                val b = ringPoints[k + 1]
+                val len = sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y))
+                if (ringBehind[k] == behind && ringBehind[k + 1] == behind && len > 0f) {
+                    // Dash starts inside this segment: from the first period mark at or after `along`.
+                    var start = ceilTo(along, period)
+                    while (start < along + len) {
+                        val s0 = ((start - along) / len).coerceIn(0f, 1f)
+                        val s1 = ((start + dash - along) / len).coerceIn(0f, 1f)
+                        strips.dash(Offset(a.x + (b.x - a.x) * s0, a.y + (b.y - a.y) * s0), Offset(a.x + (b.x - a.x) * s1, a.y + (b.y - a.y) * s1), 1.2f * dp, dashColor)
+                        start += period
+                    }
+                }
+                along += len
+            }
         }
+        strips.flush(this)
     }
+
+    private fun ceilTo(x: Float, step: Float): Float = kotlin.math.ceil(x / step) * step
 
     // ---- The body ----
 
     private fun DrawScope.coronaLayer(u: Universe, center: Offset, radius: Float, h: Float, hover: Float) {
-        // The Moon's halo is gone by 2.6 radii, the Sun's corona by 3.6: the shader runs on that disc only.
-        val span = radius * (if (h > 0.01f || u.red.value > 0f) 3.6f else 2.6f)
+        // The Moon's halo is gone by 2.6 radii, the Sun's corona by 3: the shader runs on that disc only (past 3 it
+        // was a percent of light over two fifths of the disc's area, worked out every frame).
+        val span = radius * (if (h > 0.01f || u.red.value > 0f) 3f else 2.6f)
         val shader = corona
         if (shader != null) {
             shader.uniform("uCenter", center.x, center.y)
@@ -212,10 +237,20 @@ class CosmicRenderer(shaders: Boolean) {
 
     // ---- Links and traffic ----
 
-    private val curve = Array(25) { Offset.Zero }
+    private val curve = Points(25)
+    /** Comet tails, by link colour (gold, blue) and place in the tail: drawn as one batch of round points each. */
+    private val tailPoints = Array(2) { Array(9) { ArrayList<Offset>(64) } }
+    private val glowPoints = Array(3) { ArrayList<Offset>(32) }
+    private val corePoints = ArrayList<Offset>(96)
+    private val glowColors = arrayOf(lerp(GOLD, Color.White, 0.55f), lerp(BLUE, Color.White, 0.55f), Color(0.85f, 0.96f, 1f))
+    /** A glow of radius 1 at the origin per colour, made once: each comet is drawn with it moved and scaled. */
+    private val glowBrushes = glowColors.map { c -> Brush.radialGradient(listOf(c.copy(alpha = 0.55f), c.copy(alpha = 0.12f), Color.Transparent), Offset.Zero, 1f) }
 
     private fun DrawScope.links(u: Universe, cam: Camera, dp: Float) {
         val t = u.time
+        for (side in tailPoints) for (list in side) list.clear()
+        for (list in glowPoints) list.clear()
+        corePoints.clear()
         for (l in u.links) {
             if (t < l.born) continue
             val drawn = easeOut(((t - l.born) / l.drawTime).coerceIn(0f, 1f))
@@ -243,11 +278,12 @@ class CosmicRenderer(shaders: Boolean) {
                 tmp.set(w * w * a.x + 2 * w * s * cx + s * s * b.x, w * w * a.y + 2 * w * s * cy + s * s * b.y, w * w * a.z + 2 * w * s * cz + s * s * b.z)
                 curve[j] = cam.project(tmp)
             }
-            val base = if (l.gold) Color(1f, 0.72f, 0.32f) else Color(0.25f, 0.78f, 1f)
-            val path = polyline(gone, drawn)
-            drawPath(path, base.copy(alpha = 0.09f), style = Stroke(6f * dp, cap = StrokeCap.Round))
-            drawPath(path, base.copy(alpha = 0.6f), style = Stroke(1.4f * dp, cap = StrokeCap.Round))
-            if (drawn < 1f) glowDot(at(drawn), Color(0.85f, 0.96f, 1f), 6f * dp, 1f)
+            val base = if (l.gold) GOLD else BLUE
+            val side = if (l.gold) 0 else 1
+            val count = polyline(gone, drawn)
+            strips.line(linePoints, count, 4f * dp, base.copy(alpha = 0.12f))
+            strips.line(linePoints, count, 1.4f * dp, base.copy(alpha = 0.7f))
+            if (drawn < 1f) { val p = at(drawn); glowPoints[2] += p; corePoints += p }
             if (drawn >= 1f && gone == 0f) {
                 for (k in 0 until l.count) {
                     val ph = u.pulsePhase(l, k)
@@ -255,26 +291,44 @@ class CosmicRenderer(shaders: Boolean) {
                     for (j in 9 downTo 1) {
                         val s = head - l.dir * j * 0.011f
                         if (s < 0f || s > 1f) continue
-                        val f = 1f - j / 10f
-                        drawCircle(lerp(base, Color.White, 0.3f).copy(alpha = f.pow(1.5f) * 0.75f), (0.6f + 1.6f * f) * dp, at(s))
+                        tailPoints[side][j - 1] += at(s)
                     }
-                    glowDot(at(head), lerp(base, Color.White, 0.55f), 7f * dp, 1f)
+                    val p = at(head)
+                    glowPoints[side] += p
+                    corePoints += p
                 }
             }
         }
+        strips.flush(this)
+        // The comets, after the lines: a few batches instead of a draw (and a new gradient) for every dot.
+        for (side in 0..1) {
+            val tail = lerp(if (side == 0) GOLD else BLUE, Color.White, 0.3f)
+            for (j in 9 downTo 1) {
+                val list = tailPoints[side][j - 1]
+                if (list.isEmpty()) continue
+                val f = 1f - j / 10f
+                drawPoints(list, PointMode.Points, tail.copy(alpha = f.pow(1.5f) * 0.75f), strokeWidth = 2f * (0.6f + 1.6f * f) * dp, cap = StrokeCap.Round)
+            }
+        }
+        for (c in 0..2) {
+            val r = (if (c == 2) 6f else 7f) * dp * 2.2f
+            for (p in glowPoints[c]) {
+                withTransform({ translate(p.x, p.y); scale(r, r, Offset.Zero) }) { drawCircle(glowBrushes[c], 1f, Offset.Zero) }
+            }
+        }
+        if (corePoints.isNotEmpty()) drawPoints(corePoints, PointMode.Points, Color.White.copy(alpha = 0.95f), strokeWidth = 7f * dp * 0.56f, cap = StrokeCap.Round)
     }
 
-    private fun polyline(from: Float, to: Float): Path {
-        val path = Path()
+    /** The drawn part of the link, [from]..[to] of it, into [linePoints]; how many points it took. */
+    private fun polyline(from: Float, to: Float): Int {
         val n = curve.size - 1
-        val start = at(from)
-        path.moveTo(start.x, start.y)
+        var k = 0
+        linePoints[k++] = at(from)
         val i0 = (from * n).toInt() + 1
         val i1 = (to * n).toInt()
-        for (i in i0..min(i1, n)) path.lineTo(curve[i].x, curve[i].y)
-        val end = at(to)
-        path.lineTo(end.x, end.y)
-        return path
+        for (i in i0..min(i1, n)) linePoints[k++] = curve[i]
+        linePoints[k++] = at(to)
+        return k
     }
 
     private fun at(s: Float): Offset {
@@ -285,11 +339,6 @@ class CosmicRenderer(shaders: Boolean) {
         val a = curve[i]
         val b = curve[i + 1]
         return Offset(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f)
-    }
-
-    private fun DrawScope.glowDot(p: Offset, color: Color, r: Float, a: Float) {
-        drawCircle(Brush.radialGradient(listOf(color.copy(alpha = 0.55f * a), color.copy(alpha = 0.12f * a), Color.Transparent), p, r * 2.2f), r * 2.2f, p)
-        drawCircle(Color.White.copy(alpha = 0.95f * a), r * 0.28f, p)
     }
 
     // ---- Devices ----
@@ -357,26 +406,168 @@ class CosmicRenderer(shaders: Boolean) {
         val w = 100f * panel.aspect
         val hh = 100f
         val r = panel.round * min(w, hh)
-        withTransform({
-            transform(matrix)
-            scale(1f / w, 1f / hh, Offset.Zero)
-        }) {
-            drawRoundRect(color, Offset.Zero, Size(w, hh), CornerRadius(r))
-            // A metal sheen across the face.
-            drawRoundRect(
-                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.0f), Color.White.copy(alpha = 0.07f + 0.05f * h), Color.White.copy(alpha = 0f)), Offset(0f, 0f), Offset(w, hh)),
-                Offset.Zero, Size(w, hh), CornerRadius(r),
-            )
-            when (panel.face) {
-                Face.Screen -> {
-                    val m = 0.035f * min(w, hh)
-                    screen(d, u, Offset(m, m), Size(w - 2 * m, hh - 2 * m), (r - m).coerceAtLeast(1f), h)
+        // The face as the polygon it projects to, filled straight: no perspective matrix, so no mask.
+        val face = outline(0f, 0f, w, hh, r, w, hh)
+        drawPath(face, color)
+        // A metal sheen across the face.
+        drawPath(face, Brush.linearGradient(listOf(Color.White.copy(alpha = 0.0f), Color.White.copy(alpha = 0.07f + 0.05f * h), Color.White.copy(alpha = 0f)), map(0f, 0f, w, hh), map(w, hh, w, hh)))
+        when (panel.face) {
+            Face.Screen -> {
+                val m = 0.035f * min(w, hh)
+                val p = d.power.value
+                if (p > 0.001f && p < 0.999f) {
+                    // Waking or going to sleep: the picture opens inside a clip, drawn in the screen's own frame.
+                    val kept = brushes(panel)
+                    withTransform({
+                        transform(matrix)
+                        scale(1f / w, 1f / hh, Offset.Zero)
+                    }) { screen(d, u, Offset(m, m), Size(w - 2 * m, hh - 2 * m), (r - m).coerceAtLeast(1f), h, kept) }
+                } else {
+                    flatScreen(d, u, m, w, hh, (r - m).coerceAtLeast(1f), h, awake = p >= 0.999f)
                 }
-                Face.Keys -> keys(w, hh)
-                else -> Unit
             }
+            Face.Keys -> {
+                val keys = keyRects(panel, w, hh)
+                var i = 0
+                while (i < keys.size) {
+                    val x0 = keys[i]; val y0 = keys[i + 1]; val x1 = keys[i + 2]; val y1 = keys[i + 3]
+                    strips.quad(map(x0, y0, w, hh), map(x1, y0, w, hh), map(x1, y1, w, hh), map(x0, y1, w, hh), KEY)
+                    i += 4
+                }
+                strips.flush(this)
+            }
+            else -> Unit
         }
     }
+
+    /** The point (x, y) of a [w]×[h] panel drawing on the canvas, through the projective map [place] set. */
+    private fun map(x: Float, y: Float, w: Float, h: Float): Offset {
+        val v = matrix.values
+        val s = x / w
+        val t = y / h
+        val z = v[3] * s + v[7] * t + v[15]
+        return Offset((v[0] * s + v[4] * t + v[12]) / z, (v[1] * s + v[5] * t + v[13]) / z)
+    }
+
+    private val shape = Path()
+
+    /**
+     * A rounded rectangle of a panel's [w]×[h] drawing as the convex polygon it projects to. The GPU fills a convex
+     * polygon directly; a rounded rectangle under a perspective matrix it draws through a mask, every frame.
+     */
+    private fun outline(x: Float, y: Float, rw: Float, rh: Float, r: Float, w: Float, h: Float): Path {
+        val path = shape
+        path.reset()
+        val rr = r.coerceIn(0f, min(rw, rh) / 2)
+        val steps = if (rr > 0f) 3 else 0
+        var first = true
+        for (c in 0..3) {
+            val cx = if (c == 0 || c == 3) x + rr else x + rw - rr
+            val cy = if (c < 2) y + rr else y + rh - rr
+            for (k in 0..steps) {
+                val a = PI.toFloat() * (1f + c * 0.5f) + (if (steps == 0) 0f else k * PI.toFloat() / 2 / steps)
+                val p = map(cx + rr * cos(a), cy + rr * sin(a), w, h)
+                if (first) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
+                first = false
+            }
+        }
+        path.close()
+        return path
+    }
+
+    /** A circle of a panel's drawing as the polygon it projects to. */
+    private fun disc(cx: Float, cy: Float, radius: Float, w: Float, h: Float): Path {
+        val path = shape
+        path.reset()
+        for (k in 0 until 16) {
+            val a = k * 2 * PI.toFloat() / 16
+            val p = map(cx + radius * cos(a), cy + radius * sin(a), w, h)
+            if (k == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
+        }
+        path.close()
+        return path
+    }
+
+    private val markPoints = Points(17)
+    private val arcPoints = Points(9)
+
+    /** A screen fully asleep or fully awake, drawn flat on the canvas: the glass, and when [awake] the picture. */
+    private fun DrawScope.flatScreen(d: Device, u: Universe, m: Float, w: Float, hh: Float, r: Float, h: Float, awake: Boolean) {
+        val sw = w - 2 * m
+        val sh = hh - 2 * m
+        val glass = outline(m, m, sw, sh, r, w, hh)
+        // Glass that is off: black, with a sheen of whatever light falls on it.
+        drawPath(glass, Color(0xFF030408))
+        drawPath(glass, Brush.linearGradient(
+            0.35f to Color.Transparent, 0.5f to lerp(Color(0.5f, 0.6f, 0.8f), Color(1f, 0.75f, 0.45f), h).copy(alpha = 0.06f + 0.08f * h), 0.62f to Color.Transparent,
+            start = map(m, m, w, hh), end = map(m + sw, m + sh, w, hh),
+        ))
+        if (!awake) return
+        // What a woken screen shows (as [ui]): the OpenFlux mark with a turning arc, rows of light, a line of traffic.
+        val t = u.time
+        val tint = d.tint
+        val ox = m
+        val oy = m
+        val wide = sw > sh * 1.2f
+        drawPath(glass, Brush.linearGradient(listOf(Color(0.01f, 0.07f, 0.15f), Color(0.0f, 0.02f, 0.06f)), map(ox, oy, w, hh), map(ox, oy + sh, w, hh)))
+        // Pixels of the canvas to one unit of the drawing, for the lines' widths.
+        val a0 = map(ox, oy, w, hh)
+        val a1 = map(ox + sw, oy, w, hh)
+        val k = sqrt((a1.x - a0.x) * (a1.x - a0.x) + (a1.y - a0.y) * (a1.y - a0.y)) / sw
+        val unit = sh
+        val lx = if (wide) ox + unit * 0.22f else ox + sw / 2
+        val ly = if (wide) oy + unit * 0.28f else oy + unit * 0.24f
+        val lr = unit * 0.075f
+        drawPath(disc(lx, ly, lr * 2.2f, w, hh), tint.copy(alpha = 0.18f))
+        for (j in 0..16) {
+            val a = j * 2 * PI.toFloat() / 16
+            markPoints[j] = map(lx + lr * cos(a), ly + lr * sin(a), w, hh)
+        }
+        strips.line(markPoints, 17, unit * 0.007f * k, tint.copy(alpha = 0.85f))
+        val start = ((t * 140f + d.seed * 60f) % 360f) * PI.toFloat() / 180f
+        for (j in 0..8) {
+            val a = start + j * (70f * PI.toFloat() / 180f) / 8
+            arcPoints[j] = map(lx + lr * cos(a), ly + lr * sin(a), w, hh)
+        }
+        strips.line(arcPoints, 9, unit * 0.01f * k, Color.White.copy(alpha = 0.9f))
+        val x0 = if (wide) ox + unit * 0.44f else ox + sw * 0.1f
+        val room = if (wide) sw - unit * 0.56f else sw * 0.8f
+        for (i in 0 until 4) {
+            val y = if (wide) oy + unit * (0.2f + i * 0.13f) else oy + unit * (0.44f + i * 0.1f)
+            val hsh = (sin(d.seed * 12.9898f + i * 78.233f) * 43758.547f).let { it - kotlin.math.floor(it) }
+            val rw = room * (0.35f + 0.6f * hsh)
+            val shimmer = 0.5f + 0.5f * sin(t * 1.7f + i * 1.3f + d.seed * 9f)
+            drawPath(outline(x0, y, rw, unit * 0.045f, unit * 0.022f, w, hh), lerp(tint, Color.White, 0.25f).copy(alpha = 0.18f + 0.22f * shimmer))
+        }
+        val wy = oy + unit * 0.84f
+        val left = ox + sw * 0.08f
+        val right = ox + sw * 0.92f
+        for (j in 0..24) {
+            val x = left + (right - left) * j / 24f
+            val cx = (x - ox) / unit
+            val y = wy + unit * 0.045f * sin(cx * 15f - t * 3.2f + d.seed * 5f) * sin(cx * 3.3f + t * 0.8f)
+            wavePoints[j] = map(x, y, w, hh)
+        }
+        strips.line(wavePoints, 25, unit * 0.03f * k, tint.copy(alpha = 0.25f))
+        strips.line(wavePoints, 25, unit * 0.012f * k, tint)
+        strips.flush(this)
+        drawPath(disc(lx, ly, unit * 0.018f, w, hh), Color.White)
+        if (d.flash > 0f) drawPath(outline(m, m, sw, sh, r, w, hh), d.tint.copy(alpha = d.flash * 0.3f))
+    }
+
+    /** What a panel keeps between frames: a waking screen's gradients, a deck's keys. */
+    private class PanelBrushes {
+        var glass: Brush? = null
+        var screen: Brush? = null
+        var screenAlpha = -1f
+        var keys: FloatArray? = null
+    }
+
+    private val panelBrushes = HashMap<Panel, PanelBrushes>()
+
+    private fun brushes(panel: Panel): PanelBrushes = panelBrushes.getOrPut(panel) { PanelBrushes() }
+
+    private fun keyRects(panel: Panel, w: Float, hh: Float): FloatArray = brushes(panel).let { b -> b.keys ?: keyboard(w, hh).also { b.keys = it } }
 
     private fun DrawScope.halo(d: Device, panel: Panel, cam: Camera) {
         // Drawn in the screen plane but outside it: what the glow of the screen puts on the space round it.
@@ -385,27 +576,20 @@ class CosmicRenderer(shaders: Boolean) {
         val p = d.power.value
         place(d, panel, cam)
         val a = p * p * (0.6f + 0.5f * d.flash)
-        withTransform({
-            transform(matrix)
-            scale(1f / worldW, 1f / worldH, Offset.Zero)
-        }) {
-            for ((grow, alpha) in listOf(16f to 0.05f, 9f to 0.08f, 4f to 0.12f)) {
-                drawRoundRect(d.tint.copy(alpha = alpha * a), Offset(-grow, -grow), Size(worldW + 2 * grow, worldH + 2 * grow), CornerRadius(grow + 6f))
-            }
+        for ((grow, alpha) in listOf(16f to 0.05f, 9f to 0.08f, 4f to 0.12f)) {
+            drawPath(outline(-grow, -grow, worldW + 2 * grow, worldH + 2 * grow, grow + 6f, worldW, worldH), d.tint.copy(alpha = alpha * a))
         }
     }
 
-    private fun DrawScope.screen(d: Device, u: Universe, topLeft: Offset, s: Size, r: Float, h: Float) {
+    private fun DrawScope.screen(d: Device, u: Universe, topLeft: Offset, s: Size, r: Float, h: Float, kept: PanelBrushes) {
         val corner = CornerRadius(r)
         // Glass that is off: black, with a sheen of whatever light falls on it.
         drawRoundRect(Color(0xFF030408), topLeft, s, corner)
-        drawRoundRect(
-            Brush.linearGradient(
-                0.35f to Color.Transparent, 0.5f to lerp(Color(0.5f, 0.6f, 0.8f), Color(1f, 0.75f, 0.45f), h).copy(alpha = 0.06f + 0.08f * h), 0.62f to Color.Transparent,
-                start = topLeft, end = Offset(topLeft.x + s.width, topLeft.y + s.height),
-            ),
-            topLeft, s, corner,
-        )
+        val glass = kept.glass ?: Brush.linearGradient(
+            0.35f to Color.Transparent, 0.5f to lerp(Color(0.5f, 0.6f, 0.8f), Color(1f, 0.75f, 0.45f), h).copy(alpha = 0.06f + 0.08f * h), 0.62f to Color.Transparent,
+            start = topLeft, end = Offset(topLeft.x + s.width, topLeft.y + s.height),
+        ).also { kept.glass = it }
+        drawRoundRect(glass, topLeft, s, corner)
         val p = d.power.value
         if (p <= 0.001f) return
         // Waking up as an old tube does: a line, the picture opening from it, a flash settling; asleep, the reverse.
@@ -415,18 +599,21 @@ class CosmicRenderer(shaders: Boolean) {
         val halfH = s.height * (0.006f + (0.5f - 0.006f) * smooth(0.25f, 0.65f, p))
         val settle = smooth(0.55f, 1f, p)
         clipRect(cx - halfW, cy - halfH, cx + halfW, cy + halfH) {
-            if (settle > 0f) ui(d, u, topLeft, s, corner, settle)
+            if (settle > 0f) ui(d, u, topLeft, s, corner, settle, kept)
             if (settle < 1f) drawRect(lerp(d.tint, Color(0.85f, 0.96f, 1f), 0.5f).copy(alpha = (1f - settle) * 0.85f), topLeft, s)
         }
         if (d.flash > 0f) drawRoundRect(d.tint.copy(alpha = d.flash * 0.3f * settle), topLeft, s, corner)
     }
 
     /** What a woken screen shows: the OpenFlux mark with a turning arc, a few rows of light, a line of traffic. */
-    private fun DrawScope.ui(d: Device, u: Universe, o: Offset, s: Size, corner: CornerRadius, a: Float) {
+    private fun DrawScope.ui(d: Device, u: Universe, o: Offset, s: Size, corner: CornerRadius, a: Float, kept: PanelBrushes) {
         val t = u.time
         val tint = d.tint
         val wide = s.width > s.height * 1.2f
-        drawRoundRect(Brush.verticalGradient(listOf(Color(0.01f, 0.07f, 0.15f, a), Color(0.0f, 0.02f, 0.06f, a)), o.y, o.y + s.height), o, s, corner)
+        // Its backdrop is made again only while the picture opens (its alpha moves), not every frame after.
+        val backdrop = kept.screen?.takeIf { abs(kept.screenAlpha - a) < 0.02f }
+            ?: Brush.verticalGradient(listOf(Color(0.01f, 0.07f, 0.15f, a), Color(0.0f, 0.02f, 0.06f, a)), o.y, o.y + s.height).also { kept.screen = it; kept.screenAlpha = a }
+        drawRoundRect(backdrop, o, s, corner)
         val unit = s.height
         val logo = if (wide) Offset(o.x + unit * 0.22f, o.y + unit * 0.28f) else Offset(o.x + s.width / 2, o.y + unit * 0.24f)
         val lr = unit * 0.075f
@@ -443,7 +630,6 @@ class CosmicRenderer(shaders: Boolean) {
             val shimmer = 0.5f + 0.5f * sin(t * 1.7f + i * 1.3f + d.seed * 9f)
             drawRoundRect(lerp(tint, Color.White, 0.25f).copy(alpha = (0.18f + 0.22f * shimmer) * a), Offset(x0, y), Size(w, unit * 0.045f), CornerRadius(unit * 0.022f))
         }
-        val wave = Path()
         val wy = o.y + unit * 0.84f
         val left = o.x + s.width * 0.08f
         val right = o.x + s.width * 0.92f
@@ -451,25 +637,36 @@ class CosmicRenderer(shaders: Boolean) {
             val x = left + (right - left) * k / 24f
             val cx = (x - o.x) / unit
             val y = wy + unit * 0.045f * sin(cx * 15f - t * 3.2f + d.seed * 5f) * sin(cx * 3.3f + t * 0.8f)
-            if (k == 0) wave.moveTo(x, y) else wave.lineTo(x, y)
+            wavePoints[k] = Offset(x, y)
         }
-        drawPath(wave, tint.copy(alpha = 0.95f * a), style = Stroke(unit * 0.014f, cap = StrokeCap.Round))
-        drawPath(wave, tint.copy(alpha = 0.2f * a), style = Stroke(unit * 0.05f, cap = StrokeCap.Round))
+        strips.line(wavePoints, 25, unit * 0.03f, tint.copy(alpha = 0.25f * a))
+        strips.line(wavePoints, 25, unit * 0.012f, tint.copy(alpha = a))
+        strips.flush(this)
     }
 
-    private fun DrawScope.keys(w: Float, h: Float) {
-        val key = Color(0xFF14171D)
-        val left = w * 0.06f
-        val top = h * 0.08f
-        val rows = intArrayOf(14, 14, 13, 12, 11)
-        val rowH = h * 0.085f
-        for ((ri, n) in rows.withIndex()) {
-            val gap = w * 0.008f
-            val kw = (w * 0.88f - gap * (n - 1)) / n
-            for (k in 0 until n) {
-                drawRoundRect(key, Offset(left + k * (kw + gap), top + ri * (rowH + gap)), Size(kw, rowH), CornerRadius(rowH * 0.2f))
-            }
+}
+
+private val GOLD = Color(1f, 0.72f, 0.32f)
+private val BLUE = Color(0.25f, 0.78f, 1f)
+private val KEY = Color(0xFF14171D)
+
+/** A laptop's keys and touchpad on its [w]×[h] deck, as rectangles (x0, y0, x1, y1 each): made once per panel. */
+private fun keyboard(w: Float, h: Float): FloatArray {
+    val out = ArrayList<Float>()
+    val left = w * 0.06f
+    val top = h * 0.08f
+    val rows = intArrayOf(14, 14, 13, 12, 11)
+    val rowH = h * 0.085f
+    for ((ri, n) in rows.withIndex()) {
+        val gap = w * 0.008f
+        val kw = (w * 0.88f - gap * (n - 1)) / n
+        for (k in 0 until n) {
+            val x = left + k * (kw + gap)
+            val y = top + ri * (rowH + gap)
+            out += x; out += y; out += x + kw; out += y + rowH
         }
-        drawRoundRect(Color(0xFF111318), Offset(w * 0.34f, h * 0.62f), Size(w * 0.32f, h * 0.3f), CornerRadius(h * 0.04f))
     }
+    // The touchpad, in the keys' colour: close enough at this size.
+    out += w * 0.34f; out += h * 0.62f; out += w * 0.66f; out += h * 0.92f
+    return out.toFloatArray()
 }

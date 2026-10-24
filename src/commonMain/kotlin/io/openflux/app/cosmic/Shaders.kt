@@ -52,11 +52,9 @@ float snoise(float3 v) {
   return 42.0 * dot(m * m, float4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
 }
 
-float fbm3(float3 p) {
-  float a = 0.5;
-  float s = 0.0;
-  for (int i = 0; i < 3; i++) { s += a * snoise(p); p *= 2.03; a *= 0.5; }
-  return s;
+// Two octaves: the third added detail too fine to see on a body this size, at half again the cost.
+float fbm2(float3 p) {
+  return 0.5 * snoise(p) + 0.25 * snoise(p * 2.03);
 }
 """
 
@@ -135,10 +133,11 @@ half4 main(float2 fragCoord) {
   // The Sun: the SDO surface laid round the sphere, flowing and boiling.
   float3 sun = float3(0.0);
   if (showSun) {
+    // Two noises a pixel (it was six): one bends the surface as it flows, one makes it boil.
     float3 w3 = p * 1.7 + float3(0.0, uTime * 0.02, uTime * 0.013);
-    float3 warp = float3(snoise(w3), snoise(w3 + 17.1), snoise(w3 + 31.7));
-    float3 s = triplanar(normalize(p + warp * 0.05));
-    s *= 0.82 + 0.36 * fbm3(p * 22.0 + float3(uTime * 0.25));
+    float n1 = snoise(w3);
+    float3 s = triplanar(normalize(p + float3(n1, -n1 * 0.7, n1 * 0.4) * 0.05));
+    s *= 0.82 + 0.3 * snoise(p * 22.0 + float3(uTime * 0.25));
     float l = dot(s, float3(0.3, 0.55, 0.15));
     float3 ramp = mix(float3(0.7, 0.12, 0.02), float3(1.0, 0.48, 0.09), smoothstep(0.08, 0.42, l));
     ramp = mix(ramp, float3(1.0, 0.9, 0.66), smoothstep(0.5, 0.95, l));
@@ -151,7 +150,7 @@ half4 main(float2 fragCoord) {
   float dark = 1.0 - smoothstep(0.08, 0.45, dot(albedo, float3(0.333)));
   float field = h < 0.85 ? 0.0 : 1.0;
   if (h > 0.0 && h < 0.85) {
-    float n = fbm3(p * 2.6 + 3.7) * 0.5 + 0.5;
+    float n = fbm2(p * 2.6 + 3.7) * 0.5 + 0.5;
     field = clamp(n * 0.62 + dark * 0.38, 0.0, 1.0) * 0.92;
   }
   float thr = 1.0 - h * 1.3;
@@ -200,7 +199,7 @@ half4 main(float2 fragCoord) {
   float3 sun = float3(0.0);
   // The noise is worked out only where it shows: none round the Moon, the swirl near the rim, the rays out to two radii.
   if (heat > 0.0) {
-    float st = d < 1.3 ? fbm3(float3(cos(a) * 1.7, sin(a) * 1.7, uTime * 0.05)) : 0.0;
+    float st = d < 1.3 ? 0.6 * snoise(float3(cos(a) * 1.7, sin(a) * 1.7, uTime * 0.05)) : 0.0;
     float rays = 0.0;
     if (d < 2.0) rays = pow(max(0.0, snoise(float3(cos(a) * 5.0, sin(a) * 5.0, d * 1.2 - uTime * 0.22)) * 0.5 + 0.5), 3.0) * (1.0 - smoothstep(1.6, 2.0, d));
     float glow = exp(-d * 4.2) * (0.85 + 0.6 * st) + exp(-d * 1.4) * 0.12 + rays * exp(-d * 2.0) * 0.6;
@@ -219,7 +218,8 @@ half4 main(float2 fragCoord) {
         float th = 0.016 + 0.035 * (1.0 - abs(x));
         float dist = d - y;
         float f = exp(-dist * dist / (th * th));
-        f *= f > 0.003 ? 0.55 + 0.45 * snoise(float3(x * 5.0, d * 12.0, uTime * 0.9 + float(i) * 7.0)) : 0.55;
+        // A flicker along the loop from sines, not noise: it only needs to shimmer.
+        f *= 0.55 + 0.45 * sin(x * 9.0 + d * 30.0 - uTime * 2.7 + float(i) * 7.0) * sin(x * 4.0 - uTime * 1.3);
         f += exp(-d * 22.0) * (1.0 - abs(x)) * 0.6;
         prom += f * life;
       }
@@ -228,7 +228,7 @@ half4 main(float2 fragCoord) {
   }
   float3 col = mix(moonHalo, sun, heat) * (1.0 + 0.35 * uHover);
   col = mix(col, float3(1.0, 0.18, 0.1) * exp(-d * 4.0) * 0.8, uRed * 0.7);
-  col *= 1.0 - smoothstep(2.6, 3.6, r);
+  col *= 1.0 - smoothstep(2.3, 3.0, r);
   col = 1.0 - exp(-col * 1.3);
   float alpha = max(col.r, max(col.g, col.b));
   return half4(half3(col), half(alpha));
