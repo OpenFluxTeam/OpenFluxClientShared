@@ -60,7 +60,6 @@ import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ConfirmDialog
 import io.openflux.app.components.ConnectButton
 import io.openflux.app.components.ConnectLook
-import io.openflux.app.cosmic.CosmicSwitch
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.height
 import io.openflux.app.components.Field
@@ -207,12 +206,12 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     val settings by container.settings.settings.collectAsState()
-    val animate = io.openflux.app.theme.LocalAnimations.current
     val status by container.accounts.status.collectAsState()
     val subscription by container.subscription.state.collectAsState()
     val platform = container.platform
     val exitMode = settings.mode == ConnectionMode.Exit && state.isActive
-    val now by produceState(platform.now(), animate) { while (animate) { delay(1_000); value = platform.now() } }
+    // Read when the state or the subscription changes, not on a clock: a ticking value redraws the whole window.
+    val now = remember(state, subscription) { platform.now() }
     // The exit node's controls, QR and link live here too: a switch under the button while nothing runs. A running
     // node or client hides it: the switch could not leave either, their own button stops them.
     var exitTab by rememberSaveable { mutableStateOf(false) }
@@ -278,9 +277,9 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
 }
 
 /**
- * The switch and what it says under it, one for the client and the exit node: the universe (or the plain ring),
- * [under] right below it (Home's Клиент / Выходная нода), [title] in a few words and, while [connected], the time
- * and the speed. [speeds] off leaves the speed out unless the core reports it (an exit node's traffic).
+ * The button and what it says under it, one for the client and the exit node: the button, [under] right below it
+ * (Home's Клиент / Выходная нода), [title] in a few words and, while [connected], the time and the speed. [speeds]
+ * off leaves the speed out unless the core reports it (an exit node's traffic).
  */
 @Composable
 fun SwitchBlock(
@@ -295,17 +294,14 @@ fun SwitchBlock(
     under: (@Composable () -> Unit)? = null,
 ) {
     val container = LocalAppContainer.current
-    val settings by container.settings.settings.collectAsState()
     val platform = container.platform
-    // Without animations nothing ticks: the speed is read once per state, the time since connecting is a time of day.
-    val animate = io.openflux.app.theme.LocalAnimations.current
-    val traffic by liveTraffic(animate, state)
-    val now by produceState(platform.now(), animate) { while (animate) { delay(1_000); value = platform.now() } }
-    // Settings → Look can ask for the plain ring: the universe below is the heavy one for the graphics card.
-    if (settings.simpleSwitch) {
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { ConnectButton(look, label, onClick = onClick, shortcut = shortcut) }
-    } else {
+    val settings by container.settings.settings.collectAsState()
+    val traffic by container.connection.traffic.collectAsState()
+    // Settings → Внешний вид can ask for the Moon and the Sun: the scene that keeps the graphics card busy.
+    if (settings.moonAndSun) {
         CosmicHome(look, label, onClick, (traffic.downBytesPerSec + traffic.upBytesPerSec).toDouble(), shortcut)
+    } else {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { ConnectButton(look, label, onClick = onClick, shortcut = shortcut) }
     }
     under?.invoke()
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
@@ -314,23 +310,20 @@ fun SwitchBlock(
             transitionSpec = { (fadeIn(tween(220, 90)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(90)) },
         ) { Text(it, style = AppTheme.type.title, color = AppTheme.colors.text, textAlign = TextAlign.Center) }
         AnimatedVisibility(connected != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-            val since = connected?.since ?: now
+            val since = connected?.since ?: 0L
             FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
-                if (animate) {
-                    StatPill(Icons.Rounded.Schedule, Fmt.duration(now - since))
-                    if (speeds || traffic.live) {
-                        StatPill(Icons.Rounded.ArrowDownward, Fmt.speed(traffic.downBytesPerSec))
-                        StatPill(Icons.Rounded.ArrowUpward, Fmt.speed(traffic.upBytesPerSec))
-                    }
-                } else {
-                    StatPill(Icons.Rounded.Schedule, "с " + Fmt.clock(since, platform.utcOffsetSeconds))
+                // When it connected, not a ticking timer: nothing on Home changes by itself every second.
+                StatPill(Icons.Rounded.Schedule, "с " + Fmt.clock(since, platform.utcOffsetSeconds))
+                if (speeds || traffic.live) {
+                    StatPill(Icons.Rounded.ArrowDownward, Fmt.speed(traffic.downBytesPerSec))
+                    StatPill(Icons.Rounded.ArrowUpward, Fmt.speed(traffic.upBytesPerSec))
                 }
             }
         }
     }
 }
 
-/** The switch is a small universe: the Moon while off, the Sun with its network of devices while connected. [busy] is bytes a second. */
+/** The switch as a small universe: the Moon while off, the Sun with its network of devices while connected. [busy] is bytes a second. */
 @Composable
 private fun CosmicHome(look: ConnectLook, label: String, onClick: () -> Unit, busy: Double, shortcut: String?) {
     // Its height is set, not left to an aspect ratio: in a wide window that would ask for more than the cap and
@@ -341,7 +334,7 @@ private fun CosmicHome(look: ConnectLook, label: String, onClick: () -> Unit, bu
     }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val cap = if (windowHeight > 0.dp) minOf(480.dp, windowHeight * 0.52f) else 480.dp
-        CosmicSwitch(
+        io.openflux.app.cosmic.CosmicSwitch(
             look,
             label = label,
             onClick = onClick,
@@ -359,8 +352,7 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
     val toaster = LocalToaster.current
     val scope = rememberCoroutineScope()
     val settings by container.settings.settings.collectAsState()
-    val animate = io.openflux.app.theme.LocalAnimations.current
-    val traffic by liveTraffic(animate, state)
+    val traffic by container.connection.traffic.collectAsState()
     val socks by container.connection.socksAddress.collectAsState()
     val address by container.connection.exitAddress.collectAsState()
     val android = container.platform.kind.isPhone
@@ -391,7 +383,7 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
                 ValueRow("Внешний IP", ip, Modifier.weight(1f))
                 IconAction(Icons.Rounded.Refresh, "Проверить ещё раз", container.connection::refreshExitAddress, enabled = on)
             }
-            if (on && animate) ValueRow("За сессию", Fmt.bytes(traffic.totalDown + traffic.totalUp))
+            if (on) ValueRow("За сессию", Fmt.bytes(traffic.totalDown + traffic.totalUp))
             if (on && !traffic.live) ValueRow("Статистика", "ядро не сообщает")
             for (kind in m.pushable(p, state)) {
                 RowItem("Передать вход ${kind.label} ноде", onClick = {
@@ -503,14 +495,4 @@ private fun ProfileRow(p: Profile, selected: Boolean, dot: Status, touch: Boolea
             danger = true,
         )
     }
-}
-
-/**
- * The connection's traffic: live, or with [animate] off read once per [state] (the window is then not redrawn every
- * second for the numbers; what only a live figure says is not shown).
- */
-@Composable
-private fun liveTraffic(animate: Boolean, state: ConnectionState): androidx.compose.runtime.State<io.openflux.desktop.model.TrafficStats> {
-    val flow = LocalAppContainer.current.connection.traffic
-    return if (animate) flow.collectAsState() else remember(state) { mutableStateOf(flow.value) }
 }

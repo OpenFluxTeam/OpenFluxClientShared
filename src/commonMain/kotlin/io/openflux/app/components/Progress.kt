@@ -32,11 +32,10 @@ fun ProgressLine(text: String, modifier: Modifier = Modifier, onDetails: (() -> 
     }
 }
 
-/** A bar for work of unknown length: running, or a still faint bar when the app does not animate. */
+/** A bar for work of unknown length. */
 @Composable
 fun BusyBar(modifier: Modifier = Modifier, color: androidx.compose.ui.graphics.Color = AppTheme.colors.accent, trackColor: androidx.compose.ui.graphics.Color = AppTheme.colors.surfaceHigh) {
-    if (io.openflux.app.theme.LocalAnimations.current) LinearProgressIndicator(modifier, color = color, trackColor = trackColor)
-    else LinearProgressIndicator(progress = { 1f }, modifier = modifier, color = color.copy(alpha = 0.45f), trackColor = trackColor, drawStopIndicator = {})
+    LinearProgressIndicator(modifier, color = color, trackColor = trackColor)
 }
 
 /**

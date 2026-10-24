@@ -26,13 +26,6 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 
-/**
- * Whether the app animates (Settings → Внешний вид → «Анимации»). Off, nothing moves by itself: the switch stands
- * still, a status dot does not breathe, a busy bar is a still bar; the desktop also makes every transition instant
- * (a zero MotionDurationScale over the window, see main.kt). The window is then drawn only when something changes.
- */
-val LocalAnimations = androidx.compose.runtime.compositionLocalOf { true }
-
 /** The springs everything moves on: quick, with no wobble a person would notice. */
 object Motion {
     fun <T> soft() = spring<T>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)

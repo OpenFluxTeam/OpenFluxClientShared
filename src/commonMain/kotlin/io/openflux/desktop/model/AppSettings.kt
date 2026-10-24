@@ -138,10 +138,12 @@ data class AppSettings(
     /** Set while OpenFlux has changed the Windows proxy; restored on exit or next start. */
     val savedSystemProxy: SavedSystemProxy? = null,
     val sidebarCollapsed: Boolean = false,
-    /** Home's switch as the plain ring (ConnectButton) instead of the Moon and the Sun: far lighter on the graphics card. */
-    val simpleSwitch: Boolean = false,
-    /** Anything that moves by itself, and the transitions between states: off, the window is drawn only when it changes. */
-    val animations: Boolean = true,
+    /**
+     * Home's button as the Moon and the Sun (the 3D scene with its devices and network) instead of the OpenFlux mark.
+     * Off by default: the scene keeps the graphics card busy the whole time Home is shown; the mark moves only when
+     * the state changes.
+     */
+    val moonAndSun: Boolean = false,
     /**
      * Developer mode: shows the Accounts tab. Turned on by tapping the app
      * version in Settings → About ten times, off by its switch there.

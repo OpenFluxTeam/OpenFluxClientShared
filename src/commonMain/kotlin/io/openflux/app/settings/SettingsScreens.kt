@@ -366,14 +366,12 @@ private fun LookPage() {
     io.openflux.app.components.Group("Тема") {
         Segmented(ThemeMode.entries, settings.theme, { t -> container.settings.update { it.copy(theme = t) } }, label = { it.label })
     }
-    Section(null) {
-        Toggle(
-            "Анимации", settings.animations, { v -> container.settings.update { it.copy(animations = v) } },
-            subtitle = if (settings.animations) "Выключите, чтобы ничего не двигалось и видеокарта не нагружалась" else "Выключены: окно перерисовывается, только когда что-то меняется",
-        )
-        Toggle(
-            "Простая кнопка подключения", settings.simpleSwitch, { v -> container.settings.update { it.copy(simpleSwitch = v) } },
-            subtitle = "Кольцо вместо Луны и Солнца на Главной: меньше нагружает видеокарту",
+    io.openflux.app.components.Group("Кнопка подключения") {
+        Segmented(listOf(false, true), settings.moonAndSun, { v -> container.settings.update { it.copy(moonAndSun = v) } }, label = { if (it) "Луна и Солнце" else "Логотип" })
+        Text(
+            if (settings.moonAndSun) "Сцена с устройствами и сетью: красиво, но видеокарта работает всё время, пока открыта Главная"
+            else "Знак OpenFlux: двигается только при смене состояния, видеокарту почти не нагружает",
+            style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
         )
     }
     if (container.platform.kind == PlatformKind.Desktop) {

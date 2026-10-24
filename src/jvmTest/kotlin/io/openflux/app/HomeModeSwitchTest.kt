@@ -20,7 +20,6 @@ class HomeModeSwitchTest {
     @Test
     fun theSwitchIsUnderTheConnectButtonAndUnderTheNodesButton() = runComposeUiTest {
         val c = homeWorld()
-        c.settings.update { it.copy(simpleSwitch = true) }
         setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         val button = onNodeWithContentDescription("Подключить").getBoundsInRoot()
         val client = onNodeWithText("Клиент").getBoundsInRoot()
@@ -39,7 +38,6 @@ class HomeModeSwitchTest {
     @Test
     fun whatToServeIsChosenFromItsRow() = runComposeUiTest {
         val c = homeWorld()
-        c.settings.update { it.copy(simpleSwitch = true) }
         setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
         onNodeWithText("Выходная нода").performClick()
         onNodeWithText("Амстердам").performScrollTo().performClick()

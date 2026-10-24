@@ -2,12 +2,7 @@ package io.openflux.app.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -72,7 +67,10 @@ val CopyIcon = Icons.Rounded.ContentCopy
 /** What a thing is doing, as a dot: off, busy, on, needs a look, broken. */
 enum class Status { Off, Busy, On, Warning, Error }
 
-/** The dot; a running thing breathes (a ring grows out of it and fades), a busy one does it faster. */
+/**
+ * The dot, still. It used to breathe while a thing ran; that asked for a frame at the screen's rate, and on the
+ * desktop every frame redraws the whole window, Home's scene with it, so a dot cost more than the scene.
+ */
 @Composable
 fun StatusDot(status: Status, modifier: Modifier = Modifier) {
     val c = AppTheme.colors
@@ -84,18 +82,7 @@ fun StatusDot(status: Status, modifier: Modifier = Modifier) {
             Status.Error -> c.danger
         },
     )
-    // Only a live dot runs a clock; it is read while drawing, so the pulse redraws without recomposing.
-    val pulse = if ((status == Status.On || status == Status.Busy) && io.openflux.app.theme.LocalAnimations.current) {
-        val period = if (status == Status.Busy) 900 else 1800
-        rememberInfiniteTransition().animateFloat(0f, 1f, infiniteRepeatable(tween(period, easing = LinearEasing), RepeatMode.Restart))
-    } else null
-    Box(
-        modifier.size(8.dp).drawBehind {
-            val p = pulse?.value
-            if (p != null) drawCircle(color.copy(alpha = 0.45f * (1f - p)), radius = size.minDimension / 2 * (1f + 1.3f * p))
-            drawCircle(color)
-        },
-    )
+    Box(modifier.size(8.dp).drawBehind { drawCircle(color) })
 }
 
 /** A rounded tile with an icon in the accent's wash (as in 2.x lists), a status dot in its corner when [status] is given. */

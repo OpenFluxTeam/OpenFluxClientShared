@@ -13,8 +13,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Canvas as PictureCanvas
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -26,16 +29,30 @@ import io.openflux.desktop.service.PlatformServices
 fun QrView(text: String, platform: PlatformServices, modifier: Modifier = Modifier) {
     val matrix = remember(text) { platform.qrMatrix(text) }
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        // One pixel a module, made once and drawn scaled without smoothing: a window redrawn for an animation
+        // then draws one picture, not a rectangle for each of a thousand and more modules.
+        val picture = remember(matrix) { qrPicture(matrix) }
         Canvas(
             Modifier.widthIn(max = 320.dp).fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(12.dp)).background(Color.White).padding(16.dp)
                 .semantics { contentDescription = "QR-код ссылки" },
         ) {
-            val n = matrix.size
-            if (n == 0) return@Canvas
-            val cell = size.width / n
-            for (y in 0 until n) for (x in 0 until matrix[y].size) {
-                if (matrix[y][x]) drawRect(Color.Black, Offset(x * cell, y * cell), Size(cell + 0.5f, cell + 0.5f))
-            }
+            if (picture == null) return@Canvas
+            drawImage(picture, dstSize = IntSize(size.width.toInt(), size.height.toInt()), filterQuality = FilterQuality.None)
         }
     }
+}
+
+/** The QR's modules as a picture of one pixel each, black on white; null for an empty matrix. */
+private fun qrPicture(matrix: List<BooleanArray>): ImageBitmap? {
+    val n = matrix.size
+    if (n == 0) return null
+    val image = ImageBitmap(n, n)
+    val canvas = PictureCanvas(image)
+    val white = Paint().apply { color = Color.White }
+    val black = Paint().apply { color = Color.Black; isAntiAlias = false }
+    canvas.drawRect(0f, 0f, n.toFloat(), n.toFloat(), white)
+    for (y in 0 until n) for (x in 0 until matrix[y].size) {
+        if (matrix[y][x]) canvas.drawRect(x.toFloat(), y.toFloat(), x + 1f, y + 1f, black)
+    }
+    return image
 }

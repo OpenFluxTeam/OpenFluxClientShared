@@ -55,8 +55,6 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
             implementation(compose.desktop.currentOs)
             implementation(libs.compose.uiTest)
-            // The Lottie recording of Home's scene is played only by the GPU bench (cosmic/SwitchBench, LottieShotsTest).
-            implementation("io.github.alexzhirkevich:compottie:2.2.4")
         }
     }
 }
