@@ -11,6 +11,7 @@ import io.openflux.app.settings.JournalScreen
 import io.openflux.app.settings.ScriptsScreen
 import io.openflux.app.settings.SettingsPageScreen
 import io.openflux.app.settings.SettingsRoot
+import io.openflux.app.settings.SplitTunnelAppsScreen
 import io.openflux.app.nav.AppNavigator
 import io.openflux.app.profiles.ProfileEditScreen
 import io.openflux.app.profiles.ProfileScreen
@@ -49,6 +50,7 @@ fun appEntry(dest: Dest, navigator: AppNavigator): NavEntry<Dest> = when (dest) 
     Dest.Settings -> destEntry(dest, ListDetail.list(Section.Settings)) { SettingsRoot(selected = navigator.stack(Section.Settings).last()) }
     is Dest.SettingsPage -> destEntry(dest, ListDetail.detail(Section.Settings)) { SettingsPageScreen(dest) }
     Dest.Logs -> destEntry(dest, ListDetail.detail(Section.Settings)) { JournalScreen() }
+    Dest.SplitTunnelApps -> destEntry(dest, ListDetail.detail(Section.Settings)) { SplitTunnelAppsScreen() }
     Dest.Scripts -> destEntry(dest) { ScriptsScreen() }
     else -> placeholderEntry(dest, navigator)
 }

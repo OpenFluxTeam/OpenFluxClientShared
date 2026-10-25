@@ -1,6 +1,7 @@
 package io.openflux.desktop.service
 
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.ImageBitmap
 import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.AccountSession
 import io.openflux.desktop.model.AppSettings
@@ -160,6 +161,14 @@ enum class PlatformKind { Desktop, Android, Ios }
 /** A phone (Android or iOS): touch UI, the system VPN, a gallery to pick a QR from. */
 val PlatformKind.isPhone: Boolean get() = this != PlatformKind.Desktop
 
+/** An app on this device, for Android's per-app split tunneling. */
+data class InstalledApp(
+    val packageName: String,
+    val label: String,
+    val system: Boolean,
+    val icon: ImageBitmap? = null,
+)
+
 /** Platform facilities the UI needs without touching the platform itself. */
 interface PlatformServices {
     val kind: PlatformKind get() = PlatformKind.Desktop
@@ -175,6 +184,10 @@ interface PlatformServices {
     val systemProxySupported: Boolean
     /** Whether the full tunnel (all traffic through Wintun on Windows, utun on macOS) runs on this OS. */
     val fullTunnelSupported: Boolean
+    /** Whether this platform can choose the apps that go through its full tunnel. */
+    val splitTunnelSupported: Boolean get() = false
+    /** Apps installed for the current user, for the split-tunnel picker; empty where unsupported. */
+    suspend fun installedApps(): List<InstalledApp> = emptyList()
     /** Whether OpenFlux runs with administrator rights, which the full tunnel needs. */
     val elevated: Boolean
 

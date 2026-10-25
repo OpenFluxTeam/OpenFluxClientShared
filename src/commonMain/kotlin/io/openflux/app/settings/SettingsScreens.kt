@@ -18,6 +18,8 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.Icon
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,8 +53,10 @@ import io.openflux.app.text.Fmt
 import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.AuthStatus
+import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.CoreRepos
 import io.openflux.desktop.model.CoreSource
+import io.openflux.desktop.model.SplitTunnelMode
 import io.openflux.desktop.model.ThemeMode
 import io.openflux.desktop.model.UpdateChannel
 import io.openflux.desktop.model.UpdateState
@@ -167,13 +171,23 @@ private fun ConnectionPage() {
 @Composable
 private fun VpnPage() {
     val container = LocalAppContainer.current
+    val navigator = LocalNavigator.current
     val settings by container.settings.settings.collectAsState()
     val platform = container.platform
     val android = platform.kind.isPhone
-    fun setFull(on: Boolean) {
-        container.settings.update { it.copy(fullTunnel = on) }
+    fun reconnect() {
         val s = container.connection.state.value
         if (s.isActive) s.profile?.let { container.connection.connect(it) }
+    }
+    fun setFull(on: Boolean) {
+        container.settings.update { it.copy(fullTunnel = on) }
+        reconnect()
+    }
+    fun setSplit(mode: SplitTunnelMode) {
+        if (mode == settings.splitTunnelMode) return
+        container.settings.update { it.copy(splitTunnelMode = mode) }
+        // An empty allowlist is a valid saved state to warn about, but never a VPN to restart.
+        if (mode != SplitTunnelMode.Include || settings.splitTunnelPackages.isNotEmpty()) reconnect()
     }
     if (android) {
         Section(null) {
@@ -184,6 +198,49 @@ private fun VpnPage() {
             else "Без VPN работает только прокси SOCKS5 127.0.0.1:${settings.socksPort}: через ноду идут лишь приложения, где он указан.",
             style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
         )
+        if (platform.splitTunnelSupported && settings.fullTunnel && settings.mode == ConnectionMode.Client) {
+            Section("Раздельное туннелирование") {
+                SplitModeRow(
+                    "Выключено",
+                    "Весь трафик телефона идёт через VPN",
+                    settings.splitTunnelMode == SplitTunnelMode.Off,
+                ) { setSplit(SplitTunnelMode.Off) }
+                SplitModeRow(
+                    "Все, кроме выбранных",
+                    "Выбранные приложения идут напрямую",
+                    settings.splitTunnelMode == SplitTunnelMode.Exclude,
+                ) { setSplit(SplitTunnelMode.Exclude) }
+                SplitModeRow(
+                    "Только выбранные",
+                    "Через VPN идут только выбранные приложения",
+                    settings.splitTunnelMode == SplitTunnelMode.Include,
+                ) { setSplit(SplitTunnelMode.Include) }
+                RowItem(
+                    "Приложения",
+                    subtitle = when {
+                        settings.splitTunnelMode == SplitTunnelMode.Off -> "Сначала выберите режим"
+                        settings.splitTunnelPackages.isEmpty() -> "Ничего не выбрано"
+                        else -> "Выбрано: ${settings.splitTunnelPackages.size}"
+                    },
+                    enabled = settings.splitTunnelMode != SplitTunnelMode.Off,
+                    trailing = {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = AppTheme.colors.textMuted,
+                        )
+                    },
+                    onClick = { navigator.open(Dest.SplitTunnelApps) },
+                )
+            }
+            if (settings.splitTunnelMode == SplitTunnelMode.Include && settings.splitTunnelPackages.isEmpty()) {
+                Text(
+                    "Выберите хотя бы одно приложение: с пустым списком VPN не запустится.",
+                    style = AppTheme.type.bodySmall,
+                    color = AppTheme.colors.danger,
+                )
+            }
+        }
         return
     }
     if (platform.fullTunnelSupported) {
@@ -209,6 +266,24 @@ private fun VpnPage() {
         ValueRow("Исключения", "localhost, 127.*, 10.*, 192.168.*")
     }
     Text("Прежние настройки прокси Windows возвращаются при отключении и выходе.", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
+}
+
+@Composable
+private fun SplitModeRow(title: String, subtitle: String, selected: Boolean, onSelect: () -> Unit) {
+    val c = AppTheme.colors
+    RowItem(
+        title,
+        subtitle = subtitle,
+        selected = selected,
+        onClick = onSelect,
+        leading = {
+            RadioButton(
+                selected = selected,
+                onClick = onSelect,
+                colors = RadioButtonDefaults.colors(selectedColor = c.accent, unselectedColor = c.textSecondary),
+            )
+        },
+    )
 }
 
 /** Yandex and Mail.ru sign-ins (spec 8.3, "Сервисы"). */

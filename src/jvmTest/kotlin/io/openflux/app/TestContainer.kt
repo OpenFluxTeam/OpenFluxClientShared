@@ -23,6 +23,8 @@ import io.openflux.desktop.service.ConnectionService
 import io.openflux.desktop.service.NodeWizardService
 import io.openflux.desktop.service.PhpHostingService
 import io.openflux.desktop.service.SubscriptionApi
+import io.openflux.desktop.service.InstalledApp
+import io.openflux.desktop.service.PlatformKind
 import io.openflux.desktop.service.PlatformServices
 import io.openflux.desktop.service.ProfileRepository
 import io.openflux.desktop.service.SettingsRepository
@@ -75,7 +77,12 @@ class TestConnection : ConnectionService {
     override val exitShareLink: StateFlow<String?> = MutableStateFlow(null)
     override val socksAddress: StateFlow<String?> = MutableStateFlow(null)
     override val captchaPage: StateFlow<BrowserPage?> = MutableStateFlow(null)
-    override fun connect(profile: Profile, mode: ConnectionMode?) { state.value = ConnectionState.Connected(profile, ConnectionMode.Client, 0) }
+    /** How many times the UI asked for a connection, for "applies at once" tests. */
+    var connects = 0
+    override fun connect(profile: Profile, mode: ConnectionMode?) {
+        connects++
+        state.value = ConnectionState.Connected(profile, ConnectionMode.Client, 0)
+    }
     override fun disconnect() { state.value = ConnectionState.Idle }
     override fun refreshExitAddress() = Unit
     override fun clearLogs() = Unit
@@ -85,13 +92,19 @@ class TestConnection : ConnectionService {
     override fun shutdown() = Unit
 }
 
-class TestPlatform : PlatformServices {
+class TestPlatform(
+    override var kind: PlatformKind = PlatformKind.Desktop,
+    override var fullTunnelSupported: Boolean = false,
+    override var splitTunnelSupported: Boolean = false,
+) : PlatformServices {
     override var appVersion = "test"
     override val coreVersion = "test"
     override val clientRepo = "test"
     override val systemProxySupported = false
-    override val fullTunnelSupported = false
     override val elevated = false
+    /** What the split-tunnel picker would list. */
+    var apps: List<InstalledApp> = emptyList()
+    override suspend fun installedApps(): List<InstalledApp> = apps
     override fun restartElevated() = false
     override fun clipboardText(): String? = clipboard
     override fun setClipboardText(text: String) { clipboard = text }

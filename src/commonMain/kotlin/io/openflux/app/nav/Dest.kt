@@ -147,6 +147,12 @@ sealed interface Dest {
         override val owner get() = Section.Settings
     }
 
+    /** The apps through (or past) Android's VPN. */
+    @Serializable @SerialName("split-apps")
+    data object SplitTunnelApps : Dest {
+        override val owner get() = Section.Settings
+    }
+
     /** The journal (spec 8.4). */
     @Serializable @SerialName("logs")
     data object Logs : Dest {

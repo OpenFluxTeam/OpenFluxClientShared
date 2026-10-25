@@ -3,6 +3,7 @@ package io.openflux.desktop
 import io.openflux.desktop.data.FileSettingsRepository
 import java.nio.file.Files
 import io.openflux.desktop.model.CoreSource
+import io.openflux.desktop.model.SplitTunnelMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -27,6 +28,37 @@ class SettingsMigrationTest {
             val fresh = Files.createTempDirectory("openflux-settings").toFile()
             assertTrue(FileSettingsRepository(fresh).settings.value.systemProxy)
             fresh.deleteRecursively()
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun oldSettingsStartWithoutSplitTunneling() {
+        val dir = Files.createTempDirectory("openflux-settings").toFile()
+        try {
+            dir.resolve("settings.json").writeText("""{"systemProxyDefaultOn": true, "socksPort": 1090}""")
+            val loaded = FileSettingsRepository(dir).settings.value
+            assertEquals(SplitTunnelMode.Off, loaded.splitTunnelMode)
+            assertTrue(loaded.splitTunnelPackages.isEmpty())
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun splitTunnelSettingsRoundTrip() {
+        val dir = Files.createTempDirectory("openflux-settings").toFile()
+        try {
+            FileSettingsRepository(dir).update {
+                it.copy(
+                    splitTunnelMode = SplitTunnelMode.Include,
+                    splitTunnelPackages = listOf("org.example.one", "org.example.two"),
+                )
+            }
+            val loaded = FileSettingsRepository(dir).settings.value
+            assertEquals(SplitTunnelMode.Include, loaded.splitTunnelMode)
+            assertEquals(listOf("org.example.one", "org.example.two"), loaded.splitTunnelPackages)
         } finally {
             dir.deleteRecursively()
         }

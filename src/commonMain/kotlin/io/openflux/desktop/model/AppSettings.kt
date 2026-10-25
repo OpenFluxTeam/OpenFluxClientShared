@@ -16,6 +16,10 @@ enum class ConnectionMode(val label: String, val description: String) {
     Exit("Выходная нода", "Этот компьютер выпускает других в интернет"),
 }
 
+/** Which apps Android sends through the VPN (per-app split tunneling). */
+@Serializable
+enum class SplitTunnelMode { Off, Exclude, Include }
+
 /**
  * How an exit node forwards what its clients send (the core's --mode). L4 ends
  * their connections here and opens new ones: it runs everywhere and needs no
@@ -98,6 +102,10 @@ data class AppSettings(
      * Needs administrator rights.
      */
     val fullTunnel: Boolean = false,
+    /** Android: off, all but the listed apps, or only the listed apps go through the VPN. */
+    val splitTunnelMode: SplitTunnelMode = SplitTunnelMode.Off,
+    /** Android package names for [splitTunnelMode]; the app itself is never included. */
+    val splitTunnelPackages: List<String> = emptyList(),
     val autoConnect: Boolean = false,
     val selectedProfileId: String? = null,
     val coreSource: CoreSource = CoreSource.Bundled,
