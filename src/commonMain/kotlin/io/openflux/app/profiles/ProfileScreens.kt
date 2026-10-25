@@ -105,6 +105,16 @@ fun TransportType.blurb(): String = when (this) {
     TransportType.SCRIPT -> "JS-транспорт"
 }
 
+/**
+ * What the profile editor offers: the hosting carriers in the mode without a server, every carrier but a script in a
+ * Session, and only the ones that work alone in a classic profile (Direct and FluxFast need a Session).
+ */
+fun transportChoices(stream: Boolean, session: Boolean): List<TransportType> = when {
+    stream -> PhpHosts.carriers
+    session -> TransportType.entries.filter { it != TransportType.SCRIPT }
+    else -> TransportType.entries.filter { !it.sessionOnly }
+}
+
 /** A profile (spec 6.2): what it is made of, and what can be done with it. */
 @Composable
 fun ProfileScreen(dest: Dest.Profile) {
@@ -366,11 +376,7 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
     }
     if (pick) {
         Sheet(onDismiss = { pick = false }, title = "Транспорт") {
-            val builtIn = when {
-                d.stream -> PhpHosts.carriers
-                d.session -> TransportType.entries.filter { it != TransportType.SCRIPT }
-                else -> TransportType.entries.filter { !it.sessionOnly }
-            }
+            val builtIn = transportChoices(stream = d.stream, session = d.session)
             for (t in builtIn) {
                 RowItem(t.title, subtitle = t.blurb(), selected = c.type == t, onClick = {
                     m.editTransport(index) { it.copy(type = t, scriptId = "") }
