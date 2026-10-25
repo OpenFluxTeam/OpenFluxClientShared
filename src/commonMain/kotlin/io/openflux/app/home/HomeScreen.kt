@@ -40,6 +40,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -91,6 +93,7 @@ import io.openflux.app.theme.appear
 import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.ExitAddress
+import io.openflux.desktop.model.InstalledScript
 import io.openflux.desktop.model.KnownServer
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.TransportType
@@ -103,9 +106,19 @@ import io.openflux.desktop.service.PlatformKind
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** A profile's transports in a few words, in the new interface's names. */
-fun profileLine(p: Profile): String {
-    val names = p.carriers.map { it.type.title }.distinct().joinToString(", ")
+/**
+ * A profile's transports in a few words, in the new interface's names. A JS carrier shows the installed
+ * script's own name (e.g. «Pruffme», «Телемост») instead of the generic type label; [scripts] are the
+ * installed ones, falling back to the carrier's scriptId when the script is not on this device.
+ */
+fun profileLine(p: Profile, scripts: List<InstalledScript> = emptyList()): String {
+    val names = p.carriers.map { c ->
+        if (c.type == TransportType.SCRIPT)
+            scripts.firstOrNull { it.id == c.scriptId }?.name?.ifBlank { null }
+                ?: c.scriptId.ifBlank { null }
+                ?: "Скрипт-транспорт"
+        else c.type.title
+    }.distinct().joinToString(", ")
     return if (p.stream) "Без сервера · $names" else names
 }
 
@@ -205,6 +218,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     val traffic by container.connection.traffic.collectAsState()
     val status by container.accounts.status.collectAsState()
     val subscription by container.subscription.state.collectAsState()
+    val scripts by container.scripts.scripts.collectAsState()
     val platform = container.platform
     val exitMode = settings.mode == ConnectionMode.Exit && state.isActive
     val now by produceState(platform.now()) { while (true) { delay(1_000); value = platform.now() } }
@@ -258,7 +272,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
         Section("Подключение") {
             RowItem(
                 chosen.name,
-                subtitle = profileLine(chosen),
+                subtitle = profileLine(chosen, scripts),
                 leading = { IconBubble(profileIcon(chosen), status = profileDot(state, chosen.id)) },
                 trailing = { Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = AppTheme.colors.textSecondary) },
                 onClick = onPick,
@@ -322,13 +336,65 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
     val traffic by container.connection.traffic.collectAsState()
     val socks by container.connection.socksAddress.collectAsState()
     val address by container.connection.exitAddress.collectAsState()
+    val scripts by container.scripts.scripts.collectAsState()
     val android = container.platform.kind == PlatformKind.Android
     fun copy(what: String, text: String) { container.platform.setClipboardText(text); toaster.show("$what скопирован") }
+    // A script carrier is only "script"/"script-2" to the core; name it by its installed script, like the line above.
+    fun carrierTitle(coreName: String): String? {
+        val spec = p.sessionSpecs().firstOrNull { it.name == coreName }
+        if (spec?.type == TransportType.SCRIPT)
+            return scripts.firstOrNull { it.id == spec.scriptId }?.name?.ifBlank { null }
+                ?: spec.scriptId.ifBlank { null } ?: "Скрипт-транспорт"
+        return TransportType.fromCli(coreName.substringBefore('-'))?.title
+    }
     Section(null) {
         Collapsible("Сведения") {
             val on = state is ConnectionState.Connected && state.profile?.id == p.id
             if (on && traffic.activeCarriers.isNotEmpty()) {
-                ValueRow("Сейчас через", traffic.activeCarriers.mapNotNull { TransportType.fromCli(it)?.title }.distinct().joinToString(", "))
+                ValueRow("Сейчас через", traffic.activeCarriers.mapNotNull { carrierTitle(it) }.distinct().joinToString(", "))
+            }
+            if (on && android) {
+                var picking by remember { mutableStateOf(false) }
+                var links by remember { mutableStateOf(container.connection.carrierLinks()) }
+                // The list is the core's, live while the dialog is open (a carrier comes and goes).
+                LaunchedEffect(picking) { while (picking) { links = container.connection.carrierLinks(); delay(1500) } }
+                val pinned = container.connection.carrierLinks().firstOrNull { it.pinned }
+                ValueRow(
+                    "Транспорт", pinned?.let { carrierTitle(it.name) ?: it.name } ?: "авто",
+                    Modifier.clickable { links = container.connection.carrierLinks(); picking = true },
+                )
+                if (picking) {
+                    val c = AppTheme.colors
+                    AlertDialog(
+                        onDismissRequest = { picking = false },
+                        containerColor = c.surface, titleContentColor = c.text, textContentColor = c.textSecondary,
+                        shape = RoundedCornerShape(AppTheme.shapes.large),
+                        title = { Text("Через какой транспорт", style = AppTheme.type.title) },
+                        text = {
+                            Column {
+                                fun row(label: String, mark: Boolean, onPick: () -> Unit) = @Composable {
+                                    Text(
+                                        (if (mark) "● " else "○ ") + label, style = AppTheme.type.body, color = if (mark) c.text else c.textSecondary,
+                                        modifier = Modifier.fillMaxWidth().clickable(onClick = onPick).padding(vertical = AppTheme.spacing.s),
+                                    )
+                                }
+                                row("Авто (по приоритету)", links.none { it.pinned }) { container.connection.pinCarrier(null); picking = false }()
+                                links.forEach { l ->
+                                    val title = (carrierTitle(l.name) ?: l.name) + if (l.live) " · на связи" else " · нет связи"
+                                    row(title, l.pinned) {
+                                        if (!container.connection.pinCarrier(l.name)) toaster.show("Не удалось выбрать транспорт")
+                                        picking = false
+                                    }()
+                                }
+                                Text(
+                                    "Выбранный несёт весь трафик; остальные молчат, пока не вернёшь «Авто». Нода переходит за вами через ~30 с.",
+                                    style = AppTheme.type.body, color = c.textSecondary, modifier = Modifier.padding(top = AppTheme.spacing.m),
+                                )
+                            }
+                        },
+                        confirmButton = { TextAction("Закрыть", { picking = false }) },
+                    )
+                }
             }
             ValueRow("Шифрование", if (p.secret.isNotEmpty()) "AES-256-GCM" else "нет ключа")
             if (!settings.fullTunnel) {
@@ -424,12 +490,13 @@ private fun ProfileRow(p: Profile, modifier: Modifier = Modifier, selected: Bool
     val toaster = LocalToaster.current
     val actions = remember(container) { ProfileActions(container) }
     val settings by container.settings.settings.collectAsState()
+    val scripts by container.scripts.scripts.collectAsState()
     var menu by remember { mutableStateOf(false) }
     var deleteAsk by remember { mutableStateOf(false) }
     RowItem(
         p.name,
         modifier,
-        subtitle = profileLine(p),
+        subtitle = profileLine(p, scripts),
         leading = { IconBubble(profileIcon(p), status = dot) },
         selected = selected,
         onClick = onChoose,

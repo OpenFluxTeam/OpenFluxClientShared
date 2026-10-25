@@ -200,6 +200,7 @@ class ScriptSettingsService(
 
     /** Closes the dialog and its page (and the setup wizard behind it, if one runs). */
     fun close() {
+        println("OFXDBG ScriptSettingsService.close setupRunning=$setupRunning " + Throwable().stackTraceToString().lines().drop(1).take(8).joinToString(" | "))
         token++
         onSave = null
         onSetup = null

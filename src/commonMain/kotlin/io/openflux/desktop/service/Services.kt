@@ -6,6 +6,7 @@ import io.openflux.desktop.model.AccountSession
 import io.openflux.desktop.model.AppSettings
 import io.openflux.desktop.model.TransportPrompt
 import io.openflux.desktop.model.ConnectionMode
+import io.openflux.desktop.model.CarrierLink
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.CoreSource
 import io.openflux.desktop.model.NodeCoreSource
@@ -138,6 +139,12 @@ interface ConnectionService {
     fun disconnect()
     fun refreshExitAddress()
     fun clearLogs()
+
+    /** The carriers of the running connection, highest priority first; empty where the core has none to choose from. */
+    fun carrierLinks(): List<CarrierLink> = emptyList()
+
+    /** Sends only through the carrier [name] (one of [carrierLinks]); null gives the choice back to the priorities. False if refused. */
+    fun pinCarrier(name: String?): Boolean = false
 
     fun openPrompt()
     fun submitPrompt()

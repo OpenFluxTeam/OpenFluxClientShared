@@ -4,6 +4,9 @@ package io.openflux.desktop.model
  * The connection as the UI sees it. One value at a time instead of a set of
  * booleans, so "connecting and failed" cannot happen.
  */
+/** One carrier of the running connection as the manual choice lists it ([name] is the core's, e.g. "direct", "script-2"). */
+data class CarrierLink(val name: String, val type: String, val live: Boolean, val pinned: Boolean)
+
 sealed interface ConnectionState {
     data object Idle : ConnectionState
 

@@ -377,13 +377,29 @@ class NodeEditorModel(
      */
     fun setupScript(id: String) {
         val current = draft.scripts.firstOrNull { it.id == id }
-        // The node's side is there but this device's is not (a node set up elsewhere): the wizard only signs this side in.
+        val primary = primaryKey(id)
         val required = container.scripts.byId(id)?.params.orEmpty().filter { it.required }.map { it.key }
-        val clientReady = current != null && (if (required.isEmpty()) current.settings.isNotEmpty() else required.all { current.settings[it].orEmpty().isNotBlank() })
+        // The client side is ready when every required parameter is filled: the primary one lives in the value, the rest in settings.
+        fun filled(k: String) = (current?.settings?.get(k) ?: if (k == primary) current?.value else null).orEmpty().isNotBlank()
+        val clientReady = current != null &&
+            (if (required.isEmpty()) current.settings.isNotEmpty() || current.value.isNotBlank() else required.all(::filled))
+        // The node's side is there but this device's is not (a node set up elsewhere): the wizard only signs this side in.
         val known = current?.takeIf { !clientReady }?.nodeSettings?.get("uid")?.takeIf { it.isNotBlank() }?.let { mapOf("uid" to it) } ?: emptyMap()
         container.scriptSettings.openSetup(id, known) { answer ->
             edit { d ->
-                val set = NodeScript(id, current?.value.orEmpty(), answer.client, answer.node ?: current?.nodeSettings, wizard = true)
+                // The wizard hands the primary parameter (the carrier's value, e.g. the PRUFFME board URL) inside the
+                // client/node maps. It belongs in NodeScript.value, not the settings: toTransports builds the node's
+                // transport url from the value and withScripts gives the client carrier that same value. Leaving it in
+                // settings left both ends with an empty url, so configured() was false and the wizard re-opened at
+                // connect time. A script with no profile-scoped primary (e.g. oneme-webrtc, two accounts) keeps its
+                // values in settings untouched.
+                val value = (primary?.let { answer.client[it] }?.takeIf { it.isNotBlank() } ?: current?.value).orEmpty()
+                val clientSettings = primary?.let { answer.client - it } ?: answer.client
+                val nodeRaw = (answer.node ?: current?.nodeSettings)?.let { ns -> primary?.let { ns - it } ?: ns }
+                // The ends differ only when the node's settings really differ from the client's; a shared-board carrier
+                // (pruffme) answers with identical sides and stays non-split.
+                val nodeSettings = nodeRaw?.takeIf { it != clientSettings }
+                val set = NodeScript(id, value, clientSettings, nodeSettings, wizard = true)
                 d.copy(scripts = if (current != null) d.scripts.map { if (it.id == id) set else it } else d.scripts + set)
             }
         }
