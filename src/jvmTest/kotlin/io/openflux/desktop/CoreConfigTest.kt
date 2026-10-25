@@ -34,6 +34,10 @@ class CoreConfigTest {
         ),
     )
 
+    private val fluxSession = session.copy(
+        extras = session.extras + ExtraTransport(TransportType.FLUXFAST, "203.0.113.10:8446", priority = 40),
+    )
+
     @Test
     fun clientConfNamesNetworks() {
         val bound = session.copy(
@@ -109,6 +113,27 @@ class CoreConfigTest {
         assertTrue("--inbound=tun" in classic.arguments)
         assertFalse(classic.arguments.any { it.startsWith("--socks5") || it.startsWith("--http-proxy") })
         assertNull(classic.httpProxyAddress)
+    }
+
+    @Test
+    fun aClientDialsFluxFast() {
+        val conf = CoreConfig.build(fluxSession, AppSettings(), paths).conf!!
+        assertTrue("[Transport fluxfast]" in conf, conf)
+        assertTrue("Dial = 203.0.113.10:8446" in conf, conf)
+        assertTrue("Type = fluxfast" in conf, conf)
+    }
+
+    @Test
+    fun sessionExitListensForFluxFast() {
+        val launch = CoreConfig.build(fluxSession, AppSettings(mode = ConnectionMode.Exit, exitFluxfastPort = 9100), paths)
+        val conf = launch.conf!!
+        assertTrue("[Transport fluxfast]" in conf, conf)
+        assertTrue("Listen = 0.0.0.0:9100" in conf, conf)
+        assertFalse("Dial = 203.0.113.10:8446" in conf, conf)
+        // The profile has no FluxFast: the exit does not listen for it.
+        val directOnly = fluxSession.copy(extras = fluxSession.extras.filter { it.type != TransportType.FLUXFAST })
+        val no = CoreConfig.build(directOnly, AppSettings(mode = ConnectionMode.Exit), paths).conf!!
+        assertFalse("[Transport fluxfast]" in no, no)
     }
 
     @Test

@@ -101,6 +101,7 @@ fun TransportType.blurb(): String = when (this) {
     TransportType.AVITO -> "Комнаты Avito Code, код выдаёт нода"
     TransportType.ONEME -> "Звонок в MAX, нужен токен MAX Web"
     TransportType.DIRECT -> "Прямое TCP-соединение с нодой"
+    TransportType.FLUXFAST -> "UDP до ноды: переживает смену сети"
     TransportType.SCRIPT -> "JS-транспорт"
 }
 

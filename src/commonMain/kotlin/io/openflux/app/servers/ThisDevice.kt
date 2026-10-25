@@ -182,6 +182,7 @@ fun ExitNodeBody(underButton: (@Composable () -> Unit)? = null) {
             Collapsible("Сведения") {
                 if (platform.kind == PlatformKind.Desktop && platform.exitL3Supported) ValueRow("Режим", settings.exitBackend.label)
                 ValueRow("Порт прямого подключения", settings.exitDirectPort.toString(), mono = true)
+                ValueRow("Порт FluxFast (UDP)", settings.exitFluxfastPort.toString(), mono = true)
                 ValueRow("Адрес для клиентов", settings.exitShareHost.ifBlank { "определился сам" })
             }
         }
@@ -204,6 +205,11 @@ fun ExitNodeBody(underButton: (@Composable () -> Unit)? = null) {
                         settings.exitDirectPort.toString(),
                         { v -> v.toIntOrNull()?.takeIf { it in 1..65535 }?.let { p -> container.settings.update { it.copy(exitDirectPort = p) } } },
                         "Порт прямого подключения", keyboardType = KeyboardType.Number,
+                    )
+                    Field(
+                        settings.exitFluxfastPort.toString(),
+                        { v -> v.toIntOrNull()?.takeIf { it in 1..65535 }?.let { p -> container.settings.update { it.copy(exitFluxfastPort = p) } } },
+                        "Порт FluxFast (UDP)", keyboardType = KeyboardType.Number,
                     )
                     Field(settings.exitShareHost, { v -> container.settings.update { it.copy(exitShareHost = v.trim()) } }, "Адрес для клиентов", placeholder = "определится сам")
                 }

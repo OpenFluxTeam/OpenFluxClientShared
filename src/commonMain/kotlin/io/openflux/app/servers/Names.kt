@@ -15,6 +15,7 @@ val TransportType.title: String
         TransportType.AVITO -> "Avito Code"
         TransportType.ONEME -> "MAX"
         TransportType.DIRECT -> "Прямое подключение"
+        TransportType.FLUXFAST -> "FluxFast (UDP)"
         TransportType.SCRIPT -> "JS-транспорт"
     }
 
