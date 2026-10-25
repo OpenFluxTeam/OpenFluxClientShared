@@ -166,9 +166,7 @@ class JvmPlatformServices(
     override suspend fun installUpdate(path: String): io.openflux.desktop.model.InstallResult = withContext(Dispatchers.IO) {
         val file = File(path)
         require(file.isFile) { "Файл обновления пропал: $path" }
-        val opened = runCatching {
-            if (os.contains("linux")) ProcessBuilder("xdg-open", path).start() else Desktop.getDesktop().open(file)
-        }.isSuccess
+        val opened = openInstaller(file)
         if (!opened) return@withContext io.openflux.desktop.model.InstallResult(false, "Не удалось открыть установщик: запустите его вручную из $path")
         if (os.contains("win")) {
             // The setup program replaces the files OpenFlux runs from; the shutdown hook stops the core and the proxy.
@@ -178,6 +176,25 @@ class JvmPlatformServices(
             }.apply { isDaemon = true; start() }
         }
         io.openflux.desktop.model.InstallResult(true, DesktopUpdate.afterOpen(os))
+    }
+
+    private fun openInstaller(file: File): Boolean {
+        if (os.contains("win")) {
+            if (runCatching { ProcessBuilder(file.absolutePath).start() }.isSuccess) return true
+            val quoted = file.absolutePath.replace("'", "''")
+            return runCatching {
+                ProcessBuilder(
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    "Start-Process -FilePath '$quoted'",
+                ).start()
+            }.isSuccess
+        }
+        return runCatching {
+            if (os.contains("linux")) ProcessBuilder("xdg-open", file.absolutePath).start() else Desktop.getDesktop().open(file)
+        }.isSuccess
     }
 
     override val coreDownloadSupported: Boolean get() = true
