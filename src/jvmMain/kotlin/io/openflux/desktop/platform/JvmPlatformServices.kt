@@ -180,17 +180,10 @@ class JvmPlatformServices(
 
     private fun openInstaller(file: File): Boolean {
         if (os.contains("win")) {
-            if (runCatching { ProcessBuilder(file.absolutePath).start() }.isSuccess) return true
-            val quoted = file.absolutePath.replace("'", "''")
-            return runCatching {
-                ProcessBuilder(
-                    "powershell.exe",
-                    "-NoProfile",
-                    "-NonInteractive",
-                    "-Command",
-                    "Start-Process -FilePath '$quoted'",
-                ).start()
-            }.isSuccess
+            for (command in windowsInstallerCommands(file)) {
+                if (runCatching { ProcessBuilder(command).start() }.isSuccess) return true
+            }
+            return false
         }
         return runCatching {
             if (os.contains("linux")) ProcessBuilder("xdg-open", file.absolutePath).start() else Desktop.getDesktop().open(file)
@@ -396,3 +389,30 @@ class JvmPlatformServices(
 
 /** Passed to a copy started by restartElevated: it waits for this one to exit. */
 const val RELAUNCHED_ARG = "--relaunched"
+
+/**
+ * How to start a downloaded Windows installer, most reliable first: an `.msi`
+ * goes to `msiexec` (no file association is involved), an `.exe` starts
+ * directly, then PowerShell's `Start-Process` (ShellExecute, so a manifest
+ * that needs elevation raises UAC), then `cmd`'s `start`. Every command keeps
+ * a path with spaces as one argument.
+ */
+internal fun windowsInstallerCommands(file: File): List<List<String>> {
+    val path = file.absolutePath
+    val commands = mutableListOf<List<String>>()
+    if (file.extension.equals("msi", true)) {
+        val systemRoot = System.getenv("SystemRoot") ?: "C:\\Windows"
+        commands += listOf(File(systemRoot, "System32\\msiexec.exe").path, "/i", path)
+    } else {
+        commands += listOf(path)
+    }
+    commands += listOf(
+        "powershell.exe",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "Start-Process -FilePath '${path.replace("'", "''")}'",
+    )
+    commands += listOf("cmd.exe", "/c", "start", "", path)
+    return commands
+}
