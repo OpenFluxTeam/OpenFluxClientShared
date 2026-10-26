@@ -62,15 +62,6 @@ enum class TransportType(
         "host:port", "ic_link"),
 
     /**
-     * UDP to the exit: the datagram twin of [DIRECT]. Same address, same Session requirement; packet
-     * loss is left to the tunnel's inner TCP, and a changed client address is adopted after a path
-     * challenge instead of dropping the connection.
-     */
-    @SerialName("fluxfast")
-    FLUXFAST("fluxfast", "FluxFast (UDP до ноды)", "FluxFast", ValueKind.Address,
-        "host:port", "ic_link"),
-
-    /**
      * A JS (goja) script transport. One enum member stands for every installed
      * script; which one a carrier uses is its [ExtraTransport.scriptId]. Runs
      * through the Session path so its on-disk path and pinned author key reach
@@ -85,10 +76,10 @@ enum class TransportType(
     val shareable: Boolean get() = this != ONEME && this != SCRIPT
 
     /** The types this build can run from a link: what it tells the subscription service (X-OpenFlux-Transports). */
-    val linkable: Boolean get() = shareable && this != DIRECT && this != FLUXFAST
+    val linkable: Boolean get() = shareable && this != DIRECT
 
     /** Needs an authenticated Session: no document to meet in, or (script) params ride the Session specs. */
-    val sessionOnly: Boolean get() = this == DIRECT || this == FLUXFAST || this == SCRIPT
+    val sessionOnly: Boolean get() = this == DIRECT || this == SCRIPT
 
     companion object {
         fun fromCli(name: String): TransportType? = entries.firstOrNull { it.cliName == name }

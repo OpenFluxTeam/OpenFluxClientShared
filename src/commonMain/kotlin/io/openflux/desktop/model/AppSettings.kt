@@ -135,8 +135,6 @@ data class AppSettings(
     val exitShareHost: String = "",
     /** Exit mode: TCP port for the direct transport. */
     val exitDirectPort: Int = 8445,
-    /** Exit mode: UDP port for the fluxfast transport. */
-    val exitFluxfastPort: Int = 8446,
     /** Exit mode: how the node forwards its clients' traffic. */
     val exitBackend: ExitBackend = ExitBackend.L4,
     /**

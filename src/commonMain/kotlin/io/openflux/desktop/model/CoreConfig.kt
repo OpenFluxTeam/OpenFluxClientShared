@@ -96,7 +96,7 @@ object CoreConfig {
             appendLine("EncryptionKeyFile = ${confValue(paths.keyFile ?: error("Session requires a key"))}")
             appendLine("CookieStore = ${confValue(paths.cookieStore)}")
             // The core refuses Telemost under its TUN: the rest of the profile still connects.
-            val specs = profile.sessionSpecs().filterNot { exit && (it.type == TransportType.DIRECT || it.type == TransportType.FLUXFAST) }
+            val specs = profile.sessionSpecs().filterNot { exit && it.type == TransportType.DIRECT }
                 .filterNot { !exit && settings.fullTunnel && it.type == TransportType.TELEMOST }
             require(specs.isNotEmpty()) { TELEMOST_TUN }
             for (spec in specs) {
@@ -137,15 +137,6 @@ object CoreConfig {
                 appendLine("Type = direct")
                 appendLine("Priority = ${direct.priority}")
                 appendLine("Listen = 0.0.0.0:${settings.exitDirectPort}")
-            }
-            // FluxFast is the UDP twin of direct: the same rule, its own port.
-            val fluxfast = profile.carriers.firstOrNull { it.type == TransportType.FLUXFAST }
-            if (exit && fluxfast != null) {
-                appendLine()
-                appendLine("[Transport fluxfast]")
-                appendLine("Type = fluxfast")
-                appendLine("Priority = ${fluxfast.priority}")
-                appendLine("Listen = 0.0.0.0:${settings.exitFluxfastPort}")
             }
         }
         val args = buildList {

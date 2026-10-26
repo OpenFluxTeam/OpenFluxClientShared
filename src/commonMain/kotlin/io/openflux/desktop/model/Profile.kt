@@ -202,11 +202,10 @@ data class Profile(
         }
         require(transport.shareable) { "${transport.label} нельзя передать ссылкой: токен привязан к аккаунту" }
         val transports = carriers.filter { it.type.shareable }.map {
-            val address = it.type == TransportType.DIRECT || it.type == TransportType.FLUXFAST
             ShareTransport(
                 type = it.type.cliName,
-                url = if (address) "" else it.value.trim(),
-                dial = if (address) it.value.trim() else "",
+                url = if (it.type == TransportType.DIRECT) "" else it.value.trim(),
+                dial = if (it.type == TransportType.DIRECT) it.value.trim() else "",
                 priority = it.priority,
             )
         }
@@ -274,8 +273,8 @@ data class Profile(
                 )
             }
             val sorted = config.transports.sortedByDescending { it.priority }
-            val main = sorted.firstOrNull { it.type != TransportType.DIRECT.cliName && it.type != TransportType.FLUXFAST.cliName } ?: sorted.first()
-            fun value(t: ShareTransport) = if (t.type == TransportType.DIRECT.cliName || t.type == TransportType.FLUXFAST.cliName) t.dial else t.url
+            val main = sorted.firstOrNull { it.type != TransportType.DIRECT.cliName } ?: sorted.first()
+            fun value(t: ShareTransport) = if (t.type == TransportType.DIRECT.cliName) t.dial else t.url
             fun type(t: ShareTransport) = TransportType.fromCli(t.type)
                 ?: throw IllegalArgumentException("Неизвестный транспорт ${t.type}")
             return Profile(
