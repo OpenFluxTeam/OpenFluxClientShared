@@ -106,7 +106,7 @@ fun TransportType.blurb(): String = when (this) {
 
 /**
  * What the profile editor offers: the hosting carriers in the mode without a server, every carrier but a script in a
- * Session, and only the ones that work alone in a classic profile (Direct and FluxFast need a Session).
+ * Session, and only the ones that work alone in a classic profile (Direct needs a Session).
  */
 fun transportChoices(stream: Boolean, session: Boolean): List<TransportType> = when {
     stream -> PhpHosts.carriers

@@ -2,9 +2,6 @@ package io.openflux.app
 
 import io.openflux.app.profiles.EditMode
 import io.openflux.app.profiles.ProfileEditorModel
-import io.openflux.app.profiles.blurb
-import io.openflux.app.profiles.transportChoices
-import io.openflux.app.servers.title
 import io.openflux.desktop.model.ExtraTransport
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ProfileSource
@@ -32,19 +29,6 @@ class ProfileEditorModelTest {
         assertEquals("Нода в Нидерландах", saved.name)
         assertEquals(ProfileSource.Manual, saved.source)
         assertEquals(listOf(saved), c.profiles.profiles.value)
-    }
-
-    @Test
-    fun fluxFastIsOfferedOnlyInASession() {
-        assertTrue(TransportType.FLUXFAST in transportChoices(stream = false, session = true))
-        assertFalse(TransportType.FLUXFAST in transportChoices(stream = false, session = false))
-        assertEquals("FluxFast (UDP)", TransportType.FLUXFAST.title)
-        assertEquals("UDP до ноды: переживает смену сети", TransportType.FLUXFAST.blurb())
-        val classic = Profile(
-            id = "c", name = "C", transport = TransportType.FLUXFAST,
-            value = "203.0.113.10:8446", secret = "k".repeat(32),
-        )
-        assertTrue(classic.problems().any { "Session" in it }, "a classic FluxFast profile must be refused")
     }
 
     @Test
