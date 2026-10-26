@@ -39,7 +39,7 @@ enum class NetworkKind(val cli: String, val label: String) {
 /** One extra carrier of a Session profile. */
 @Serializable
 data class ExtraTransport(
-    val type: TransportType,
+    val type: TransportType = TransportType.VYANDEX,
     val value: String = "",
     val uid: String = "",
     val priority: Int = 50,

@@ -21,6 +21,9 @@ import java.util.UUID
 
 internal val StoreJson = Json {
     ignoreUnknownKeys = true
+    // A transport this build no longer has (FluxFast, 3.13.0-3.14.0) loads as the property's default instead of
+    // failing the whole file: a failed read would show no profiles and the next save would overwrite them.
+    coerceInputValues = true
     encodeDefaults = true
     prettyPrint = true
 }
