@@ -63,8 +63,10 @@ class CoreLinksContractTest {
         for (profile in profiles) {
             val link = codec.encode(profile.toShare().getOrThrow())
             val back = Profile.fromShare(codec.decode(link), profile.id, 0, ProfileSource.Qr)
-            // The core names the context of a Session link by its rule.
-            val context = if (profile.session) profile.value else ""
+            // The core gives a Session link the one fixed context every peer
+            // now derives (transport.KDFContexts — ContextPlaceholder "http://#"),
+            // not the document URL; a link without Session carries none.
+            val context = if (profile.session) "http://#" else ""
             assertEquals(profile.copy(context = context, source = ProfileSource.Qr), back, profile.name)
         }
     }
