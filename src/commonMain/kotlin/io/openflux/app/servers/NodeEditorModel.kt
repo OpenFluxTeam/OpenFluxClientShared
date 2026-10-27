@@ -395,7 +395,12 @@ class NodeEditorModel(
                 // values in settings untouched.
                 val value = (primary?.let { answer.client[it] }?.takeIf { it.isNotBlank() } ?: current?.value).orEmpty()
                 val clientSettings = primary?.let { answer.client - it } ?: answer.client
-                val nodeRaw = (answer.node ?: current?.nodeSettings)?.let { ns -> primary?.let { ns - it } ?: ns }
+                // The node's own primary usually equals value (the shared case above) and is dropped the same way;
+                // when an old, not-yet-scoped script's wizard gives the node a DIFFERENT primary (two accounts),
+                // toTransports' url is still the client's, so that value must survive in nodeSettings for
+                // withPackages to send - dropping it here sent the client's own value to the node instead of the
+                // one the wizard signed the node in with.
+                val nodeRaw = (answer.node ?: current?.nodeSettings)?.let { ns -> primary?.let { key -> if (ns[key] == value) ns - key else ns } ?: ns }
                 // The ends differ only when the node's settings really differ from the client's; a shared-board carrier
                 // (pruffme) answers with identical sides and stays non-split.
                 val nodeSettings = nodeRaw?.takeIf { it != clientSettings }
@@ -612,10 +617,13 @@ class NodeEditorModel(
                 ?: throw NodeWizardException("JS-транспорт ${t.script} не установлен на этом устройстве как подписанный пакет .flux")
             val bytes = container.scripts.packageBytes(t.script)?.first
                 ?: throw NodeWizardException("Пакет JS-транспорта ${installed.name.ifBlank { t.script }} не читается: переустановите его")
-            var settings = ScriptSettingsCodec.withPrimary(ScriptSettingsCodec.decode(t.params), installed.primaryParam?.key, t.url)
             // The node half a live setup page left behind (consumeNodeParams) is for a script the editor's own wizard
             // did not set up: a script that was has its node side in the draft already.
             val wizardSetUp = draft.scripts.firstOrNull { it.id == t.script }?.split == true
+            // A split script's own wizard already gave each end its right value (settings/forNode via toTransports);
+            // url is only ever the client's half of a shared primary, so once the two ends differ it must not
+            // overwrite what the node side already carries in params.
+            var settings = ScriptSettingsCodec.withPrimary(ScriptSettingsCodec.decode(t.params), installed.primaryParam?.key, if (wizardSetUp) "" else t.url)
             if (nodeParams != null && nodeParams.first == t.script && !wizardSetUp) {
                 settings = settings + nodeParams.second
             }
