@@ -60,6 +60,7 @@ import io.openflux.app.components.Brand
 import io.openflux.app.components.Chip
 import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ConfirmDialog
+import io.openflux.app.components.ConnectButton
 import io.openflux.app.components.ConnectLook
 import io.openflux.app.cosmic.CosmicSwitch
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -92,6 +93,7 @@ import io.openflux.app.theme.AppTheme
 import io.openflux.app.theme.appear
 import io.openflux.desktop.model.ConnectionMode
 import io.openflux.desktop.model.ConnectionState
+import io.openflux.desktop.model.SceneStyle
 import io.openflux.desktop.model.ExitAddress
 import io.openflux.desktop.model.InstalledScript
 import io.openflux.desktop.model.KnownServer
@@ -244,14 +246,28 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val cap = if (windowHeight > 0.dp) minOf(480.dp, windowHeight * 0.52f) else 480.dp
-        CosmicSwitch(
-            state.look(),
-            label = if (state.isActive) "Отключить" else "Подключить",
-            onClick = m::toggle,
-            modifier = Modifier.fillMaxWidth().height(minOf(maxWidth / 1.12f, cap)),
-            traffic = (kotlin.math.log10(busy + 1.0) / 7.0).toFloat(),
-            shortcut = "Ctrl+Enter",
-        )
+        val actionLabel = if (state.isActive) "Отключить" else "Подключить"
+        if (settings.sceneStyle == SceneStyle.Cosmic) {
+            CosmicSwitch(
+                state.look(),
+                label = actionLabel,
+                onClick = m::toggle,
+                modifier = Modifier.fillMaxWidth().height(minOf(maxWidth / 1.12f, cap)),
+                traffic = (kotlin.math.log10(busy + 1.0) / 7.0).toFloat(),
+                shortcut = "Ctrl+Enter",
+            )
+        } else {
+            val w = maxWidth
+            Box(Modifier.fillMaxWidth().height(minOf(w / 1.12f, cap)), contentAlignment = Alignment.Center) {
+                ConnectButton(
+                    state.look(),
+                    label = actionLabel,
+                    onClick = m::toggle,
+                    size = minOf(w * 0.78f, 300.dp),
+                    shortcut = "Ctrl+Enter",
+                )
+            }
+        }
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
         AnimatedContent(

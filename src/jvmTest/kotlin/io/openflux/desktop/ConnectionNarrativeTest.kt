@@ -45,7 +45,7 @@ class ConnectionNarrativeTest {
     fun theCommonFailuresHavePlainReasons() {
         fun why(raw: String?) = ConnectionNarrative.explainCheckFailure(raw)
         assertTrue(why("Connection refused").contains("прокси ядра"))
-        assertTrue(why("java.net.UnknownHostException: api.ipify.org").contains("DNS"))
+        assertTrue(why("java.net.UnknownHostException: icanhazip.com").contains("DNS"))
         assertTrue(why("PKIX path building failed").contains("TLS"))
         assertTrue(why("Network is unreachable").contains("маршрута"))
         assertTrue(why("неожиданный ответ").contains("не так"))

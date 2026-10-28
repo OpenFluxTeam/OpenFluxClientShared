@@ -5,6 +5,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class ThemeMode(val label: String) { System("Как в системе"), Light("Светлая"), Dark("Тёмная") }
 
+/** How the home screen's big switch looks: the OpenFlux ring (the default, like the desktop) or the full space scene. */
+@Serializable
+enum class SceneStyle(val label: String) { Ring("OpenFlux"), Cosmic("Космос") }
+
 /** Which releases "check for updates" looks at: the main ones, or also the nightly test builds. */
 @Serializable
 enum class UpdateChannel(val label: String) { Stable("Основной"), Nightly("Ночной") }
@@ -82,6 +86,7 @@ data class WindowBounds(val x: Float, val y: Float, val width: Float, val height
 @Serializable
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.System,
+    val sceneStyle: SceneStyle = SceneStyle.Ring,
     val mode: ConnectionMode = ConnectionMode.Client,
     val socksPort: Int = 1080,
     /** Point Windows (browsers and most programs) at the core's HTTP proxy while connected. */

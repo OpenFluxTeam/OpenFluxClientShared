@@ -23,7 +23,7 @@ object ConnectionNarrative {
         val via = carriers.filter { it.isNotBlank() }.joinToString(", ")
         return Narrated(
             LogLevel.Success,
-            "Канал до ноды поднят${if (via.isNotEmpty()) " (через $via)" else ""}. Проверить адрес из приложения нельзя: откройте в браузере api.ipify.org, там должен быть адрес ноды",
+            "Канал до ноды поднят${if (via.isNotEmpty()) " (через $via)" else ""}. Проверить адрес из приложения нельзя: откройте в браузере icanhazip.com, там должен быть адрес ноды",
         )
     }
 

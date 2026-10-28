@@ -579,7 +579,7 @@ class CoreConnectionService(
                     builder.proxy(HttpClient.Builder.NO_PROXY)
                 }
                 val client = builder.build()
-                val request = HttpRequest.newBuilder(URI("https://api.ipify.org")).timeout(Duration.ofSeconds(30)).build()
+                val request = HttpRequest.newBuilder(URI("https://icanhazip.com")).timeout(Duration.ofSeconds(30)).build()
                 val body = client.send(request, HttpResponse.BodyHandlers.ofString()).body().trim()
                 require(IP.matches(body)) { "неожиданный ответ" }
                 ExitAddress.Known(body)

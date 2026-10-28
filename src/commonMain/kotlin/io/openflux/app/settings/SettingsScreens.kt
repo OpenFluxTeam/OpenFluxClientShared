@@ -55,6 +55,7 @@ import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.AuthStatus
 import io.openflux.desktop.model.CoreRepos
 import io.openflux.desktop.model.CoreSource
+import io.openflux.desktop.model.SceneStyle
 import io.openflux.desktop.model.ThemeMode
 import io.openflux.desktop.model.UpdateChannel
 import io.openflux.desktop.model.UpdateState
@@ -370,6 +371,9 @@ private fun LookPage() {
     val settings by container.settings.settings.collectAsState()
     io.openflux.app.components.Group("Тема") {
         Segmented(ThemeMode.entries, settings.theme, { t -> container.settings.update { it.copy(theme = t) } }, label = { it.label })
+    }
+    io.openflux.app.components.Group("Анимация") {
+        Segmented(SceneStyle.entries, settings.sceneStyle, { s -> container.settings.update { it.copy(sceneStyle = s) } }, label = { it.label })
     }
     if (container.platform.kind == PlatformKind.Desktop) {
         Section(null) {
