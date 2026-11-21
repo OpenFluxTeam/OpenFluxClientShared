@@ -283,6 +283,7 @@ private fun NodeEditor(m: NodeEditorModel, serverId: String) {
             dismiss = "Остаться",
         )
     }
+    SignInConsentDialog(m.signInConsent)
     if (removeAsk) {
         ConfirmDialog(
             title = "Удалить ноду?",

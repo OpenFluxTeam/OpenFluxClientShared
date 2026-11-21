@@ -91,6 +91,20 @@ class NodeEditorModel(
     private var candidate: Profile? = null
     private var job: Job? = null
 
+    /** The person's yes before a sign-in first leaves for a node; the screen shows its ask (SignInConsentDialog). */
+    val signInConsent = SignInConsent(container.settings)
+
+    /**
+     * True when [cookies] are a sign-in the person has not yet agreed to hand nodes: the ask is then shown,
+     * and [again] runs on a yes.
+     */
+    private fun needsConsent(cookies: String, again: () -> Unit): Boolean {
+        val kind = signInKind(cookies) ?: return false
+        if (signInConsent.given(kind)) return false
+        signInConsent.withConsent(kind, again)
+        return true
+    }
+
     private val host: String get() = hostOf(serverId)
     /** The server's address, for the node's "address:port". */
     val serverHost: String get() = host
@@ -147,6 +161,7 @@ class NodeEditorModel(
             return
         }
         d.applyProblem(o)?.let { error = it; return }
+        if (needsConsent(cookiesFor(d), ::apply)) return
         run("Применяю на сервере…") {
             val id = installedId ?: return@run
             val ready = withRooms(d)
@@ -171,6 +186,7 @@ class NodeEditorModel(
             error = "У ноды нет транспорта Яндекса"
             return
         }
+        if (needsConsent(cookies, ::pushYandexSignIn)) return
         run("Передаю вход в Яндекс ноде…") {
             installed = pushSignIn(info, cookies)
             recordNodeSignIn(container, serverId, info.id, AccountKind.Yandex)
@@ -198,6 +214,7 @@ class NodeEditorModel(
             error = "У ноды нет транспорта Mail.ru"
             return
         }
+        if (needsConsent(cookies, ::pushMailruSignIn)) return
         run("Передаю вход в Mail.ru ноде…") {
             installed = pushSignIn(info, cookies)
             recordNodeSignIn(container, serverId, info.id, AccountKind.Mailru)
@@ -239,6 +256,7 @@ class NodeEditorModel(
 
     fun install() {
         draft.problem()?.let { error = it; return }
+        if (needsConsent(cookiesFor(draft), ::install)) return
         run("Готовлю ноду…") {
             val ch = link.call(serverId) { newChannel() }
             val ready = withRooms(draft)
