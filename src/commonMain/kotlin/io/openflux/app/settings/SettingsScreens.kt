@@ -191,10 +191,16 @@ private fun VpnPage() {
     }
     if (android) {
         Section(null) {
-            Toggle("VPN: весь трафик телефона", settings.fullTunnel, ::setFull, subtitle = "Android спросит разрешение при первом подключении")
+            // Each phone names only its own system: App Review rejects an iOS app that speaks of Android (2.3.10).
+            val ios = platform.kind == PlatformKind.Ios
+            Toggle(
+                "VPN: весь трафик телефона", settings.fullTunnel, ::setFull,
+                subtitle = if (ios) "iOS попросит добавить конфигурацию VPN при первом подключении" else "Android спросит разрешение при первом подключении",
+            )
         }
         Text(
-            if (settings.fullTunnel) "Чтобы при обрыве ничего не шло мимо, включите в настройках Android «Постоянный VPN» и «Блокировать подключения без VPN»."
+            if (settings.fullTunnel && platform.kind == PlatformKind.Ios) "Весь трафик телефона идёт через ноду. VPN включается и выключается и здесь, и в Настройках iOS → VPN."
+            else if (settings.fullTunnel) "Чтобы при обрыве ничего не шло мимо, включите в настройках Android «Постоянный VPN» и «Блокировать подключения без VPN»."
             else "Без VPN работает только прокси SOCKS5 127.0.0.1:${settings.socksPort}: через ноду идут лишь приложения, где он указан.",
             style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
         )
