@@ -74,7 +74,7 @@ fun AccountScreen() {
     LaunchedEffect(m.notice) { m.notice?.let { toaster.show(it); m.clearNotice() } }
     LaunchedEffect(buy.notice) { buy.notice?.let { toaster.show(it); buy.clearNotice() } }
     val platform = container.platform
-    ScreenScaffold(if (platform.purchasesInApp) "Подписка" else "Аккаунт OpenFlux", onBack = { navigator.back() }, actions = { TextAction("Обновить", m::refreshAll, enabled = m.busy == null) }) {
+    ScreenScaffold(if (platform.purchasesInApp) "Подписка" else if (platform.accountSignInInApp) "Аккаунт OpenFlux" else "Подключения OpenFlux", onBack = { navigator.back() }, actions = { TextAction("Обновить", m::refreshAll, enabled = m.busy == null) }) {
         OpenFluxAccountContent(
             summary = accountSummary(bot, platform.now(), platform.utcOffsetSeconds),
             bot = bot,
@@ -82,6 +82,7 @@ fun AccountScreen() {
             error = m.error,
             offsetSeconds = platform.utcOffsetSeconds,
             purchases = platform.purchasesInApp,
+            signIn = platform.accountSignInInApp,
             actions = AccountActions(
                 onSignIn = { navigator.open(Dest.Auth) },
                 onBuy = buy::open,
@@ -203,9 +204,19 @@ fun OpenFluxAccountContent(
     connectedProfileId: String? = null,
     /** PlatformServices.purchasesInApp: false shows the account's state and connections, never a way to pay. */
     purchases: Boolean = true,
+    /** PlatformServices.accountSignInInApp: false offers adding a connection link instead of signing in. */
+    signIn: Boolean = true,
 ) {
     val idle = busy == null
-    if (summary == null) {
+    if (summary == null && !signIn) {
+        Group("Подключения OpenFlux") {
+            Text(
+                "Подключение из бота OpenFlux добавляется ссылкой: ＋ → «Ключ, ссылка или файл». Аккаунт для этого не нужен.",
+                style = AppTheme.type.body, color = AppTheme.colors.textSecondary,
+            )
+        }
+        PrimaryButton("Добавить ссылку", actions.onAddLink, Modifier.fillMaxWidth())
+    } else if (summary == null) {
         Group("Аккаунт OpenFlux") {
             Text(
                 if (purchases) "Войдите, чтобы купить подписку и получить подключение. Вход по почте или через Telegram."

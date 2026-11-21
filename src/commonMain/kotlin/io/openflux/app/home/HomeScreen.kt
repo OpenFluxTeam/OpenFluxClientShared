@@ -189,8 +189,9 @@ private fun StartPanel(hasSubscription: Boolean, preparing: Boolean, botSignedIn
     }
     Text("Приступим", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
     Text("Все способы — под кнопкой ＋", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
+    val signIn = LocalAppContainer.current.platform.accountSignInInApp
     Section(null) {
-        RowItem(
+        if (signIn) RowItem(
             "Войти в аккаунт OpenFlux",
             subtitle = if (LocalAppContainer.current.platform.purchasesInApp) "По почте или через Telegram; подписка и подключение появятся сами" else "По почте или через Telegram; подключения появятся сами",
             onClick = { navigator.open(Dest.Auth) },

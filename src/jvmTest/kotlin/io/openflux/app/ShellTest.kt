@@ -47,6 +47,17 @@ class ShellTest {
     }
 
     @Test
+    fun withoutSignInNeitherHomeNorAddOffersTheAccount() = runComposeUiTest {
+        setContent { OpenFluxApp(testContainer(platform = TestPlatform().apply { accountSignInInApp = false }), NoScrollbars, Shortcuts()) }
+        onNodeWithText("Приступим").assertIsDisplayed()
+        onNodeWithText("Войти в аккаунт OpenFlux").assertDoesNotExist()
+        onNodeWithText("Ключ или ссылка").assertIsDisplayed()
+        onNodeWithContentDescription("Добавить").performClick()
+        onNodeWithText("Ключ, ссылка или файл").assertIsDisplayed()
+        onNodeWithText("Аккаунт OpenFlux").assertDoesNotExist()
+    }
+
+    @Test
     fun bottomBarFitsSmallScreen() = runComposeUiTest {
         setContent {
             val base = LocalDensity.current

@@ -97,11 +97,16 @@ private fun SettingsPage.dest(): Dest = when (this) {
 fun SettingsRoot(selected: Dest? = null) {
     val navigator = LocalNavigator.current
     val android = LocalAppContainer.current.platform.kind.isPhone
+    val signIn = LocalAppContainer.current.platform.accountSignInInApp
     ScreenScaffold("Настройки") {
         Section(null) {
             for (p in SettingsPage.entries) {
                 RowItem(
-                    if (p == SettingsPage.Vpn && android) "VPN" else p.title,
+                    when {
+                        p == SettingsPage.Vpn && android -> "VPN"
+                        p == SettingsPage.Account && !signIn -> "Подключения OpenFlux"
+                        else -> p.title
+                    },
                     leading = { Icon(p.icon, contentDescription = null, tint = AppTheme.colors.textSecondary) },
                     trailing = { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = AppTheme.colors.textMuted) },
                     selected = selected == p.dest(),

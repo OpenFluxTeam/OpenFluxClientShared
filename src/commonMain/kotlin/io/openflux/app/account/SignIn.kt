@@ -220,6 +220,11 @@ fun SignInContent(
 fun SignInScreen() {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
+    // No way in where the app may not sign in (PlatformServices.accountSignInInApp), whatever opened it.
+    if (!container.platform.accountSignInInApp) {
+        LaunchedEffect(Unit) { navigator.back() }
+        return
+    }
     val m = rememberScreenModel { SignInModel(container, it) }
     LaunchedEffect(m.ui) { if (m.ui == SignInUi.Done) navigator.back() }
     ScreenScaffold("Вход", onBack = { m.cancel(); navigator.back() }) {
