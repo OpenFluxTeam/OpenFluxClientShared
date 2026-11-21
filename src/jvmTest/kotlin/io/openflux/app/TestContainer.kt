@@ -101,6 +101,8 @@ class TestPlatform(
     override val coreVersion = "test"
     override val clientRepo = "test"
     override val systemProxySupported = false
+    /** Off as on iOS: no OpenFlux account sign-in, bot connections only as links. */
+    override var accountSignInInApp = true
     override val elevated = false
     /** What the split-tunnel picker would list. */
     var apps: List<InstalledApp> = emptyList()

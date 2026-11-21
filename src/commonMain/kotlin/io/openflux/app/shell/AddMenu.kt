@@ -25,10 +25,11 @@ enum class AddChoice(val title: String, val icon: ImageVector) {
 }
 
 @Composable
-fun AddMenu(cameraScan: Boolean, onChoice: (AddChoice) -> Unit, onDismiss: () -> Unit) {
+fun AddMenu(cameraScan: Boolean, onChoice: (AddChoice) -> Unit, onDismiss: () -> Unit, account: Boolean = true) {
     Sheet(onDismiss = onDismiss, title = "Добавить") {
         for (choice in AddChoice.entries) {
             if (choice == AddChoice.Scan && !cameraScan) continue
+            if (choice == AddChoice.Account && !account) continue
             RowItem(
                 choice.title,
                 leading = { Icon(choice.icon, contentDescription = null, tint = AppTheme.colors.textSecondary) },

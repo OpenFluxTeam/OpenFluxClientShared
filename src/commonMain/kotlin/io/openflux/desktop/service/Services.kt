@@ -303,6 +303,14 @@ interface PlatformServices {
     val purchasesInApp: Boolean get() = true
 
     /**
+     * The app may sign in to (and so create) an OpenFlux account: by email or Telegram, from Home, ＋ and the
+     * account screen. False on iOS: an account made in an app has to be deletable in it (App Store 5.1.1(v)) and a
+     * subscription bought elsewhere then needs an in-app purchase as well (3.1.3(b)). There a bot connection still
+     * comes in as a link (＋ → Ключ, ссылка или файл), which needs no account.
+     */
+    val accountSignInInApp: Boolean get() = true
+
+    /**
      * Reads a downloaded transport and returns the core's JSON trust report
      * (name, version, params, signature, fingerprint, official) without
      * running it. data is a .flux package or a bare .js; sig is the detached

@@ -61,6 +61,16 @@ class AccountScreenTest {
     }
 
     @Test
+    fun withoutSignInTheWayIsALinkNeverAnAccount() = runComposeUiTest {
+        val c = testContainer(platform = TestPlatform().apply { accountSignInInApp = false })
+        open(c)
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
+        onNodeWithText("Добавить ссылку").assertIsDisplayed()
+        onNodeWithText("Войти в аккаунт OpenFlux").assertDoesNotExist()
+        onNodeWithText("Подключения OpenFlux", ignoreCase = true).assertExists()
+    }
+
+    @Test
     fun aSignedInSubscriptionIsShownFirstNeverAsNone() = runComposeUiTest {
         val api = Api()
         val c = testContainer(bot = api)
