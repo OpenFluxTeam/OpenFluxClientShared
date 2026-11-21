@@ -167,6 +167,11 @@ data class AppSettings(
      * it changes or the node says it is signed out (see NodeSignInPolicy). Fingerprints only, never cookies.
      */
     val keepNodeSignIns: Boolean = true,
+    /**
+     * Services whose sign-in the person agreed to hand their nodes (io.openflux.app.servers.SignInConsent):
+     * asked once per service, before the first sign-in leaves for a node.
+     */
+    val nodeSignInConsent: Set<AccountKind> = emptySet(),
     val nodeSignIns: Map<String, NodeSignInRecord> = emptyMap(),
     /** The new interface's place and screens (JSON of io.openflux.app.nav.NavState), restored at the next start on the desktop. */
     val navState: String = "",

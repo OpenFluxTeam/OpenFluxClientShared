@@ -79,6 +79,8 @@ import io.openflux.app.components.Tone
 import io.openflux.app.components.ValueRow
 import io.openflux.app.nav.Dest
 import io.openflux.app.profiles.ProfileActions
+import io.openflux.app.servers.SignInConsent
+import io.openflux.app.servers.SignInConsentDialog
 import io.openflux.app.servers.isOwnNode
 import io.openflux.app.servers.serverIdOf
 import io.openflux.app.servers.title
@@ -327,6 +329,8 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
     val socks by container.connection.socksAddress.collectAsState()
     val address by container.connection.exitAddress.collectAsState()
     val android = container.platform.kind.isPhone
+    val consent = remember(container) { SignInConsent(container.settings) }
+    SignInConsentDialog(consent)
     fun copy(what: String, text: String) { container.platform.setClipboardText(text); toaster.show("$what скопирован") }
     Section(null) {
         Collapsible("Сведения") {
@@ -358,10 +362,12 @@ private fun Details(m: HomeModel, p: Profile, state: ConnectionState) {
             if (on && !traffic.live) ValueRow("Статистика", "ядро не сообщает")
             for (kind in m.pushable(p, state)) {
                 RowItem("Передать вход в ${kind.label} ноде", onClick = {
-                    scope.launch {
-                        runCatching { container.connection.pushAccountToExit(kind) }
-                            .onSuccess { toaster.show("Вход в ${kind.label} передан ноде") }
-                            .onFailure { toaster.show(it.message ?: "Не удалось передать вход") }
+                    consent.withConsent(kind) {
+                        scope.launch {
+                            runCatching { container.connection.pushAccountToExit(kind) }
+                                .onSuccess { toaster.show("Вход в ${kind.label} передан ноде") }
+                                .onFailure { toaster.show(it.message ?: "Не удалось передать вход") }
+                        }
                     }
                 })
             }

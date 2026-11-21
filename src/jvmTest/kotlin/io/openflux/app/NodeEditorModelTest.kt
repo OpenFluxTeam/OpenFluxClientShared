@@ -4,6 +4,7 @@ import io.openflux.app.nav.Dest
 import io.openflux.app.servers.NodeEditorModel
 import io.openflux.app.servers.NodeVerifier
 import io.openflux.app.servers.ServerLink
+import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.ConnectionState
 import io.openflux.desktop.model.ExitAddress
 import io.openflux.desktop.model.InstalledChannel
@@ -267,8 +268,28 @@ class NodeEditorModelTest {
         assertEquals("Сначала войдите в Яндекс: Настройки → Сервисы", m.error)
         yandexCookies = "Session_id=s; yandex_login=ivan"
         m.pushYandexSignIn(); advanceUntilIdle()
+        assertEquals(AccountKind.Yandex, m.signInConsent.asking?.kind, "the first sign-in for a node waits for the person's yes")
+        assertEquals(emptyList(), fake.cookiesSent)
+        m.signInConsent.accept(); advanceUntilIdle()
         assertEquals(listOf("Session_id=s; yandex_login=ivan"), fake.cookiesSent)
         assertNull(m.error)
+        m.pushYandexSignIn(); advanceUntilIdle()
+        assertNull(m.signInConsent.asking, "asked once per service")
+        assertEquals(2, fake.cookiesSent.size)
+    }
+
+    @Test
+    fun noYesNoSignInLeaves() = runTest {
+        installedNode()
+        val m = editor("of-x")
+        m.load(); advanceUntilIdle()
+        yandexCookies = "Session_id=s; yandex_login=ivan"
+        m.pushYandexSignIn(); advanceUntilIdle()
+        m.signInConsent.decline(); advanceUntilIdle()
+        assertEquals(emptyList(), fake.cookiesSent)
+        assertNull(m.signInConsent.asking)
+        m.pushYandexSignIn(); advanceUntilIdle()
+        assertEquals(AccountKind.Yandex, m.signInConsent.asking?.kind, "a no is asked again next time")
     }
 
     @Test
@@ -281,6 +302,8 @@ class NodeEditorModelTest {
         assertEquals("Сначала войдите в Mail.ru: Настройки → Сервисы", m.error)
         mailruCookies = "Mpop=p; t=t"
         m.pushMailruSignIn(); advanceUntilIdle()
+        assertEquals(AccountKind.Mailru, m.signInConsent.asking?.kind)
+        m.signInConsent.accept(); advanceUntilIdle()
         assertEquals(listOf("Mpop=p; t=t"), fake.cookiesSent)
         assertNull(m.error)
     }
@@ -290,6 +313,8 @@ class NodeEditorModelTest {
         val m = editor()
         m.createYandexDocument(); advanceUntilIdle()
         m.install(); advanceUntilIdle()
+        assertEquals(emptyList(), fake.cookiesSent, "nothing installs before the yes")
+        m.signInConsent.accept(); advanceUntilIdle()
         assertNull(m.error)
         assertEquals(listOf("Session_id=s; yandex_login=ivan"), fake.cookiesSent)
     }
