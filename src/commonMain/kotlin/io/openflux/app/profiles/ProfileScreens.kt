@@ -310,7 +310,11 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
         )
         Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             if (c.type == TransportType.SCRIPT && !settings.experimental) {
-                Text("Экспериментальные функции выключены: с этим транспортом профиль не подключится.", style = AppTheme.type.bodySmall, color = AppTheme.colors.warning)
+                Text(
+                    if (LocalAppContainer.current.platform.scriptsInApp) "Экспериментальные функции выключены: с этим транспортом профиль не подключится."
+                    else "JS-транспорты на этом устройстве не поддерживаются: с этим транспортом профиль не подключится.",
+                    style = AppTheme.type.bodySmall, color = AppTheme.colors.warning,
+                )
             }
             val param = script?.primaryParam
             val noField = c.type == TransportType.SCRIPT && script != null && param == null

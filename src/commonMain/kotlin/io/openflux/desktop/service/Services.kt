@@ -311,6 +311,19 @@ interface PlatformServices {
     val accountSignInInApp: Boolean get() = true
 
     /**
+     * The app may take JS transports (Settings → Экспериментальное: a catalog, adding one by link) and run them in the
+     * core. False on iOS: an App Store app may not download code that changes what it does (2.5.2), and a feature
+     * that appears after review reads as a hidden one (5.6). There only the core's own transports exist.
+     */
+    val scriptsInApp: Boolean get() = true
+
+    /**
+     * Ten taps on the version turn developer mode on. False on iOS, where a gesture that unlocks more reads as a
+     * hidden feature to App Review (5.6).
+     */
+    val developerModeInApp: Boolean get() = true
+
+    /**
      * Reads a downloaded transport and returns the core's JSON trust report
      * (name, version, params, signature, fingerprint, official) without
      * running it. data is a .flux package or a bare .js; sig is the detached

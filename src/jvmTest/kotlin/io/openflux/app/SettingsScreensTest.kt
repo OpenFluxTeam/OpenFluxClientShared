@@ -58,6 +58,25 @@ class SettingsScreensTest {
         assertEquals(true, c.settings.settings.value.developerMode)
     }
 
+    @Test
+    fun withoutDeveloperModeTheVersionIsJustText() = runComposeUiTest {
+        val c = testContainer(platform = TestPlatform().apply { developerModeInApp = false })
+        c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.SettingsPage("about")) }.snapshot().encode()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
+        repeat(10) { onNodeWithText("Версия приложения").performClick() }
+        waitForIdle()
+        assertEquals(false, c.settings.settings.value.developerMode)
+    }
+
+    @Test
+    fun withoutScriptsThereIsNoExperimentalPage() = runComposeUiTest {
+        val c = testContainer(platform = TestPlatform().apply { scriptsInApp = false })
+        c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.Settings) }.snapshot().encode()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
+        onNodeWithText("О программе").assertExists()
+        onNodeWithText("Экспериментальное").assertDoesNotExist()
+    }
+
     private fun androidPlatform(vararg installed: InstalledApp) = TestPlatform(
         kind = PlatformKind.Android,
         fullTunnelSupported = true,

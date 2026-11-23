@@ -103,6 +103,10 @@ class TestPlatform(
     override val systemProxySupported = false
     /** Off as on iOS: no OpenFlux account sign-in, bot connections only as links. */
     override var accountSignInInApp = true
+    /** Off as on iOS: no JS transports, no Settings → Экспериментальное. */
+    override var scriptsInApp = true
+    /** Off as on iOS: taps on the version unlock nothing. */
+    override var developerModeInApp = true
     override val elevated = false
     /** What the split-tunnel picker would list. */
     var apps: List<InstalledApp> = emptyList()
