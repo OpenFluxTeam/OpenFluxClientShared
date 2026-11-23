@@ -98,9 +98,11 @@ fun SettingsRoot(selected: Dest? = null) {
     val navigator = LocalNavigator.current
     val android = LocalAppContainer.current.platform.kind.isPhone
     val signIn = LocalAppContainer.current.platform.accountSignInInApp
+    val scripts = LocalAppContainer.current.platform.scriptsInApp
     ScreenScaffold("Настройки") {
         Section(null) {
             for (p in SettingsPage.entries) {
+                if (p == SettingsPage.Experimental && !scripts) continue
                 RowItem(
                     when {
                         p == SettingsPage.Vpn && android -> "VPN"
@@ -463,6 +465,11 @@ private fun LookPage() {
 private fun ExperimentalPage() {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
+    // Nothing here where the app may not take JS transports (PlatformServices.scriptsInApp), whatever opened it.
+    if (!container.platform.scriptsInApp) {
+        LaunchedEffect(Unit) { navigator.back() }
+        return
+    }
     val settings by container.settings.settings.collectAsState()
     Section(null) {
         Toggle(
@@ -487,7 +494,8 @@ private fun AboutPage() {
     val update by container.updates.state.collectAsState()
     val taps = remember(container) { VersionTaps(container.settings) }
     Section(null) {
-        RowItem("Версия приложения", subtitle = platform.appVersion, onClick = { taps.tap()?.let(toaster::show) })
+        if (platform.developerModeInApp) RowItem("Версия приложения", subtitle = platform.appVersion, onClick = { taps.tap()?.let(toaster::show) })
+        else ValueRow("Версия приложения", platform.appVersion)
         ValueRow("Ядро OpenFlux", platform.coreVersion)
         if (platform.selfUpdates) ValueRow(
             "Последний выпуск",
