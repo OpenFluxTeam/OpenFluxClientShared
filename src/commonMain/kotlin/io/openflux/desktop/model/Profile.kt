@@ -7,9 +7,9 @@ import kotlinx.serialization.Serializable
 enum class ProfileSource(val label: String) {
     Manual("Вручную"), Link("Ссылка openflux://"), Qr("QR-код"), Node("Своя нода"),
     /** A location that comes with the subscription: the app keeps it up to date and the user cannot change it. */
-    Subscription("Подписка"),
+    Subscription(SUBSCRIPTION_SOURCE_LABEL),
     /** A connection bought in the OpenFlux bot, from its short link: kept up to date like a subscription's. */
-    Bot("Бот OpenFlux"),
+    Bot(BOT_SOURCE_LABEL),
 }
 
 /** A profile of the subscription: read-only, its key and documents are not shown or shared. */

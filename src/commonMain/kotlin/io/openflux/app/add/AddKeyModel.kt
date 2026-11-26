@@ -22,6 +22,7 @@ import io.openflux.desktop.model.OpenFluxBot
 import io.openflux.desktop.service.BotAccountManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import io.openflux.app.shell.buildExtras
 
 /** What the pasted text turned out to be. */
 sealed interface KeyResult {
@@ -62,28 +63,34 @@ class AddKeyModel(private val container: AppContainer, private val scope: Corout
         source = from
         job?.cancel()
         val t = firstLine(value)
-        // Without the service (PlatformServices.serviceInApp) only a profile link is read: no key, no bot link, no request.
-        if (!container.platform.serviceInApp) {
-            // A subscription key is an openflux:// address too: it is not a profile, and is not read here.
-            val profileLink = t.startsWith(ShareLinkCodec.PREFIX) && !SubscriptionInvite.looksLike(t) && !OpenFluxBot.looksLike(t)
-            result = when {
-                t.isEmpty() -> KeyResult.Empty
-                profileLink -> KeyResult.Checking
-                else -> KeyResult.Invalid(NOT_A_PROFILE_LINK)
-            }
-            if (!profileLink) return
-            job = scope.launch {
-                delay(250) // typing, not pasting: wait for the end of it
-                result = try {
-                    KeyResult.Profile(container.shareCodec.decode(t), t)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    KeyResult.Invalid(e.message ?: "Не удалось прочитать ссылку")
-                }
-            }
+        // The service's keys and links are read by the build that has the service (BuildExtras), and only while the
+        // platform lets it: elsewhere only a profile link is read, and no request leaves.
+        val extras = buildExtras?.takeIf { container.platform.serviceInApp }
+        if (extras != null) {
+            extras.readKey(this, t)
             return
         }
+        val profileLink = t.startsWith(ShareLinkCodec.PREFIX)
+        result = when {
+            t.isEmpty() -> KeyResult.Empty
+            profileLink -> KeyResult.Checking
+            else -> KeyResult.Invalid(NOT_A_PROFILE_LINK)
+        }
+        if (!profileLink) return
+        job = scope.launch {
+            delay(250) // typing, not pasting: wait for the end of it
+            result = try {
+                KeyResult.Profile(container.shareCodec.decode(t), t)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                KeyResult.Invalid(e.message ?: "Не удалось прочитать ссылку")
+            }
+        }
+    }
+
+    /** [onText] of a build with the OpenFlux service: a subscription key and the bot's link are read too. */
+    internal fun readServiceKey(t: String) {
         result = when {
             t.isEmpty() -> KeyResult.Empty
             t.startsWith(ShareLinkCodec.PREFIX) || SubscriptionInvite.looksLike(t) || OpenFluxBot.looksLike(t) -> KeyResult.Checking
@@ -149,6 +156,12 @@ class AddKeyModel(private val container: AppContainer, private val scope: Corout
             container.settings.update { it.copy(selectedProfileId = p.id) }
             Dest.Profile(p.id)
         }
+        is KeyResult.Bot, is KeyResult.Subscription -> buildExtras?.addKey(this, r)
+        else -> null
+    }
+
+    /** [add] of what only a build with the OpenFlux service reads. */
+    internal fun addServiceKey(r: KeyResult): Dest? = when (r) {
         is KeyResult.Bot -> {
             busy = true
             scope.launch {

@@ -20,6 +20,8 @@ import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import io.openflux.app.shell.buildExtras
+import io.openflux.desktop.model.SUBSCRIPTION_SOURCE_LABEL
 import io.openflux.app.components.IconBubble
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,7 +66,6 @@ import androidx.compose.foundation.layout.height
 import io.openflux.app.components.Field
 import io.openflux.app.components.IconAction
 import io.openflux.app.components.LocalToaster
-import io.openflux.app.components.ProgressLine
 import io.openflux.app.components.RowItem
 import io.openflux.app.components.Segmented
 import io.openflux.app.servers.ExitNodeBody
@@ -74,7 +75,6 @@ import io.openflux.app.components.Section
 import io.openflux.app.components.Sheet
 import io.openflux.app.components.Status
 import io.openflux.app.components.StatusDot
-import io.openflux.app.components.TextAction
 import io.openflux.app.components.Tone
 import io.openflux.app.components.ValueRow
 import io.openflux.app.nav.Dest
@@ -134,16 +134,13 @@ fun HomeRoot() {
     val profiles by container.profiles.profiles.collectAsState()
     val settings by container.settings.settings.collectAsState()
     val state by container.connection.state.collectAsState()
-    val subscription by container.subscription.state.collectAsState()
-    val preparing by container.subscription.preparing.collectAsState()
-    val bot by container.bot.state.collectAsState()
     var picker by rememberSaveable { mutableStateOf(false) }
     val chosen = m.selected(profiles)
     ScreenScaffold(null, scroll = false) {
         if (profiles.isEmpty()) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.l)) {
                 Brand(Modifier.padding(top = AppTheme.spacing.s), large = true)
-                StartPanel(hasSubscription = subscription != null, preparing = preparing || bot.preparing, botSignedIn = bot.session != null, botNote = bot.connectionNote)
+                StartPanel()
             }
             return@ScreenScaffold
         }
@@ -165,38 +162,17 @@ fun HomeRoot() {
     }
 }
 
-/** No connections yet (spec 6): the three ways to start. */
+/** No connections yet (spec 6): the ways to start. */
 @Composable
-private fun StartPanel(hasSubscription: Boolean, preparing: Boolean, botSignedIn: Boolean = false, botNote: String? = null) {
+private fun StartPanel() {
     val navigator = LocalNavigator.current
-    if (preparing) {
-        Text("Готовим вашу локацию", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
-        ProgressLine("Обычно это минута-две, она появится здесь сама")
-        return
-    }
-    // Signed in through Telegram but nothing to connect to: say why, instead of offering to sign in again.
-    if (botNote != null) {
-        Banner(botNote, Tone.Warning, action = if (LocalAppContainer.current.platform.purchasesInApp) "Открыть подписку" else "Открыть аккаунт", onAction = { navigator.open(Dest.Account) })
-        return
-    }
-    if (botSignedIn) {
-        Banner("Вы вошли, подключения пока нет", Tone.Info, action = if (LocalAppContainer.current.platform.purchasesInApp) "Открыть подписку" else "Открыть аккаунт", onAction = { navigator.open(Dest.Account) })
-        return
-    }
-    if (hasSubscription) {
-        Banner("В подписке пока нет локаций", Tone.Info, action = if (LocalAppContainer.current.platform.purchasesInApp) "Открыть подписку" else "Открыть аккаунт", onAction = { navigator.open(Dest.Account) })
-        return
-    }
+    // The OpenFlux service's word comes first where the build has the service (BuildExtras) and the platform lets it.
+    val service = buildExtras?.takeIf { LocalAppContainer.current.platform.serviceInApp }
+    if (service != null && service.StartNotice()) return
     Text("Приступим", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
     Text("Все способы — под кнопкой ＋", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
-    val signIn = LocalAppContainer.current.platform.accountSignInInApp && LocalAppContainer.current.platform.serviceInApp
     Section(null) {
-        if (signIn) RowItem(
-            "Войти в аккаунт OpenFlux",
-            subtitle = if (LocalAppContainer.current.platform.purchasesInApp) "По почте или через Telegram; подписка и подключение появятся сами" else "По почте или через Telegram; подключения появятся сами",
-            onClick = { navigator.open(Dest.Auth) },
-        )
-        if (LocalAppContainer.current.platform.serviceInApp) RowItem("Ключ или ссылка", subtitle = "От друга или из сервиса", onClick = { navigator.open(Dest.AddKey) })
+        if (service != null) service.StartRows()
         else RowItem("Ссылка или QR-код", subtitle = "Профиль openflux:// от владельца сервера", onClick = { navigator.open(Dest.AddKey) })
         RowItem("Свой сервер", subtitle = "VDS по SSH: нода поставится сама", onClick = { navigator.open(Dest.AddServer) })
     }
@@ -210,7 +186,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     val scope = rememberCoroutineScope()
     val settings by container.settings.settings.collectAsState()
     val status by container.accounts.status.collectAsState()
-    val subscription by container.subscription.state.collectAsState()
+    val subscription = buildExtras?.subscriptionState()
     val platform = container.platform
     val exitMode = settings.mode == ConnectionMode.Exit && state.isActive
     // Read when the state or the subscription changes, not on a clock: a ticking value redraws the whole window.
@@ -264,18 +240,12 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
             action = "Войти заново",
             onAction = { scope.launch { runCatching { container.accounts.signIn(b.kind) }.onFailure { toaster.show(it.message ?: "Вход не выполнен") } } },
         )
-        is HomeBanner.Subscription -> Banner(b.look.line, Tone.Warning, action = if (container.platform.purchasesInApp) "Продлить" else "Открыть", onAction = { navigator.open(Dest.Account) })
+        is HomeBanner.Subscription -> buildExtras?.SubscriptionBanner(b)
         HomeBanner.ThisDevice -> Banner("Это устройство работает как нода", Tone.Info, action = "Открыть", onAction = { navigator.open(Dest.ThisDevice) })
         null -> Unit
     }
     // A connection from the bot that the bot no longer serves: the way to a new one.
-    val bot by container.bot.state.collectAsState()
-    if (platform.serviceInApp && chosen != null && bot.links.any { it.profileId == chosen.id && it.gone }) {
-        Banner(
-            io.openflux.desktop.service.BotAccountManager.GONE, Tone.Warning,
-            action = "Открыть бота", onAction = { platform.openUrl(io.openflux.desktop.model.OpenFluxBot.CHAT_URL) },
-        )
-    }
+    if (chosen != null) buildExtras?.takeIf { platform.serviceInApp }?.GoneLinkBanner(chosen)
     if (chosen != null && !exitMode) Details(m, chosen, state)
 }
 
@@ -402,7 +372,6 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
     val openAdd = LocalOpenAdd.current
     val navigator = LocalNavigator.current
     val state by container.connection.state.collectAsState()
-    val subscription by container.subscription.state.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
     val touch = container.platform.kind.isPhone
     val shown = if (query.isBlank()) profiles else profiles.filter { p ->
@@ -412,15 +381,7 @@ fun ConnectionList(m: HomeModel, profiles: List<Profile>, chosen: Profile?, onCh
     if (shown.isEmpty()) Text("Ничего не найдено", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
     for ((title, list) in m.groups(shown)) {
         Section(title) {
-            if (title == "Подписка") {
-                subscription?.let { sub ->
-                    val look = sub.look(container.platform.now(), container.platform.utcOffsetSeconds)
-                    RowItem(
-                        sub.title.ifBlank { "Подписка" }, subtitle = look.line,
-                        trailing = { TextAction(if (look.attention && container.platform.purchasesInApp) "Продлить" else "Открыть", { navigator.open(Dest.Account) }) },
-                    )
-                }
-            }
+            if (title == SUBSCRIPTION_SOURCE_LABEL) buildExtras?.SubscriptionGroupRow()
             for (p in list) {
                 ProfileRow(p, selected = p.id == chosen?.id, dot = profileDot(state, p.id), touch = touch, onChoose = { m.choose(p); onChosen() })
             }

@@ -11,16 +11,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import io.openflux.app.components.RowItem
+import io.openflux.desktop.model.ACCOUNT_TITLE
+import io.openflux.desktop.model.KEY_CHOICE_TITLE
 import io.openflux.app.components.Sheet
 import io.openflux.app.theme.AppTheme
 
 /** Everything new comes in through ＋ (spec 7.1). */
 enum class AddChoice(val title: String, val icon: ImageVector) {
-    Key("Ключ, ссылка или файл", Icons.Rounded.Link),
+    Key(KEY_CHOICE_TITLE, Icons.Rounded.Link),
     Scan("Сканировать QR", Icons.Rounded.QrCodeScanner),
     Server("Свой сервер", Icons.Rounded.Dns),
     Hosting("Без сервера (хостинг)", Icons.Rounded.Cloud),
-    Account("Аккаунт OpenFlux", Icons.Rounded.AccountCircle),
+    Account(ACCOUNT_TITLE, Icons.Rounded.AccountCircle),
     Manual("Вручную", Icons.Rounded.Edit),
 }
 
