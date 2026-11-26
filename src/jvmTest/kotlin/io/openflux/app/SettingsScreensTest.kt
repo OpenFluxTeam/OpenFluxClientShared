@@ -77,6 +77,16 @@ class SettingsScreensTest {
         onNodeWithText("Экспериментальное").assertDoesNotExist()
     }
 
+    @Test
+    fun withoutTheServiceThereIsNoAccountPage() = runComposeUiTest {
+        val c = testContainer(platform = TestPlatform().apply { serviceInApp = false; accountSignInInApp = false })
+        c.settings.update { it.copy(navState = AppNavigator().apply { open(Dest.Settings) }.snapshot().encode()) }
+        setContent { OpenFluxApp(c, NoScrollbars, Shortcuts()) }
+        onNodeWithText("О программе").assertExists()
+        onNodeWithText("Аккаунт OpenFlux").assertDoesNotExist()
+        onNodeWithText("Подключения OpenFlux").assertDoesNotExist()
+    }
+
     private fun androidPlatform(vararg installed: InstalledApp) = TestPlatform(
         kind = PlatformKind.Android,
         fullTunnelSupported = true,

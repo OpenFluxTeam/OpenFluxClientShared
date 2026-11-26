@@ -114,7 +114,8 @@ internal fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortc
             if (addOpen) {
                 AddMenu(
                     cameraScan = container.platform.cameraScanSupported,
-                    account = container.platform.accountSignInInApp,
+                    account = container.platform.accountSignInInApp && container.platform.serviceInApp,
+                    service = container.platform.serviceInApp,
                     onChoice = { choice ->
                         addOpen = false
                         when (choice) {

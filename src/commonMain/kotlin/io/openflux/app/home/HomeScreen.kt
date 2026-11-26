@@ -189,14 +189,15 @@ private fun StartPanel(hasSubscription: Boolean, preparing: Boolean, botSignedIn
     }
     Text("Приступим", style = AppTheme.type.screenTitle, color = AppTheme.colors.text)
     Text("Все способы — под кнопкой ＋", style = AppTheme.type.body, color = AppTheme.colors.textSecondary)
-    val signIn = LocalAppContainer.current.platform.accountSignInInApp
+    val signIn = LocalAppContainer.current.platform.accountSignInInApp && LocalAppContainer.current.platform.serviceInApp
     Section(null) {
         if (signIn) RowItem(
             "Войти в аккаунт OpenFlux",
             subtitle = if (LocalAppContainer.current.platform.purchasesInApp) "По почте или через Telegram; подписка и подключение появятся сами" else "По почте или через Telegram; подключения появятся сами",
             onClick = { navigator.open(Dest.Auth) },
         )
-        RowItem("Ключ или ссылка", subtitle = "От друга или из сервиса", onClick = { navigator.open(Dest.AddKey) })
+        if (LocalAppContainer.current.platform.serviceInApp) RowItem("Ключ или ссылка", subtitle = "От друга или из сервиса", onClick = { navigator.open(Dest.AddKey) })
+        else RowItem("Ссылка или QR-код", subtitle = "Профиль openflux:// от владельца сервера", onClick = { navigator.open(Dest.AddKey) })
         RowItem("Свой сервер", subtitle = "VDS по SSH: нода поставится сама", onClick = { navigator.open(Dest.AddServer) })
     }
 }
@@ -269,7 +270,7 @@ private fun Main(m: HomeModel, chosen: Profile?, state: ConnectionState, onPick:
     }
     // A connection from the bot that the bot no longer serves: the way to a new one.
     val bot by container.bot.state.collectAsState()
-    if (chosen != null && bot.links.any { it.profileId == chosen.id && it.gone }) {
+    if (platform.serviceInApp && chosen != null && bot.links.any { it.profileId == chosen.id && it.gone }) {
         Banner(
             io.openflux.desktop.service.BotAccountManager.GONE, Tone.Warning,
             action = "Открыть бота", onAction = { platform.openUrl(io.openflux.desktop.model.OpenFluxBot.CHAT_URL) },

@@ -53,6 +53,19 @@ class AddKeyModelTest {
     }
 
     @Test
+    fun withoutTheServiceOnlyAProfileLinkIsRead() = runTest {
+        platform.serviceInApp = false
+        val m = AddKeyModel(c, this)
+        m.onText(key); advanceUntilIdle()
+        assertEquals(AddKeyModel.NOT_A_PROFILE_LINK, assertIs<KeyResult.Invalid>(m.result).message)
+        m.onText("https://link.openflux.dev/abcDEF123"); advanceUntilIdle()
+        assertEquals(AddKeyModel.NOT_A_PROFILE_LINK, assertIs<KeyResult.Invalid>(m.result).message)
+        assertEquals(emptyList(), api.calls, "no request leaves for a key or a bot link")
+        m.onText(link("Нода друга")); advanceUntilIdle()
+        assertEquals("Нода друга", assertIs<KeyResult.Profile>(m.result).config.name)
+    }
+
+    @Test
     fun anEndedKeyCannotBeAdded() = runTest {
         api.document = SubscriptionDocument(status = SubStatus.REVOKED)
         val m = AddKeyModel(c, this)
