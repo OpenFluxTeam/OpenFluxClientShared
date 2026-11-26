@@ -62,6 +62,28 @@ class AddKeyModel(private val container: AppContainer, private val scope: Corout
         source = from
         job?.cancel()
         val t = firstLine(value)
+        // Without the service (PlatformServices.serviceInApp) only a profile link is read: no key, no bot link, no request.
+        if (!container.platform.serviceInApp) {
+            // A subscription key is an openflux:// address too: it is not a profile, and is not read here.
+            val profileLink = t.startsWith(ShareLinkCodec.PREFIX) && !SubscriptionInvite.looksLike(t) && !OpenFluxBot.looksLike(t)
+            result = when {
+                t.isEmpty() -> KeyResult.Empty
+                profileLink -> KeyResult.Checking
+                else -> KeyResult.Invalid(NOT_A_PROFILE_LINK)
+            }
+            if (!profileLink) return
+            job = scope.launch {
+                delay(250) // typing, not pasting: wait for the end of it
+                result = try {
+                    KeyResult.Profile(container.shareCodec.decode(t), t)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    KeyResult.Invalid(e.message ?: "Не удалось прочитать ссылку")
+                }
+            }
+            return
+        }
         result = when {
             t.isEmpty() -> KeyResult.Empty
             t.startsWith(ShareLinkCodec.PREFIX) || SubscriptionInvite.looksLike(t) || OpenFluxBot.looksLike(t) -> KeyResult.Checking
@@ -162,6 +184,11 @@ class AddKeyModel(private val container: AppContainer, private val scope: Corout
             }
         }
         else -> null
+    }
+
+    companion object {
+        /** What anything but a profile link is told where the app knows no service (PlatformServices.serviceInApp). */
+        const val NOT_A_PROFILE_LINK = "Это не ссылка на профиль openflux://"
     }
 
     private fun firstLine(t: String) = t.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }.orEmpty()

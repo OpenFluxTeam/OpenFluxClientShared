@@ -58,6 +58,17 @@ class ShellTest {
     }
 
     @Test
+    fun withoutTheServiceTheStartAndAddSpeakOnlyOfLinks() = runComposeUiTest {
+        setContent { OpenFluxApp(testContainer(platform = TestPlatform().apply { serviceInApp = false; accountSignInInApp = false }), NoScrollbars, Shortcuts()) }
+        onNodeWithText("Ссылка или QR-код").assertIsDisplayed()
+        onNodeWithText("От друга или из сервиса").assertDoesNotExist()
+        onNodeWithContentDescription("Добавить").performClick()
+        onNodeWithText("Ссылка или файл").assertIsDisplayed()
+        onNodeWithText("Ключ, ссылка или файл").assertDoesNotExist()
+        onNodeWithText("Аккаунт OpenFlux").assertDoesNotExist()
+    }
+
+    @Test
     fun bottomBarFitsSmallScreen() = runComposeUiTest {
         setContent {
             val base = LocalDensity.current

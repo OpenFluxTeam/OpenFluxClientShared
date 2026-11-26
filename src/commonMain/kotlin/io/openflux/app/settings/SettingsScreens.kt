@@ -103,6 +103,7 @@ fun SettingsRoot(selected: Dest? = null) {
         Section(null) {
             for (p in SettingsPage.entries) {
                 if (p == SettingsPage.Experimental && !scripts) continue
+                if (p == SettingsPage.Account && !LocalAppContainer.current.platform.serviceInApp) continue
                 RowItem(
                     when {
                         p == SettingsPage.Vpn && android -> "VPN"

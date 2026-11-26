@@ -311,6 +311,13 @@ interface PlatformServices {
     val accountSignInInApp: Boolean get() = true
 
     /**
+     * The app knows the OpenFlux service: its account screen, subscription keys, the bot's connection links, the
+     * words "подписка" and "бот". False on iOS, where the app is only a free client for one's own servers and
+     * openflux:// configs: nothing there names, opens or reaches a paid service (App Store 3.1.1, 3.1.3).
+     */
+    val serviceInApp: Boolean get() = true
+
+    /**
      * The app may take JS transports (Settings → Экспериментальное: a catalog, adding one by link) and run them in the
      * core. False on iOS: an App Store app may not download code that changes what it does (2.5.2), and a feature
      * that appears after review reads as a hidden one (5.6). There only the core's own transports exist.

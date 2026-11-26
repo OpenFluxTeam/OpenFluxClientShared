@@ -56,7 +56,7 @@ fun AddKeyScreen(scan: Boolean = false) {
         container.pendingKey.collect { k -> if (k != null) { container.pendingKey.value = null; m.onText(k) } }
     }
     ScreenScaffold(
-        "Ключ, ссылка или файл",
+        if (platform.serviceInApp) "Ключ, ссылка или файл" else io.openflux.app.shell.LINK_ONLY_TITLE,
         onBack = { navigator.back() },
         bottomBar = {
             val r = m.result
@@ -73,7 +73,8 @@ fun AddKeyScreen(scan: Boolean = false) {
             }
         },
     ) {
-        Field(m.text, { m.onText(it) }, "Ключ или ссылка", placeholder = "Ключ подписки или ссылка openflux://", singleLine = false, mono = true)
+        if (platform.serviceInApp) Field(m.text, { m.onText(it) }, "Ключ или ссылка", placeholder = "Ключ подписки или ссылка openflux://", singleLine = false, mono = true)
+        else Field(m.text, { m.onText(it) }, "Ссылка", placeholder = "openflux://…", singleLine = false, mono = true)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             SecondaryButton("Вставить", m::paste, leading = Icons.Rounded.ContentPaste)
             SecondaryButton("Файл", m::fromFile, leading = Icons.Rounded.Description)

@@ -58,6 +58,11 @@ private fun Submit(busy: String?, label: String, onClick: () -> Unit) {
 fun AccountScreen() {
     val container = LocalAppContainer.current
     val navigator = LocalNavigator.current
+    // No account screen where the app does not know the service (PlatformServices.serviceInApp), whatever opened it.
+    if (!container.platform.serviceInApp) {
+        LaunchedEffect(Unit) { navigator.back() }
+        return
+    }
     val toaster = LocalToaster.current
     val m = rememberScreenModel { SubscriptionModel(container, it) }
     val buy = rememberScreenModel { PurchaseModel(container, it) }

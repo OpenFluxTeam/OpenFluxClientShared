@@ -24,14 +24,17 @@ enum class AddChoice(val title: String, val icon: ImageVector) {
     Manual("Вручную", Icons.Rounded.Edit),
 }
 
+/** What "Ключ, ссылка или файл" is called where there are no keys of a service (PlatformServices.serviceInApp). */
+const val LINK_ONLY_TITLE = "Ссылка или файл"
+
 @Composable
-fun AddMenu(cameraScan: Boolean, onChoice: (AddChoice) -> Unit, onDismiss: () -> Unit, account: Boolean = true) {
+fun AddMenu(cameraScan: Boolean, onChoice: (AddChoice) -> Unit, onDismiss: () -> Unit, account: Boolean = true, service: Boolean = true) {
     Sheet(onDismiss = onDismiss, title = "Добавить") {
         for (choice in AddChoice.entries) {
             if (choice == AddChoice.Scan && !cameraScan) continue
             if (choice == AddChoice.Account && !account) continue
             RowItem(
-                choice.title,
+                if (choice == AddChoice.Key && !service) LINK_ONLY_TITLE else choice.title,
                 leading = { Icon(choice.icon, contentDescription = null, tint = AppTheme.colors.textSecondary) },
                 onClick = { onChoice(choice) },
             )
