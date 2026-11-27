@@ -1,5 +1,7 @@
 package io.openflux.app.home
 
+import io.openflux.app.shell.buildExtras
+import io.openflux.desktop.model.SUBSCRIPTION_SOURCE_LABEL
 import io.openflux.app.servers.isOwnNode
 import io.openflux.app.text.Fmt
 import io.openflux.desktop.model.AccountKind
@@ -85,7 +87,7 @@ class HomeModel(private val container: AppContainer) {
 
     /** The drawer's groups, in order, without empty ones. */
     fun groups(list: List<Profile>): List<Pair<String, List<Profile>>> = listOf(
-        "Подписка" to list.filter { it.managed },
+        SUBSCRIPTION_SOURCE_LABEL to list.filter { it.managed },
         "Мои серверы" to list.filter { !it.managed && it.isOwnNode },
         "Остальные" to list.filter { !it.managed && !it.isOwnNode },
     ).filter { it.second.isNotEmpty() }
@@ -114,7 +116,7 @@ class HomeModel(private val container: AppContainer) {
             return HomeBanner.NeedsAdmin
         }
         profile?.let { p -> accountAlert(p, status)?.let { return it } }
-        subscription?.look(nowMillis, platform.utcOffsetSeconds)?.takeIf { it.attention }?.let { return HomeBanner.Subscription(it) }
+        subscription?.let { buildExtras?.subscriptionLook(it, nowMillis, platform.utcOffsetSeconds) }?.takeIf { it.attention }?.let { return HomeBanner.Subscription(it) }
         if (state.isActive && settings.mode == ConnectionMode.Exit) return HomeBanner.ThisDevice
         return null
     }

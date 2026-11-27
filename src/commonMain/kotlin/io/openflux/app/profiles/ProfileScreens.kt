@@ -37,6 +37,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import io.openflux.app.shell.buildExtras
 import io.openflux.app.components.Banner
 import io.openflux.app.components.Collapsible
 import io.openflux.app.components.ConfirmDialog
@@ -149,7 +150,7 @@ fun ProfileScreen(dest: Dest.Profile) {
             if (!p.managed) SecondaryButton("Изменить", { navigator.open(Dest.ProfileEdit(p.id)) }, leading = Icons.Rounded.Edit)
             if (actions.canShare(p)) SecondaryButton("Поделиться", { navigator.open(Dest.Give(p.id)) }, leading = Icons.Rounded.Share)
         }
-        if (p.managed) Banner("Приходит с подпиской, менять его нельзя", Tone.Info, action = "Подписка", onAction = { navigator.open(Dest.Account) })
+        if (p.managed) buildExtras?.ManagedBanner(withLink = true)
         p.problems().firstOrNull()?.let { Banner(it, Tone.Danger) }
         Section("Транспорты") {
             for (c in p.carriers) {
@@ -224,7 +225,7 @@ fun ProfileEditScreen(dest: Dest.ProfileEdit) {
         actions = { if (!m.readOnly) TextAction("Сохранить", save) },
     ) {
         if (m.readOnly) {
-            Banner("Приходит с подпиской, менять его нельзя", Tone.Info)
+            buildExtras?.ManagedBanner(withLink = false)
             return@ScreenScaffold
         }
         if (m.showProblems) m.problems.firstOrNull()?.let { Banner(it, Tone.Danger) }
@@ -311,8 +312,8 @@ private fun TransportBlock(m: ProfileEditorModel, index: Int) {
         Column(Modifier.fillMaxWidth().padding(AppTheme.spacing.l), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             if (c.type == TransportType.SCRIPT && !settings.experimental) {
                 Text(
-                    if (LocalAppContainer.current.platform.scriptsInApp) "Экспериментальные функции выключены: с этим транспортом профиль не подключится."
-                    else "JS-транспорты на этом устройстве не поддерживаются: с этим транспортом профиль не подключится.",
+                    buildExtras?.takeIf { LocalAppContainer.current.platform.scriptsInApp }?.experimentalOffNote
+                        ?: "JS-транспорты на этом устройстве не поддерживаются: с этим транспортом профиль не подключится.",
                     style = AppTheme.type.bodySmall, color = AppTheme.colors.warning,
                 )
             }

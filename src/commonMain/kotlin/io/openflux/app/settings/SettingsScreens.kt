@@ -32,10 +32,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.KeyboardType
+import io.openflux.app.shell.buildExtras
+import io.openflux.desktop.model.ACCOUNT_TITLE
+import io.openflux.desktop.model.EXPERIMENTAL_TITLE
 import io.openflux.app.components.Banner
 import io.openflux.app.components.Field
 import io.openflux.app.components.LocalToaster
-import io.openflux.app.components.PrimaryButton
 import io.openflux.app.components.ProgressLine
 import io.openflux.app.components.RowItem
 import io.openflux.app.components.ScreenScaffold
@@ -49,7 +51,6 @@ import io.openflux.app.components.ValueRow
 import io.openflux.app.nav.Dest
 import io.openflux.app.nav.LocalInPane
 import io.openflux.app.shell.LocalNavigator
-import io.openflux.app.text.Fmt
 import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.AccountKind
 import io.openflux.desktop.model.AuthStatus
@@ -58,8 +59,6 @@ import io.openflux.desktop.model.CoreRepos
 import io.openflux.desktop.model.CoreSource
 import io.openflux.desktop.model.SplitTunnelMode
 import io.openflux.desktop.model.ThemeMode
-import io.openflux.desktop.model.UpdateChannel
-import io.openflux.desktop.model.UpdateState
 import io.openflux.desktop.model.isActive
 import io.openflux.desktop.model.profile
 import io.openflux.desktop.service.AccountException
@@ -73,12 +72,12 @@ import kotlinx.coroutines.launch
 enum class SettingsPage(val id: String, val title: String, val icon: ImageVector) {
     Connection("connection", "Подключение", Icons.Rounded.SwapHoriz),
     Vpn("vpn", "VPN и прокси", Icons.Rounded.Route),
-    Account("account", "Аккаунт OpenFlux", Icons.Rounded.AccountCircle),
+    Account("account", ACCOUNT_TITLE, Icons.Rounded.AccountCircle),
     Services("services", "Сервисы", Icons.Rounded.Key),
     Core("core", "Ядро", Icons.Rounded.Memory),
     Look("look", "Внешний вид", Icons.Rounded.DarkMode),
     Journal("journal", "Журнал", Icons.Rounded.ListAlt),
-    Experimental("experimental", "Экспериментальное", Icons.Rounded.Extension),
+    Experimental("experimental", EXPERIMENTAL_TITLE, Icons.Rounded.Extension),
     About("about", "О программе", Icons.Rounded.Info);
 
     companion object {
@@ -107,7 +106,7 @@ fun SettingsRoot(selected: Dest? = null) {
                 RowItem(
                     when {
                         p == SettingsPage.Vpn && android -> "VPN"
-                        p == SettingsPage.Account && !signIn -> "Подключения OpenFlux"
+                        p == SettingsPage.Account && !signIn -> buildExtras?.accountRowTitle ?: p.title
                         else -> p.title
                     },
                     leading = { Icon(p.icon, contentDescription = null, tint = AppTheme.colors.textSecondary) },
@@ -133,7 +132,7 @@ fun SettingsPageScreen(dest: Dest.SettingsPage) {
             SettingsPage.Services -> ServicesPage()
             SettingsPage.Core -> CorePage()
             SettingsPage.Look -> LookPage()
-            SettingsPage.Experimental -> ExperimentalPage()
+            SettingsPage.Experimental -> buildExtras?.ExperimentalPage()
             SettingsPage.About -> AboutPage()
             SettingsPage.Account, SettingsPage.Journal -> Unit
         }
@@ -386,53 +385,9 @@ private fun CorePage() {
     val container = LocalAppContainer.current
     val settings by container.settings.settings.collectAsState()
     val platform = container.platform
-    val scope = rememberCoroutineScope()
-    var downloading by remember { mutableStateOf(false) }
-    var result by remember { mutableStateOf<String?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var downloads by remember { mutableStateOf(0) }
-    if (platform.kind.isPhone) {
-        Section(null) { ValueRow("Встроенное ядро", platform.coreVersion) }
-    } else {
-        io.openflux.app.components.Group("Файл ядра") {
-            Segmented(CoreSource.choices, settings.coreSource, { s -> container.settings.update { it.copy(coreSource = s) } }, label = { it.label })
-        }
-        val repo = settings.coreSource.repo
-        when {
-            settings.coreSource == CoreSource.Bundled -> Section(null) { ValueRow("Встроенное ядро", platform.coreVersion) }
-            repo != null -> {
-                val source = settings.coreSource
-                val tag = remember(source, downloads) { platform.downloadedCore(source) }
-                Section(null) { ValueRow("Скачанное ядро", tag?.let { "$it · $repo" } ?: "не скачано") }
-                if (downloading) ProgressLine("Скачиваю ядро…")
-                else SecondaryButton(if (tag == null) "Скачать последний выпуск" else "Проверить и обновить", {
-                    downloading = true; error = null; result = null
-                    scope.launch {
-                        try {
-                            val got = platform.downloadCore(source)
-                            result = if (got == tag) "Уже последняя версия: $got" else "Скачано ядро $got"
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            error = e.message ?: "Не удалось скачать ядро"
-                        } finally {
-                            downloading = false
-                            downloads++
-                        }
-                    }
-                }, enabled = platform.coreDownloadSupported)
-                result?.let { Banner(it, Tone.Success) }
-                error?.let { Banner(it, Tone.Danger) }
-                Text("Выпуск из github.com/$repo, сверенный с SHA256SUMS.txt. Мастер своей ноды всегда работает со встроенным ядром.", style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary)
-            }
-            else -> {
-                Field(settings.customCorePath, { v -> container.settings.update { it.copy(customCorePath = v) } }, "Путь к файлу ядра", mono = true)
-                TextAction("Выбрать файл…", {
-                    scope.launch { platform.pickFile("Файл ядра OpenFlux", emptyList())?.let { path -> container.settings.update { it.copy(customCorePath = path) } } }
-                })
-            }
-        }
-    }
+    // Another file of the core (a download, a path) is a desktop matter, and a full build's (BuildExtras).
+    if (platform.kind.isPhone) Section(null) { ValueRow("Встроенное ядро", platform.coreVersion) }
+    else buildExtras?.CoreFile()
     io.openflux.app.components.Group("Детализация журнала ядра") {
         Segmented(listOf(0, 1, 2, 3), settings.debugLevel, { v -> container.settings.update { it.copy(debugLevel = v) } }, label = { if (it == 0) "Выкл" else "-" + "d".repeat(it) })
         Text(
@@ -463,79 +418,16 @@ private fun LookPage() {
 }
 
 @Composable
-private fun ExperimentalPage() {
-    val container = LocalAppContainer.current
-    val navigator = LocalNavigator.current
-    // Nothing here where the app may not take JS transports (PlatformServices.scriptsInApp), whatever opened it.
-    if (!container.platform.scriptsInApp) {
-        LaunchedEffect(Unit) { navigator.back() }
-        return
-    }
-    val settings by container.settings.settings.collectAsState()
-    Section(null) {
-        Toggle(
-            "Экспериментальные функции", settings.experimental, { v -> container.settings.update { it.copy(experimental = v) } },
-            subtitle = if (settings.experimental) "Включены: профили с JS-транспортом подключаются" else "Выключены: профили с JS-транспортом не подключатся",
-        )
-        if (settings.experimental) RowItem("Транспорты на JS", subtitle = "Каталог: добавить, обновить, отключить", onClick = { navigator.open(Dest.Scripts) })
-    }
-    Text(
-        "Могут работать нестабильно и меняться от версии к версии. JS-транспорт — чужой код без песочницы, с полным доступом к сети: ставьте только от авторов, которым доверяете.",
-        style = AppTheme.type.bodySmall, color = AppTheme.colors.textSecondary,
-    )
-}
-
-@Composable
 private fun AboutPage() {
-    val container = LocalAppContainer.current
-    val toaster = LocalToaster.current
-    val scope = rememberCoroutineScope()
-    val platform = container.platform
-    val settings by container.settings.settings.collectAsState()
-    val update by container.updates.state.collectAsState()
-    val taps = remember(container) { VersionTaps(container.settings) }
+    val platform = LocalAppContainer.current.platform
+    // The version's taps, the app's own updates and the support chat are a full build's (BuildExtras).
+    val extras = buildExtras
     Section(null) {
-        if (platform.developerModeInApp) RowItem("Версия приложения", subtitle = platform.appVersion, onClick = { taps.tap()?.let(toaster::show) })
-        else ValueRow("Версия приложения", platform.appVersion)
+        if (extras != null) extras.AboutVersionRow() else ValueRow("Версия приложения", platform.appVersion)
         ValueRow("Ядро OpenFlux", platform.coreVersion)
-        if (platform.selfUpdates) ValueRow(
-            "Последний выпуск",
-            when (val u = update) {
-                UpdateState.Checking -> "проверяю…"
-                UpdateState.UpToDate -> "у вас последняя версия"
-                is UpdateState.Available -> u.release.version
-                is UpdateState.Downloading -> "скачиваю ${u.release.version}…"
-                is UpdateState.Installing -> "${u.release.version}: установка"
-                is UpdateState.Failed -> u.message
-                UpdateState.Idle -> if (settings.updateCheckedAt == 0L) "не проверялось" else "проверено ${Fmt.ago(platform.now() - settings.updateCheckedAt)}"
-            },
-        )
+        extras?.AboutReleaseRow()
     }
-    // A store updates the app where it does not update itself (iOS): no checking, downloading or channel here.
-    if (platform.selfUpdates) {
-        val offered = update as? UpdateState.Available
-        if (offered != null) PrimaryButton("Обновить до ${offered.release.version}", container.updates::install, Modifier.fillMaxWidth())
-        SecondaryButton("Проверить обновления", {
-            scope.launch {
-                container.updates.check(manual = true)
-                if (container.updates.state.value == UpdateState.UpToDate) toaster.show("У вас последняя версия")
-            }
-        }, Modifier.fillMaxWidth())
-        Section(null) {
-            Toggle("Проверять обновления автоматически", settings.autoUpdate, { v -> container.settings.update { it.copy(autoUpdate = v) } }, subtitle = "Раз в несколько часов. Обновления ставятся только с вашего согласия")
-        }
-        if (settings.developerMode) {
-            io.openflux.app.components.Group("Канал обновлений") {
-                Segmented(UpdateChannel.entries, settings.updateChannel, { c -> container.settings.update { it.copy(updateChannel = c) } }, label = { it.label })
-            }
-        }
-    }
-    if (settings.developerMode) {
-        Section(null) { Toggle("Режим разработчика", true, { on -> container.settings.update { it.copy(developerMode = on) } }) }
-    }
-    platform.supportUrl?.let { url ->
-        Section(null) { RowItem("Поддержка", subtitle = "Чат в Telegram: вопросы, проблемы с подключением", onClick = { platform.openUrl(url) }) }
-    }
+    extras?.AboutControls()
     Section("Исходный код") {
         RowItem("Исходный код ядра", subtitle = "github.com/${CoreRepos.OFFICIAL}", onClick = { platform.openUrl("https://github.com/${CoreRepos.OFFICIAL}") })
         RowItem("Это приложение", subtitle = "github.com/${platform.clientRepo}", onClick = { platform.openUrl("https://github.com/${platform.clientRepo}") })

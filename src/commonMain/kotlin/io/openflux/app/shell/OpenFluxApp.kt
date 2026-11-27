@@ -57,8 +57,7 @@ fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shor
 internal fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortcuts: Shortcuts, browsers: BrowserViews, link: ServerLink?) {
     val settings by container.settings.settings.collectAsState()
     // The app's own updates; the script transports' updates only with the experimental features on.
-    LaunchedEffect(Unit) { container.updates.start() }
-    LaunchedEffect(settings.experimental) { if (settings.experimental) runCatching { container.scriptUpdater.autoCheck() } }
+    buildExtras?.Background(container, settings.experimental)
     val dark = when (settings.theme) {
         ThemeMode.System -> isSystemInDarkTheme()
         ThemeMode.Light -> false
@@ -101,7 +100,7 @@ internal fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortc
             Box(Modifier.fillMaxSize()) {
                 Shell(navigator, onAdd = { addOpen = true }) { wide ->
                     androidx.compose.foundation.layout.Column {
-                        UpdateLine()
+                        buildExtras?.UpdateBanner()
                         AppNavHost(navigator, wide, androidx.compose.ui.Modifier.weight(1f), nothingChosen = { NothingChosen(it) }) { appEntry(it, navigator) }
                     }
                 }
@@ -124,10 +123,7 @@ internal fun OpenFluxApp(container: AppContainer, scrollbars: Scrollbars, shortc
                             AddChoice.Manual -> navigator.open(Dest.ProfileEdit())
                             AddChoice.Key -> navigator.open(Dest.AddKey)
                             AddChoice.Scan -> navigator.open(Dest.Scan)
-                            AddChoice.Account -> {
-                                val signedIn = container.bot.state.value.session != null
-                                navigator.open(if (signedIn) Dest.Account else Dest.Auth)
-                            }
+                            AddChoice.Account -> buildExtras?.openAccount(container, navigator)
                         }
                     },
                     onDismiss = { addOpen = false },

@@ -34,10 +34,10 @@ import io.openflux.app.servers.isOwnNode
 import io.openflux.app.servers.title
 import io.openflux.app.shell.LocalNavigator
 import io.openflux.app.shell.rememberScreenModel
-import io.openflux.app.text.Fmt
 import io.openflux.app.theme.AppTheme
 import io.openflux.desktop.model.Profile
-import io.openflux.desktop.model.SubStatus
+import io.openflux.app.shell.buildExtras
+import io.openflux.desktop.model.KEY_CHOICE_TITLE
 import io.openflux.desktop.model.TransportType
 import io.openflux.desktop.model.managed
 import io.openflux.desktop.service.LocalAppContainer
@@ -52,11 +52,13 @@ fun AddKeyScreen(scan: Boolean = false) {
     val navigator = LocalNavigator.current
     val m = rememberScreenModel { AddKeyModel(container, it).also { k -> if (scan) k.fromQr() } }
     val platform = container.platform
+    // The service's keys, links and words come from the build that has it (BuildExtras), while the platform lets it.
+    val service = buildExtras?.takeIf { platform.serviceInApp }
     LaunchedEffect(m) {
         container.pendingKey.collect { k -> if (k != null) { container.pendingKey.value = null; m.onText(k) } }
     }
     ScreenScaffold(
-        if (platform.serviceInApp) "Ключ, ссылка или файл" else io.openflux.app.shell.LINK_ONLY_TITLE,
+        if (service != null) KEY_CHOICE_TITLE else io.openflux.app.shell.LINK_ONLY_TITLE,
         onBack = { navigator.back() },
         bottomBar = {
             val r = m.result
@@ -64,7 +66,7 @@ fun AddKeyScreen(scan: Boolean = false) {
             if (ok) {
                 androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().padding(AppTheme.spacing.page)) {
                     PrimaryButton(
-                        if (r is KeyResult.Subscription) "Подключить подписку" else "Добавить профиль",
+                        service?.keyButton(r) ?: "Добавить профиль",
                         { m.add()?.let(navigator::replaceTop) },
                         Modifier.fillMaxWidth(),
                         enabled = !m.busy,
@@ -73,7 +75,7 @@ fun AddKeyScreen(scan: Boolean = false) {
             }
         },
     ) {
-        if (platform.serviceInApp) Field(m.text, { m.onText(it) }, "Ключ или ссылка", placeholder = "Ключ подписки или ссылка openflux://", singleLine = false, mono = true)
+        if (service != null) service.KeyField(m)
         else Field(m.text, { m.onText(it) }, "Ссылка", placeholder = "openflux://…", singleLine = false, mono = true)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.s), verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.s)) {
             SecondaryButton("Вставить", m::paste, leading = Icons.Rounded.ContentPaste)
@@ -89,30 +91,7 @@ fun AddKeyScreen(scan: Boolean = false) {
                 ValueRow("Транспорты", r.config.transports.mapNotNull { TransportType.fromCli(it.type)?.title }.distinct().joinToString(", ").ifEmpty { "—" })
                 ValueRow("Шифрование", if (r.config.secret.isNotEmpty()) "AES-256-GCM" else "нет ключа")
             }
-            is KeyResult.Bot -> Section("Подключение из бота OpenFlux") {
-                ValueRow("Название", r.connection.name.ifBlank { "OpenFlux" })
-                ValueRow("Обновление", "само, пока подключение действует в боте")
-            }
-            is KeyResult.Subscription -> {
-                val doc = r.preview.document
-                val offset = platform.utcOffsetSeconds
-                Section("Подписка") {
-                    ValueRow("Название", doc.title.ifBlank { r.preview.invite.name.ifBlank { "Подписка" } })
-                    ValueRow(
-                        "Срок",
-                        when {
-                            doc.status == SubStatus.REVOKED -> "доступ отключён"
-                            doc.status == SubStatus.EXPIRED -> "истёк" + if (doc.expires > 0) " ${Fmt.date(doc.expires, offset)}" else ""
-                            doc.expires == 0L -> "без ограничения"
-                            else -> "до ${Fmt.date(doc.expires, offset)}"
-                        },
-                    )
-                    if (doc.profiles.isNotEmpty()) ValueRow("Локации", doc.profiles.joinToString(", ") { it.name })
-                }
-                if (!r.canAdd) Banner("По этому ключу подключиться нельзя: срок истёк или доступ отключён", Tone.Warning)
-                val current = container.subscription.state.collectAsState().value
-                if (current != null && r.canAdd) Banner("Новая подписка заменит ту, что есть на этом устройстве", Tone.Info)
-            }
+            is KeyResult.Bot, is KeyResult.Subscription -> service?.KeyPreview(r)
         }
     }
 }
@@ -128,7 +107,7 @@ fun ShareRoot() {
     ScreenScaffold("Поделиться") {
         if (shareable.isEmpty()) {
             Text(
-                "Пока нечем делиться. Поставьте свою ноду в «Серверах» или добавьте подключение через ＋. Локациями подписки делиться нельзя.",
+                buildExtras?.takeIf { container.platform.serviceInApp }?.nothingToShare ?: "Пока нечем делиться. Поставьте свою ноду в «Серверах» или добавьте подключение через ＋.",
                 style = AppTheme.type.body, color = AppTheme.colors.textSecondary,
             )
             return@ScreenScaffold

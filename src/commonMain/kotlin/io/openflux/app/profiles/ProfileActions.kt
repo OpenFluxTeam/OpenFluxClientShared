@@ -44,7 +44,7 @@ class ProfileActions(private val container: AppContainer) {
 
     /** The link the core makes for [p], or why it cannot be shared. */
     suspend fun link(p: Profile): Result<String> {
-        if (p.managed) return Result.failure(IllegalStateException("Локациями подписки делиться нельзя"))
+        if (p.managed) return Result.failure(IllegalStateException(io.openflux.app.shell.buildExtras?.managedShareRefusal.orEmpty()))
         val config = p.toShare().getOrElse { return Result.failure(it) }
         return try {
             Result.success(container.shareCodec.encode(config))

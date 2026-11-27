@@ -4,11 +4,8 @@ import androidx.navigation3.runtime.NavEntry
 import io.openflux.app.add.AddKeyScreen
 import io.openflux.app.add.GiveScreen
 import io.openflux.app.add.ShareRoot
-import io.openflux.app.account.AccountScreen
-import io.openflux.app.account.SignInScreen
 import io.openflux.app.home.HomeRoot
 import io.openflux.app.settings.JournalScreen
-import io.openflux.app.settings.ScriptsScreen
 import io.openflux.app.settings.SettingsPageScreen
 import io.openflux.app.settings.SettingsRoot
 import io.openflux.app.settings.SplitTunnelAppsScreen
@@ -45,12 +42,11 @@ fun appEntry(dest: Dest, navigator: AppNavigator): NavEntry<Dest> = when (dest) 
     Dest.NewHosting -> destEntry(dest) { NewHostingScreen() }
     is Dest.Hosting -> destEntry(dest, ListDetail.detail(Section.Servers)) { HostingScreen(dest) }
     Dest.ThisDevice -> destEntry(dest, ListDetail.detail(Section.Servers)) { ThisDeviceScreen() }
-    Dest.Auth -> destEntry(dest) { SignInScreen() }
-    Dest.Account -> destEntry(dest, ListDetail.detail(Section.Settings)) { AccountScreen() }
+    // Screens only a full build has come through BuildExtras, so that a build without them does not carry them.
+    Dest.Auth, Dest.Account, Dest.Scripts -> buildExtras?.entry(dest, navigator) ?: placeholderEntry(dest, navigator)
     Dest.Settings -> destEntry(dest, ListDetail.list(Section.Settings)) { SettingsRoot(selected = navigator.stack(Section.Settings).last()) }
     is Dest.SettingsPage -> destEntry(dest, ListDetail.detail(Section.Settings)) { SettingsPageScreen(dest) }
     Dest.Logs -> destEntry(dest, ListDetail.detail(Section.Settings)) { JournalScreen() }
     Dest.SplitTunnelApps -> destEntry(dest, ListDetail.detail(Section.Settings)) { SplitTunnelAppsScreen() }
-    Dest.Scripts -> destEntry(dest) { ScriptsScreen() }
     else -> placeholderEntry(dest, navigator)
 }

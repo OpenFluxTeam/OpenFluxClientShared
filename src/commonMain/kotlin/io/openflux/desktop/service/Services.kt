@@ -29,9 +29,6 @@ import io.openflux.desktop.model.ShareLinkCodec
 import io.openflux.desktop.model.TrafficStats
 import io.openflux.desktop.model.YandexDocument
 import io.openflux.app.platform.BrowserPage
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -479,31 +476,39 @@ class AppContainer(
     /** Installed JS script transports; in-memory no-op unless the platform ships one. */
     val scripts: ScriptRepository = InMemoryScriptRepository(),
     /** The subscription service client and where the subscription is kept; none unless the platform ships them. */
-    val subscriptionApi: SubscriptionApi = NoSubscriptionApi,
-    val subscriptionRepo: SubscriptionRepository = InMemorySubscriptionRepository(),
+    subscriptionApi: SubscriptionApi? = null,
+    subscriptionRepo: SubscriptionRepository? = null,
     /** The OpenFlux bot's API and where its session and connections are kept. */
-    val botApi: BotApi = NoBotApi,
-    val botRepo: BotRepository = InMemoryBotRepository(),
-    val signIn: SignInSupport = NoSignIn,
+    botApi: BotApi? = null,
+    botRepo: BotRepository? = null,
+    signIn: SignInSupport? = null,
     /** Shows a script's settings page in the platform's built-in browser. */
     settingsPageHost: SettingsPageHost = NoSettingsPageHost,
 ) {
+    // The OpenFlux service, the script transports' updates and the app's own are a full build's: they are made
+    // through ServiceExtras, so a build without them (iOS) carries none of their code. Nothing asks for them there.
+    private fun extras(): ServiceExtras = serviceExtras ?: error("this build has no OpenFlux service, script updates or app updates")
+
+    val subscriptionApi: SubscriptionApi by lazy { subscriptionApi ?: extras().noSubscriptionApi }
+    val subscriptionRepo: SubscriptionRepository by lazy { subscriptionRepo ?: extras().newSubscriptionRepo() }
+    val botApi: BotApi by lazy { botApi ?: extras().noBotApi }
+    val botRepo: BotRepository by lazy { botRepo ?: extras().newBotRepo() }
+    val signIn: SignInSupport by lazy { signIn ?: extras().noSignIn }
+
     /** Accounts, the subscription document and its profiles. */
-    val subscription: SubscriptionManager by lazy {
-        SubscriptionManager(subscriptionApi, subscriptionRepo, profiles, shareCodec, platform, connection, io.openflux.desktop.model.ServiceDefaults.endpoint)
-    }
+    val subscription: SubscriptionManager by lazy { extras().subscription(this) }
 
     /** The OpenFlux bot: its connection links as profiles, and its subscription after a Telegram sign-in. */
-    val bot: BotAccountManager by lazy { BotAccountManager(botApi, botRepo, profiles, shareCodec, platform, connection, accounts) }
+    val bot: BotAccountManager by lazy { extras().bot(this) }
 
     /** The "Настройки" of an installed script transport (its wizard page, saved with the script). */
     val scriptSettings: ScriptSettingsService by lazy { ScriptSettingsService(scripts, platform, settingsPageHost) }
 
     /** Checks installed script transports for updates and applies them. */
-    val scriptUpdater: ScriptUpdater by lazy { ScriptUpdater(scripts, platform, settings) }
+    val scriptUpdater: ScriptUpdater by lazy { extras().scriptUpdater(this) }
 
     /** The app's own updates from its GitHub releases. */
-    val updates: AppUpdates by lazy { AppUpdates(platform, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default)) }
+    val updates: AppUpdates by lazy { extras().updates(this) }
 
     /** An `openflux://` link opened from outside (a scanned code, a chat); the Profiles screen imports it. */
     val incomingLink = MutableStateFlow<String?>(null)
